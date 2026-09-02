@@ -1,0 +1,7 @@
+**
+!Dockerfile
+!Dockerfile.amd64
+!requirements.lock
+!requirements.amd64.lock
+!worker.py
+!worker.amd64.py

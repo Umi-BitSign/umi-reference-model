@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools==80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "umi-reference-model"
+version = "0.1.0"
+description = "Skeletal ASL-to-English reference model for UMI miner component tests"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+license = "Apache-2.0"
+dependencies = [
+  "numpy==2.3.5",
+  "rfc8785==0.1.4",
+  "safetensors==0.8.0",
+  "torch==2.7.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest==8.4.2",
+  "ruff==0.12.12",
+]
+
+[project.scripts]
+umi-reference-backend = "bitsign_motion.umi_reference_backend:main"
+umi-build-local-extractor = "bitsign_motion.local_extractor_release:main"
+umi-rebind-local-extractor = "bitsign_motion.local_bundle_rebind:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["bitsign_motion*"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "RUF"]
+
+[tool.ruff.format]
+quote-style = "double"

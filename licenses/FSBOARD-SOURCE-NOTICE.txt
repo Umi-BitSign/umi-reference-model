@@ -1,0 +1,4 @@
+Copyright 2025 Google
+
+The daun_v3 and dmk_v3 datasets are licensed under CC BY 4.0
+https://creativecommons.org/licenses/by/4.0/

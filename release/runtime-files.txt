@@ -1,0 +1,27 @@
+# Frozen source closure for portable revision
+# a4fcd32ebb108afeadb36c338607e162998e20e1a593c1b3da75a3ee4d74bb99.
+src/bitsign_motion/__init__.py
+src/bitsign_motion/amd64_holistic_container.py
+src/bitsign_motion/canonical.py
+src/bitsign_motion/constants.py
+src/bitsign_motion/holistic_container.py
+src/bitsign_motion/holistic_motion.py
+src/bitsign_motion/mediapipe_mapping.py
+src/bitsign_motion/motion_artifact.py
+src/bitsign_motion/portable_model.py
+src/bitsign_motion/s1_decode_tokenizer.py
+src/bitsign_motion/s1_portable_runtime.py
+src/bitsign_motion/s1_state_digest.py
+src/bitsign_motion/umi_reference_backend.py
+docker/mediapipe-holistic/.dockerignore
+docker/mediapipe-holistic/Dockerfile
+docker/mediapipe-holistic/Dockerfile.amd64
+docker/mediapipe-holistic/requirements.lock
+docker/mediapipe-holistic/requirements.amd64.lock
+docker/mediapipe-holistic/worker.py
+docker/mediapipe-holistic/worker.amd64.py
+tests/__init__.py
+tests/test_holistic_motion.py
+tests/test_mediapipe_mapping.py
+tests/test_s1_portable_runtime.py
+tests/test_umi_release_e2e.py
