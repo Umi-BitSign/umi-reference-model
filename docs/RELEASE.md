@@ -7,8 +7,9 @@ does not activate UMI translation weights or establish useful ASL translation.
 The release history has three commits:
 
 1. commit A contains the tested source, base model ZIP, three pre-E2E aggregate
-   evidence files, and six license companions;
-2. commit B is the sole child of A and adds only the public E2E evidence file;
+   evidence files, and six license companions; an unpublished reseal may also
+   retain the prior generated artifacts at A;
+2. commit B is the sole child of A and changes only the public E2E evidence file;
 3. commit C is the sole child of B and changes only `release/release-manifest.json`
    and `release/SHA256SUMS`.
 
@@ -135,9 +136,11 @@ must be clean. Record its full commit as `UMI_GIT_REVISION`.
 )
 ```
 
-Commit all reviewed source and release inputs except the public E2E evidence and the
-two generated metadata files. This is commit A. If metadata from an earlier release
-is already tracked, it may remain at A; commit C will replace it.
+Commit all reviewed source and release inputs without regenerating the two metadata
+files. This is commit A. For an initial seal, the public E2E evidence and metadata
+are absent at A. When resealing the same release ID before it has been published,
+the prior tracked E2E evidence and metadata may remain at A; commits B and C replace
+them respectively. Never reuse a published release ID.
 
 ```bash
 git status --short
@@ -148,7 +151,9 @@ A="$(git rev-parse HEAD)"
 UMI_GIT_REVISION="$(git -C ../umi rev-parse HEAD)"
 test -z "$(git status --porcelain=v1 --untracked-files=all)"
 test -z "$(git -C ../umi status --porcelain=v1 --untracked-files=all)"
-test ! -e release/umi-s1-baseline-v0-release-e2e-evidence.json
+test ! -e release/umi-s1-baseline-v0-release-e2e-evidence.json ||
+  git ls-files --error-unmatch \
+    release/umi-s1-baseline-v0-release-e2e-evidence.json >/dev/null
 ```
 
 Any runtime, model, evidence, dependency, or extractor-source change after A requires
@@ -278,13 +283,19 @@ The outer inference, admission, and lifecycle timeouts are fixed by the test at 
 must contain the exact `150/180/10/60` timeout tuple. A skipped test is not a pass.
 The private report must be mode `0600` and remain outside the repository.
 
-Project the sealed private run to its aggregate public record:
+Project the sealed private run to a new temporary aggregate record, then install it
+at the fixed release path. The temporary path must be outside the repository and
+must not already exist:
 
 ```bash
+PUBLIC_E2E_STAGING=/absolute/owner-only/e2e/public-release-e2e.json
+test ! -e "$PUBLIC_E2E_STAGING"
 uv run --frozen --extra dev python -m bitsign_motion.s1_release_evidence \
   release-e2e \
   --run-report "$BITSIGN_UMI_RELEASE_E2E_REPORT" \
-  --output release/umi-s1-baseline-v0-release-e2e-evidence.json
+  --output "$PUBLIC_E2E_STAGING"
+install -m 0644 "$PUBLIC_E2E_STAGING" \
+  release/umi-s1-baseline-v0-release-e2e-evidence.json
 ```
 
 The public record must name A as `tested_reference_model_git_revision`, bind the exact
@@ -294,7 +305,8 @@ response material, and fixture identity.
 
 ## 5. Commit B and generate commit C
 
-Commit only the new public E2E evidence file. This is commit B:
+Commit only the public E2E evidence file. It may be new for an initial seal or
+modified for an unpublished reseal. This is commit B:
 
 ```bash
 A="$(
@@ -303,10 +315,12 @@ A="$(
 )"
 test "$(git rev-parse HEAD)" = "$A"
 git add release/umi-s1-baseline-v0-release-e2e-evidence.json
-test "$(git status --porcelain=v1 --untracked-files=all)" = \
-  "A  release/umi-s1-baseline-v0-release-e2e-evidence.json"
+test "$(git diff --cached --name-only)" = \
+  "release/umi-s1-baseline-v0-release-e2e-evidence.json"
+test -z "$(git diff --name-only)"
+test -z "$(git ls-files --others --exclude-standard)"
 git diff --cached --check
-git commit -m "Add UMI S1 release E2E evidence"
+git commit -m "Record UMI S1 release E2E evidence"
 B="$(git rev-parse HEAD)"
 test "$(git rev-parse HEAD^)" = "$A"
 test -z "$(git status --porcelain=v1 --untracked-files=all)"
