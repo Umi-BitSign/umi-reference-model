@@ -7,6 +7,7 @@ import importlib.metadata
 import json
 import os
 import platform
+import re
 import stat
 import subprocess
 import tomllib
@@ -25,6 +26,10 @@ _UMI_ADMISSION_TIMEOUT_SECONDS = 10
 _UMI_LIFECYCLE_TIMEOUT_SECONDS = 60
 _RESPONSE_WINDOW_ROUNDS = 80
 _REVEAL_WAIT_TIMEOUT_SECONDS = 300
+_PACKAGED_NUMERIC_VERSION = re.compile(
+    r"(?P<core>[0-9]{1,4}(?:\.[0-9]{1,4}){1,3})"
+    r"(?:[+~_-][0-9A-Za-z.+~_-]+)?"
+)
 
 pytestmark = pytest.mark.skipif(
     os.environ.get("BITSIGN_RUN_UMI_RELEASE_E2E") != "1",
@@ -249,7 +254,10 @@ def _docker_version(docker: str) -> str:
     )
     client, separator, server = result.stdout.strip().partition("|")
     assert separator and client and server
-    return f"client={client};server={server}"
+    client_match = _PACKAGED_NUMERIC_VERSION.fullmatch(client)
+    server_match = _PACKAGED_NUMERIC_VERSION.fullmatch(server)
+    assert client_match is not None and server_match is not None
+    return f"client={client_match.group('core')};server={server_match.group('core')}"
 
 
 def _write_private_report(
