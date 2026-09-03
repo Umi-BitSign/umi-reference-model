@@ -9,8 +9,9 @@ import platform
 import shutil
 import stat
 import tempfile
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from fractions import Fraction
 from pathlib import Path
 from typing import Any, Final, cast
 
@@ -71,20 +72,49 @@ S1_PORTABLE_MANIFEST_SCHEMA: Final = "umi-s1-portable-manifest/1"
 S1_PORTABLE_CONFIG_SCHEMA: Final = "umi-s1-portable-config/1"
 S1_PORTABLE_PREPROCESSING_SCHEMA: Final = "umi-s1-preprocessing-contract/1"
 S1_PORTABLE_RIGHTS_SCHEMA: Final = "umi-s1-portable-rights/1"
+S1_PORTABLE_MULTI_SOURCE_RIGHTS_SCHEMA: Final = "umi-s1-portable-multi-source-rights/1"
 S1_PORTABLE_TENSOR_SCHEMA: Final = "umi-s1-portable-tensors/1"
 S1_TEXT_POSTPROCESS_SCHEMA: Final = "umi-s1-text-postprocess/1"
 S1_RAW_TEXT_POSTPROCESS_REVISION: Final = "raw-tokenizer-output/1"
 S1_WORD_PREFIX_SELECTION_SCHEMA: Final = "umi-s1-word-prefix-selection/1"
 S1_VALIDATION_WORD_PREFIX_REVISION: Final = "validation-whitespace-word-prefix/1"
+S1_AUTHORITY_WORD_PREFIX_REVISION: Final = "training-authority-whitespace-word-prefix/1"
+S1_EXPERIMENT_BOOTSTRAP_CLAIM_PROFILE: Final = (
+    "fleurs-prefix-contrastive050-epoch8-validation-only/1"
+)
+S1_PUBLIC_FINETUNE_CLAIM_PROFILE: Final = "public-s1-finetune/1"
 S1_PORTABLE_MODEL_CLASS: Final = "bitsign_motion.portable_model.PortableS1"
 S1_PORTABLE_RUNTIME_REVISION: Final = "s1-pytorch-beam-runtime/1"
 S1_PORTABLE_BEAM_WIDTH: Final = 2
 S1_PORTABLE_MAXIMUM_DECODE_TOKENS: Final = 24
 S1_PORTABLE_NO_REPEAT_NGRAM_SIZE: Final = 3
 
+_EXPERIMENT_BOOTSTRAP_MODEL_STATE_SHA256: Final = (
+    "137b2733af1803d853a87396c31e5332f4170a4b5c5beffdfb246c60bb681521"
+)
+_EXPERIMENT_BOOTSTRAP_RELEASE_IDENTITY_SHA256: Final = (
+    "48292a46e555bf4a1cb63788d3d4b78a7e8fb4c4d99cc67d68bd37aa12ddc9b3"
+)
+_EXPERIMENT_BOOTSTRAP_TOKENIZER_MODEL_SHA256: Final = (
+    "7d8abdec60dab3a2a1969c1a7f194bdaa26f4c23884b23a204365b1535cf6783"
+)
+_EXPERIMENT_BOOTSTRAP_TOKENIZER_RECORD_SHA256: Final = (
+    "eaaa5055b60f756c4e93befbec725344bfd3395da7d84a5ae2da78d3d24f57c0"
+)
+_EXPERIMENT_BOOTSTRAP_RIGHTS_SHA256: Final = (
+    "adc1dc03f23568498759d2f14c35b55969973d2c1a7d43164ef03d2a77850634"
+)
+
 _IDENTITY_DOMAIN = b"umi-s1-portable-v1\0"
 _MANIFEST_DOMAIN = b"umi-s1-portable-manifest-v1\0"
 _WORD_PREFIX_SELECTION_DOMAIN = b"umi-s1-word-prefix-selection-v1\0"
+_PUBLIC_FINETUNE_RELEASE_IDENTITY_DOMAIN = b"umi-public-s1-finetune-release-identity-v1\0"
+_PUBLIC_FINETUNE_RELEASE_IDENTITY_SCHEMA: Final = "umi-public-s1-finetune-release-identity/1"
+_PUBLIC_FINETUNE_RELEASE_CLAIM_BOUNDARY: Final = (
+    "FLEURS-validation-selected public bootstrap candidate only. This is not untouched "
+    "confirmation, UMI activation evidence, interpreter equivalence, accessibility "
+    "certification, or proof of useful real-world accuracy."
+)
 _EXPECTED_FILES: Final = (
     "bundle-manifest.json",
     "inference-identity.json",
@@ -136,6 +166,33 @@ _RIGHTS_FIELDS: Final = {
     "release_rights_decision_sha256",
     "upstream_rights_sha256",
     "claim_boundary",
+}
+_MULTI_SOURCE_RIGHTS_FIELDS: Final = {
+    "schema",
+    "sources",
+    "rights_as_of",
+    "runtime_code_license",
+    "intended_public_weight_license",
+    "redistribution_blocked_pending_final_rights_review",
+    "release_rights_decision_sha256",
+    "upstream_rights_sha256",
+    "claim_boundary",
+}
+_MULTI_SOURCE_RIGHTS_ENTRY_FIELDS: Final = {
+    "source_id",
+    "source_version",
+    "source_name",
+    "source_entry_sha256",
+    "license_id",
+    "license_sha256",
+    "terms_sha256",
+    "source_use_policy_sha256",
+    "attribution_notice",
+    "attribution_notice_sha256",
+    "public_weight_eligible",
+    "public_data_eligible",
+    "raw_data_release",
+    "public_data_release",
 }
 
 
@@ -497,7 +554,129 @@ def build_s1_rights_record(
     return record
 
 
+def build_s1_multi_source_rights_record(
+    *,
+    sources: Sequence[Mapping[str, Any]],
+    rights_as_of: str,
+    runtime_code_license: str,
+    intended_public_weight_license: str,
+    redistribution_blocked_pending_final_rights_review: bool,
+    release_rights_decision_sha256: str | None,
+    upstream_rights: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Embed readable rights and attribution for every source behind public weights."""
+
+    rows = [dict(source) for source in sources]
+    if not rows or [row.get("source_id") for row in rows] != sorted(
+        row.get("source_id") for row in rows if isinstance(row.get("source_id"), str)
+    ):
+        raise S1PortableError("portable source rights must be nonempty and sorted")
+    if len({row.get("source_id") for row in rows}) != len(rows):
+        raise S1PortableError("portable source rights contain duplicate sources")
+    if (
+        not isinstance(rights_as_of, str)
+        or not rights_as_of
+        or not isinstance(runtime_code_license, str)
+        or not runtime_code_license
+        or not isinstance(intended_public_weight_license, str)
+        or not intended_public_weight_license
+        or type(redistribution_blocked_pending_final_rights_review) is not bool
+    ):
+        raise S1PortableError("public multi-source weight rights values are invalid")
+    if redistribution_blocked_pending_final_rights_review:
+        if release_rights_decision_sha256 is not None:
+            raise S1PortableError("blocked weight redistribution cannot name a release decision")
+    else:
+        _require_sha256(release_rights_decision_sha256, "release rights decision")
+    record: dict[str, Any] = {
+        "schema": S1_PORTABLE_MULTI_SOURCE_RIGHTS_SCHEMA,
+        "sources": rows,
+        "rights_as_of": rights_as_of,
+        "runtime_code_license": runtime_code_license,
+        "intended_public_weight_license": intended_public_weight_license,
+        "redistribution_blocked_pending_final_rights_review": (
+            redistribution_blocked_pending_final_rights_review
+        ),
+        "release_rights_decision_sha256": release_rights_decision_sha256,
+        "upstream_rights_sha256": canonical_json_sha256(dict(upstream_rights)),
+        "claim_boundary": (
+            "The portable artifact carries weights, tokenizer data, and readable attribution "
+            "for every model source. It grants no right to redistribute source videos or "
+            "annotations. Runtime code and model-weight distribution remain governed by every "
+            "recorded source license and the final review state."
+        ),
+    }
+    _validate_rights(record)
+    return record
+
+
 def _validate_rights(value: object) -> dict[str, Any]:
+    if isinstance(value, dict) and value.get("schema") == S1_PORTABLE_MULTI_SOURCE_RIGHTS_SCHEMA:
+        rights = _exact_dict(value, _MULTI_SOURCE_RIGHTS_FIELDS, "portable multi-source rights")
+        raw_sources = rights["sources"]
+        if not isinstance(raw_sources, list) or not raw_sources:
+            raise S1PortableError("portable multi-source rights must name sources")
+        sources = [
+            _exact_dict(source, _MULTI_SOURCE_RIGHTS_ENTRY_FIELDS, "portable source rights")
+            for source in raw_sources
+        ]
+        source_ids: list[str] = []
+        for source in sources:
+            for field in (
+                "source_entry_sha256",
+                "license_sha256",
+                "terms_sha256",
+                "source_use_policy_sha256",
+                "attribution_notice_sha256",
+            ):
+                _require_sha256(source[field], f"portable source rights {field}")
+            for field in ("source_id", "source_version", "source_name", "license_id"):
+                if not isinstance(source[field], str) or not source[field]:
+                    raise S1PortableError(f"portable source rights {field} is invalid")
+            notice = source["attribution_notice"]
+            if (
+                not isinstance(notice, str)
+                or not notice
+                or _sha256(notice.encode("utf-8")) != source["attribution_notice_sha256"]
+            ):
+                raise S1PortableError("portable source attribution notice differs")
+            for field in (
+                "public_weight_eligible",
+                "public_data_eligible",
+                "raw_data_release",
+                "public_data_release",
+            ):
+                if type(source[field]) is not bool:
+                    raise S1PortableError(f"portable source rights {field} must be boolean")
+            if (
+                source["public_weight_eligible"] is not True
+                or source["public_data_eligible"] is not False
+                or source["raw_data_release"] is not False
+                or source["public_data_release"] is not False
+            ):
+                raise S1PortableError("portable source is not eligible for weight-only release")
+            source_ids.append(cast(str, source["source_id"]))
+        if source_ids != sorted(source_ids) or len(source_ids) != len(set(source_ids)):
+            raise S1PortableError("portable source rights order or uniqueness differs")
+        for field in (
+            "rights_as_of",
+            "runtime_code_license",
+            "intended_public_weight_license",
+            "claim_boundary",
+        ):
+            if not isinstance(rights[field], str) or not rights[field]:
+                raise S1PortableError(f"portable rights {field} is invalid")
+        _require_sha256(rights["upstream_rights_sha256"], "portable rights upstream review")
+        blocked = rights["redistribution_blocked_pending_final_rights_review"]
+        if type(blocked) is not bool:
+            raise S1PortableError("portable rights blocked state must be boolean")
+        decision = rights["release_rights_decision_sha256"]
+        if blocked:
+            if decision is not None:
+                raise S1PortableError("blocked portable rights cannot name a release decision")
+        else:
+            _require_sha256(decision, "portable rights release decision")
+        return rights
     rights = _exact_dict(value, _RIGHTS_FIELDS, "portable rights")
     if rights["schema"] != S1_PORTABLE_RIGHTS_SCHEMA:
         raise S1PortableError("portable rights schema is unsupported")
@@ -686,6 +865,45 @@ def build_s1_validation_word_prefix_contract(
     }
 
 
+def build_s1_authority_word_prefix_contract(
+    *,
+    training_authority_sha256: str,
+    training_authority_content_sha256: str,
+    final_report_content_sha256: str,
+    maximum_words: int,
+) -> dict[str, Any]:
+    """Bind the deploy cap that an experiment fixed before optimization began."""
+
+    authority_sha256 = _require_sha256(training_authority_sha256, "training authority")
+    authority_content_sha256 = _require_sha256(
+        training_authority_content_sha256, "training authority content"
+    )
+    final_content_sha256 = _require_sha256(final_report_content_sha256, "final report content")
+    if type(maximum_words) is not int or maximum_words != 8:
+        raise S1PortableError("authority-bound word-prefix cap must equal the deploy profile")
+    return {
+        "schema": S1_TEXT_POSTPROCESS_SCHEMA,
+        "revision": S1_AUTHORITY_WORD_PREFIX_REVISION,
+        "operation": "whitespace-word-prefix",
+        "maximum_words": maximum_words,
+        "selected_from_validation": False,
+        "basis": "training-target-policy-fixed-before-optimization",
+        "authority": {
+            "schema": "umi-s1-training-word-prefix-authority/1",
+            "training_authority_sha256": authority_sha256,
+            "training_authority_content_sha256": authority_content_sha256,
+            "final_report_content_sha256": final_content_sha256,
+            "training_target_policy": "deploy-aligned-whole-word-prefix-v1",
+            "maximum_training_output_words": maximum_words,
+        },
+        "claim_boundary": (
+            "The eight-word cap was fixed in the content-addressed training authority before "
+            "optimization. It was not selected after inspecting validation or test output and "
+            "is not evidence of UMI activation or production quality."
+        ),
+    }
+
+
 def _validate_text_postprocess(value: object) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise S1PortableError("text postprocess must be an object")
@@ -718,6 +936,44 @@ def _validate_text_postprocess(value: object) -> dict[str, Any]:
         if record != expected:
             raise S1PortableError("word-prefix text postprocess policy differs")
         return record
+    if value.get("revision") == S1_AUTHORITY_WORD_PREFIX_REVISION:
+        record = _exact_dict(
+            value,
+            {
+                "schema",
+                "revision",
+                "operation",
+                "maximum_words",
+                "selected_from_validation",
+                "basis",
+                "authority",
+                "claim_boundary",
+            },
+            "text postprocess",
+        )
+        authority = _exact_dict(
+            record["authority"],
+            {
+                "schema",
+                "training_authority_sha256",
+                "training_authority_content_sha256",
+                "final_report_content_sha256",
+                "training_target_policy",
+                "maximum_training_output_words",
+            },
+            "text postprocess authority",
+        )
+        expected = build_s1_authority_word_prefix_contract(
+            training_authority_sha256=cast(str, authority["training_authority_sha256"]),
+            training_authority_content_sha256=cast(
+                str, authority["training_authority_content_sha256"]
+            ),
+            final_report_content_sha256=cast(str, authority["final_report_content_sha256"]),
+            maximum_words=cast(int, record["maximum_words"]),
+        )
+        if record != expected:
+            raise S1PortableError("authority-bound word-prefix text postprocess policy differs")
+        return record
     raise S1PortableError("text postprocess policy is unsupported by this runtime")
 
 
@@ -726,6 +982,415 @@ def _apply_text_postprocess(text: str, policy: Mapping[str, Any]) -> str:
     if record["revision"] == S1_RAW_TEXT_POSTPROCESS_REVISION:
         return text
     return " ".join(text.split()[: cast(int, record["maximum_words"])])
+
+
+def _claim_fraction(value: object, label: str) -> Fraction:
+    record = _exact_dict(value, {"numerator", "denominator"}, label)
+    if not isinstance(record["numerator"], str) or not isinstance(record["denominator"], str):
+        raise S1PortableError(f"{label} must use string integer fields")
+    try:
+        result = Fraction(int(record["numerator"]), int(record["denominator"]))
+    except (ValueError, ZeroDivisionError) as exc:
+        raise S1PortableError(f"{label} is not an exact rational") from exc
+    if record != {"numerator": str(result.numerator), "denominator": str(result.denominator)}:
+        raise S1PortableError(f"{label} is not reduced canonical rational form")
+    return result
+
+
+def _claim_fraction_text(value: Fraction) -> str:
+    return f"{value.numerator}/{value.denominator}"
+
+
+def _public_finetune_claim_boundary(
+    evidence: object,
+    *,
+    model_state_sha256: str,
+    upstream_release_identity_sha256: str,
+    tokenizer_model_sha256: str,
+    tokenizer_record_sha256: str,
+    text_postprocess: Mapping[str, Any],
+    rights_sha256: str,
+) -> str:
+    identity = _exact_dict(
+        evidence,
+        {
+            "schema",
+            "candidate",
+            "gate",
+            "tokenizer",
+            "text_pretraining",
+            "motion_sources",
+            "rights_review_sha256",
+            "rights_record_sha256",
+            "base_preprocessing",
+            "release_contents",
+            "claim_boundary",
+            "content_sha256",
+        },
+        "public fine-tune release identity",
+    )
+    supplied_content = _require_sha256(
+        identity["content_sha256"], "public fine-tune release identity content"
+    )
+    unsigned_identity = dict(identity)
+    del unsigned_identity["content_sha256"]
+    if (
+        identity["schema"] != _PUBLIC_FINETUNE_RELEASE_IDENTITY_SCHEMA
+        or canonical_json_sha256(unsigned_identity, domain=_PUBLIC_FINETUNE_RELEASE_IDENTITY_DOMAIN)
+        != supplied_content
+        or canonical_json_sha256(identity) != upstream_release_identity_sha256
+        or identity["claim_boundary"] != _PUBLIC_FINETUNE_RELEASE_CLAIM_BOUNDARY
+    ):
+        raise S1PortableError("public fine-tune release identity differs")
+
+    candidate = _exact_dict(
+        identity["candidate"],
+        {
+            "training_authority_sha256",
+            "training_authority_file_sha256",
+            "training_authority_content_sha256",
+            "final_report_sha256",
+            "final_report_content_sha256",
+            "selected_epoch",
+            "selected_epoch_report_content_sha256",
+            "selected_validation_sha256",
+            "selected_validation_content_sha256",
+            "selected_checkpoint_manifest_sha256",
+            "selected_checkpoint_metadata_sha256",
+            "selected_model_state_sha256",
+        },
+        "public fine-tune candidate identity",
+    )
+    for field in (
+        "training_authority_sha256",
+        "training_authority_file_sha256",
+        "training_authority_content_sha256",
+        "final_report_sha256",
+        "final_report_content_sha256",
+        "selected_epoch_report_content_sha256",
+        "selected_validation_sha256",
+        "selected_validation_content_sha256",
+        "selected_checkpoint_manifest_sha256",
+        "selected_checkpoint_metadata_sha256",
+        "selected_model_state_sha256",
+    ):
+        _require_sha256(candidate[field], f"public fine-tune candidate {field}")
+    selected_epoch = candidate["selected_epoch"]
+    if type(selected_epoch) is not int or selected_epoch < 1:
+        raise S1PortableError("public fine-tune selected epoch is invalid")
+    if candidate["selected_model_state_sha256"] != model_state_sha256:
+        raise S1PortableError("public fine-tune model state differs")
+
+    tokenizer = _exact_dict(
+        identity["tokenizer"],
+        {"binding_sha256", "model_sha256", "record_sha256", "training_report_sha256"},
+        "public fine-tune tokenizer identity",
+    )
+    for field in tokenizer:
+        _require_sha256(tokenizer[field], f"public fine-tune tokenizer {field}")
+    if (
+        tokenizer["model_sha256"] != tokenizer_model_sha256
+        or tokenizer["record_sha256"] != tokenizer_record_sha256
+    ):
+        raise S1PortableError("public fine-tune tokenizer differs")
+
+    postprocess = _validate_text_postprocess(dict(text_postprocess))
+    postprocess_authority = _exact_dict(
+        postprocess.get("authority"),
+        {
+            "schema",
+            "training_authority_sha256",
+            "training_authority_content_sha256",
+            "final_report_content_sha256",
+            "training_target_policy",
+            "maximum_training_output_words",
+        },
+        "public fine-tune postprocess authority",
+    )
+    if (
+        postprocess_authority["training_authority_sha256"] != candidate["training_authority_sha256"]
+        or postprocess_authority["training_authority_content_sha256"]
+        != candidate["training_authority_content_sha256"]
+        or postprocess_authority["final_report_content_sha256"]
+        != candidate["final_report_content_sha256"]
+    ):
+        raise S1PortableError("public fine-tune postprocess authority differs")
+
+    _require_sha256(identity["rights_review_sha256"], "public fine-tune rights review")
+    if identity["rights_record_sha256"] != rights_sha256:
+        raise S1PortableError("public fine-tune rights record differs")
+
+    release_contents = _exact_dict(
+        identity["release_contents"],
+        {
+            "safe_tensor_weights",
+            "tokenizer_artifacts",
+            "raw_training_or_validation_data",
+            "source_video_or_annotations",
+            "prediction_plaintext",
+        },
+        "public fine-tune release contents",
+    )
+    if release_contents != {
+        "safe_tensor_weights": True,
+        "tokenizer_artifacts": True,
+        "raw_training_or_validation_data": False,
+        "source_video_or_annotations": False,
+        "prediction_plaintext": False,
+    }:
+        raise S1PortableError("public fine-tune release contains non-portable data")
+
+    text_pretraining = identity["text_pretraining"]
+    if (
+        not isinstance(text_pretraining, dict)
+        or text_pretraining.get("release_lineage_allowed") is not True
+        or text_pretraining.get("motion_encoder_invocation_count") != 0
+        or text_pretraining.get("cross_attention_invocation_count") != 0
+    ):
+        raise S1PortableError("public fine-tune text-pretraining lineage differs")
+    for field in (
+        "training_authority_sha256",
+        "training_authority_content_sha256",
+        "final_report_sha256",
+        "final_report_content_sha256",
+        "selected_checkpoint_manifest_sha256",
+        "selected_checkpoint_metadata_sha256",
+        "selected_model_state_sha256",
+        "training_authority_file_sha256",
+        "corpus_manifest_sha256",
+        "corpus_manifest_content_sha256",
+        "source_entry_sha256",
+    ):
+        _require_sha256(text_pretraining.get(field), f"public text pretraining {field}")
+
+    motion_sources = _exact_dict(
+        identity["motion_sources"], {"fleurs", "two_m_flores"}, "public motion sources"
+    )
+    fleurs = _exact_dict(
+        motion_sources["fleurs"],
+        {
+            "manifest_sha256",
+            "manifest_content_sha256",
+            "source_entry_sha256",
+            "source_ledger_sha256",
+            "training_rows_loaded",
+            "validation_rows_loaded",
+            "test_inference_rows",
+        },
+        "public FLEURS source",
+    )
+    two_m = _exact_dict(
+        motion_sources["two_m_flores"],
+        {
+            "manifest_sha256",
+            "manifest_content_sha256",
+            "binding_content_sha256",
+            "source_entry_sha256",
+            "source_ledger_sha256",
+            "sample_count",
+            "devtest_rows_loaded",
+            "evaluation_rows_loaded",
+        },
+        "public 2M-Flores source",
+    )
+    for label, record, fields in (
+        (
+            "FLEURS",
+            fleurs,
+            (
+                "manifest_sha256",
+                "manifest_content_sha256",
+                "source_entry_sha256",
+                "source_ledger_sha256",
+            ),
+        ),
+        (
+            "2M-Flores",
+            two_m,
+            (
+                "manifest_sha256",
+                "manifest_content_sha256",
+                "binding_content_sha256",
+                "source_entry_sha256",
+                "source_ledger_sha256",
+            ),
+        ),
+    ):
+        for field in fields:
+            _require_sha256(record[field], f"public {label} {field}")
+    for label, value in (
+        ("FLEURS training rows", fleurs["training_rows_loaded"]),
+        ("FLEURS validation rows", fleurs["validation_rows_loaded"]),
+        ("2M-Flores samples", two_m["sample_count"]),
+    ):
+        if type(value) is not int or value < 1:
+            raise S1PortableError(f"{label} must be positive")
+    if (
+        fleurs["test_inference_rows"] != 0
+        or two_m["devtest_rows_loaded"] != 0
+        or two_m["evaluation_rows_loaded"] != 0
+    ):
+        raise S1PortableError("public fine-tune evidence used test, devtest, or evaluation rows")
+
+    gate_result = _exact_dict(
+        identity["gate"],
+        {
+            "passed",
+            "real_motion_score",
+            "zero_motion_score",
+            "deranged_motion_score",
+            "real_minus_zero",
+            "real_minus_deranged",
+            "prediction_count",
+            "unique_real_hypotheses",
+            "maximum_real_hypothesis_multiplicity",
+            "gate",
+        },
+        "public fine-tune gate result",
+    )
+    configured_gate = _exact_dict(
+        gate_result["gate"],
+        {
+            "minimum_real_score",
+            "minimum_control_advantage",
+            "minimum_unique_real_hypotheses",
+            "maximum_real_hypothesis_multiplicity",
+            "reject_empty_hypotheses",
+            "reject_unk_token_id",
+        },
+        "public fine-tune configured gate",
+    )
+    real = _claim_fraction(gate_result["real_motion_score"], "public real-motion score")
+    zero = _claim_fraction(gate_result["zero_motion_score"], "public zero-motion score")
+    deranged = _claim_fraction(gate_result["deranged_motion_score"], "public deranged-motion score")
+    real_minus_zero = _claim_fraction(
+        gate_result["real_minus_zero"], "public real-minus-zero effect"
+    )
+    real_minus_deranged = _claim_fraction(
+        gate_result["real_minus_deranged"], "public real-minus-deranged effect"
+    )
+    minimum_real = _claim_fraction(configured_gate["minimum_real_score"], "minimum real score")
+    minimum_advantage = _claim_fraction(
+        configured_gate["minimum_control_advantage"], "minimum control advantage"
+    )
+    prediction_count = gate_result["prediction_count"]
+    unique = gate_result["unique_real_hypotheses"]
+    multiplicity = gate_result["maximum_real_hypothesis_multiplicity"]
+    minimum_unique = configured_gate["minimum_unique_real_hypotheses"]
+    maximum_multiplicity = configured_gate["maximum_real_hypothesis_multiplicity"]
+    if (
+        gate_result["passed"] is not True
+        or not 0 <= zero <= 1
+        or not 0 <= deranged <= 1
+        or not 0 <= real <= 1
+        or real_minus_zero != real - zero
+        or real_minus_deranged != real - deranged
+        or real < minimum_real
+        or real_minus_zero < minimum_advantage
+        or real_minus_deranged < minimum_advantage
+        or type(prediction_count) is not int
+        or prediction_count != fleurs["validation_rows_loaded"]
+        or type(unique) is not int
+        or type(minimum_unique) is not int
+        or not 1 <= minimum_unique <= unique <= prediction_count
+        or type(multiplicity) is not int
+        or type(maximum_multiplicity) is not int
+        or not 1 <= multiplicity <= maximum_multiplicity
+        or configured_gate["reject_empty_hypotheses"] is not True
+        or configured_gate["reject_unk_token_id"] != 3
+    ):
+        raise S1PortableError("public fine-tune metric or diversity evidence differs")
+
+    return (
+        "This is a low-accuracy, FLEURS-validation-selected public bootstrap and miner "
+        "replacement target, not a production-quality ASL translator. On its bound "
+        f"{prediction_count}-sample FLEURS validation diagnostic, exact normalized scores "
+        f"were real motion {_claim_fraction_text(real)}, zero motion "
+        f"{_claim_fraction_text(zero)}, and deranged motion "
+        f"{_claim_fraction_text(deranged)}; exact real-motion advantages were "
+        f"{_claim_fraction_text(real_minus_zero)} over zero and "
+        f"{_claim_fraction_text(real_minus_deranged)} over deranged motion. It produced "
+        f"{unique} unique real-motion hypotheses with maximum multiplicity {multiplicity}. "
+        "The bound gate rejects non-ok, empty, and UNK-bearing predictions. No FLEURS test "
+        "inference or 2M-Flores devtest/evaluation inference was performed. This does not "
+        "establish expected production performance, UMI activation, interpreter equivalence, "
+        "accessibility certification, or production-quality translation."
+    )
+
+
+def _portable_claim_boundary(
+    profile: str | None,
+    *,
+    model_state_sha256: str,
+    upstream_release_identity_sha256: str,
+    tokenizer_model_sha256: str,
+    tokenizer_record_sha256: str,
+    text_postprocess: Mapping[str, Any],
+    rights_sha256: str,
+    claim_boundary_evidence: Mapping[str, Any] | None = None,
+) -> str:
+    if profile is None:
+        if claim_boundary_evidence is not None:
+            raise S1PortableError("generic portable claim does not accept external evidence")
+        return (
+            "This is an integration fixture and replacement target, not a usable ASL "
+            "translator. On the bound fixed-validation diagnostic, zero motion outscored "
+            "real motion, so the checkpoint has not established useful motion grounding. "
+            "Its exact ARM64 training frontend and AMD64 reference-miner frontend are not "
+            "tensor-equivalent. The AMD64 path is a component-test baseline, not UMI "
+            "activation evidence, accessibility certification, or production-quality "
+            "translation."
+        )
+    if profile == S1_PUBLIC_FINETUNE_CLAIM_PROFILE:
+        if claim_boundary_evidence is None:
+            raise S1PortableError("public fine-tune claim requires release evidence")
+        return _public_finetune_claim_boundary(
+            claim_boundary_evidence,
+            model_state_sha256=model_state_sha256,
+            upstream_release_identity_sha256=upstream_release_identity_sha256,
+            tokenizer_model_sha256=tokenizer_model_sha256,
+            tokenizer_record_sha256=tokenizer_record_sha256,
+            text_postprocess=text_postprocess,
+            rights_sha256=rights_sha256,
+        )
+    if profile != S1_EXPERIMENT_BOOTSTRAP_CLAIM_PROFILE:
+        raise S1PortableError("portable claim-boundary profile is unsupported")
+    if claim_boundary_evidence is not None:
+        raise S1PortableError("fixed bootstrap claim does not accept external evidence")
+    expected_postprocess = build_s1_authority_word_prefix_contract(
+        training_authority_sha256=(
+            "f57a189360f80f7c88cfc435df033c5ef8e0c2f7084fa6fe835f45f5f57a54be"
+        ),
+        training_authority_content_sha256=(
+            "6e33714687a942df27d0c3729ede68eb0d68e857aea17cb27b1e9f135c70343a"
+        ),
+        final_report_content_sha256=(
+            "fa81389b82a95edd671719157c2f06decd3f684bf9a724ef0ac6e687e9154735"
+        ),
+        maximum_words=8,
+    )
+    if (
+        model_state_sha256 != _EXPERIMENT_BOOTSTRAP_MODEL_STATE_SHA256
+        or upstream_release_identity_sha256 != _EXPERIMENT_BOOTSTRAP_RELEASE_IDENTITY_SHA256
+        or tokenizer_model_sha256 != _EXPERIMENT_BOOTSTRAP_TOKENIZER_MODEL_SHA256
+        or tokenizer_record_sha256 != _EXPERIMENT_BOOTSTRAP_TOKENIZER_RECORD_SHA256
+        or dict(text_postprocess) != expected_postprocess
+        or rights_sha256 != _EXPERIMENT_BOOTSTRAP_RIGHTS_SHA256
+    ):
+        raise S1PortableError("portable claim-boundary evidence differs")
+    return (
+        "This is a low-accuracy validation-only FLEURS-ASL bootstrap and miner replacement "
+        "target, not a usable ASL translator. Its bound 285-sample validation diagnostic "
+        "scored real motion about 8.12%, only about 0.16 percentage points above zero and "
+        "deranged motion. No FLEURS test result is claimed. Some historical training or "
+        "validation-diagnostic source bytes named by the bound records are unavailable, so "
+        "original-code reproduction is incomplete; checkpoint and record lineage plus "
+        "current-runtime validation are the verification scope. This does not establish "
+        "robust motion grounding, expected production performance, UMI activation, "
+        "accessibility certification, or production-quality translation. The ARM64 "
+        "training and AMD64 reference-miner frontends are not tensor-equivalent; AMD64 is "
+        "component-test only."
+    )
 
 
 def _validate_preprocessing(value: object) -> dict[str, Any]:
@@ -1079,6 +1744,8 @@ def export_s1_portable_bundle(
     rights: Mapping[str, Any],
     upstream_release_identity_sha256: str,
     text_postprocess: Mapping[str, Any] | None = None,
+    claim_boundary_profile: str | None = None,
+    claim_boundary_evidence: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Atomically publish an independently copyable, pickle-free S1 runtime bundle."""
 
@@ -1090,6 +1757,12 @@ def export_s1_portable_bundle(
     text_postprocess_record = _validate_text_postprocess(
         _raw_text_postprocess_contract() if text_postprocess is None else dict(text_postprocess)
     )
+    if claim_boundary_profile not in (
+        None,
+        S1_EXPERIMENT_BOOTSTRAP_CLAIM_PROFILE,
+        S1_PUBLIC_FINETUNE_CLAIM_PROFILE,
+    ):
+        raise S1PortableError("portable claim-boundary profile is unsupported")
     if output.exists() or output.is_symlink():
         raise S1PortableError("portable bundle destination already exists")
     parent = output.parent.resolve(strict=True)
@@ -1131,6 +1804,16 @@ def export_s1_portable_bundle(
         if any(not torch.isfinite(tensor).all().item() for tensor in state.values()):
             raise S1PortableError("portable model contains a non-finite tensor")
         state_sha256 = s1_tensor_set_sha256(state)
+        claim_boundary = _portable_claim_boundary(
+            claim_boundary_profile,
+            model_state_sha256=state_sha256,
+            upstream_release_identity_sha256=upstream_release_identity_sha256,
+            tokenizer_model_sha256=tokenizer.model_sha256,
+            tokenizer_record_sha256=tokenizer.record_sha256,
+            text_postprocess=text_postprocess_record,
+            rights_sha256=canonical_json_sha256(rights_record),
+            claim_boundary_evidence=claim_boundary_evidence,
+        )
         config = _fixed_config_record(model, state_sha256)
         config_bytes = canonical_json_bytes(config)
         tensor_bytes = save_safetensors(
@@ -1166,15 +1849,7 @@ def export_s1_portable_bundle(
             "runtime": _runtime_contract(),
             "text_postprocess": text_postprocess_record,
             "rights": rights_record,
-            "claim_boundary": (
-                "This is an integration fixture and replacement target, not a usable ASL "
-                "translator. On the bound fixed-validation diagnostic, zero motion outscored "
-                "real motion, so the checkpoint has not established useful motion grounding. "
-                "Its exact ARM64 training frontend and AMD64 reference-miner frontend are not "
-                "tensor-equivalent. The AMD64 path is a component-test baseline, not UMI "
-                "activation evidence, accessibility certification, or production-quality "
-                "translation."
-            ),
+            "claim_boundary": claim_boundary,
         }
         identity["inference_revision"] = canonical_json_sha256(identity, domain=_IDENTITY_DOMAIN)
         identity_bytes = canonical_json_bytes(identity)
@@ -1253,6 +1928,24 @@ class S1PortableRuntime:
     @property
     def preprocessing(self) -> Mapping[str, Any]:
         return cast(Mapping[str, Any], self.identity["preprocessing"])
+
+    def model_copy_for_export(self) -> PortableS1:
+        """Return an isolated, frozen CPU copy for trusted format exporters."""
+
+        with torch.no_grad():
+            model = PortableS1(self._model.config)
+            state = {
+                name: tensor.detach().to(device="cpu").contiguous().clone()
+                for name, tensor in self._model.state_dict().items()
+            }
+            model.load_state_dict(state, strict=True)
+        expected = cast(Mapping[str, Any], self.identity["model"])["state_sha256"]
+        if s1_tensor_set_sha256(model.state_dict()) != expected:
+            raise S1PortableError("portable export model copy differs from its identity")
+        model.eval()
+        for parameter in model.parameters():
+            parameter.requires_grad_(False)
+        return model
 
     def require_preprocessing_platform(self, platform_id: str) -> str:
         return require_s1_preprocessing_platform(self.preprocessing, platform_id)
