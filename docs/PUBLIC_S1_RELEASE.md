@@ -20,7 +20,9 @@ Do not push, tag, or upload the release until the project owner has reviewed com
 ## 1. Run the public intake
 
 The source release and intake policy come from the private training repository. The
-policy must be reviewed and copied to its fixed public filename before intake:
+policy must be reviewed and copied to its fixed public filename before intake. Run
+every command block in this document in the same Bash session so the fail-fast
+settings and exact revision, archive, and extractor variables remain in force.
 
 ```bash
 set -euo pipefail
@@ -75,6 +77,26 @@ additional, renamed, or digest-mismatched companion.
 
 ## 2. Create and test commit A
 
+Remove the previous v0 payloads, release README, and metadata. Keep the reviewed
+`runtime-files.txt`; the public-S1 history pins its digest and uses an exact
+release-directory inventory at every stage. Retaining or repurposing any other
+legacy filename makes verification fail.
+
+```bash
+git rm -- \
+  release/CC-BY-4.0.txt \
+  release/FLEURS-ATTRIBUTION.txt \
+  release/FSBOARD-ATTRIBUTION.txt \
+  release/README.md \
+  release/SHA256SUMS \
+  release/release-manifest.json \
+  release/umi-s1-baseline-v0-motion-ablation-evidence.json \
+  release/umi-s1-baseline-v0-portable.zip \
+  release/umi-s1-baseline-v0-release-e2e-evidence.json \
+  release/umi-s1-baseline-v0-rights-decision.json \
+  release/umi-s1-baseline-v0-selection-ledger.json
+```
+
 Run the locked checks before commit A:
 
 ```bash
@@ -89,12 +111,30 @@ Commit the reviewed source, intake artifacts, policy, licenses, and attribution
 files. Leave the public E2E file and generated metadata files out of commit A. Record
 the resulting commit as `A`.
 
+```bash
+git status --short
+git add --all
+git diff --cached --check
+git commit -m "Prepare public S1 release source"
+A="$(git rev-parse HEAD)"
+test -z "$(git status --porcelain=v1 --untracked-files=all)"
+```
+
 ## 3. Bind the local extractor and run E2E
 
-Build the Linux/AMD64 extractor from commit A as described in `docs/RUN_MINER.md`.
-Read the base revision and archive digest from the staged intake:
+On the Linux/AMD64 E2E host, build the extractor from A, record its immutable image
+identity outside the repository, and read the public base revision and archive
+digest:
 
 ```bash
+DOCKER_EXECUTABLE="$(command -v docker)"
+EXTRACTOR_BUILD_RECORD=/absolute/owner-only/local-build/local-extractor.json
+install -d -m 700 "$(dirname "$EXTRACTOR_BUILD_RECORD")"
+test ! -e "$EXTRACTOR_BUILD_RECORD"
+uv run --frozen --extra dev python -m bitsign_motion.local_extractor_release \
+  --docker "$DOCKER_EXECUTABLE" \
+  --output "$EXTRACTOR_BUILD_RECORD"
+
 BASE_ARCHIVE=release/umi-s1-public-finetune-v1-portable.zip
 BASE_INFERENCE_REVISION="$(
   unzip -p "$BASE_ARCHIVE" inference-identity.json | jq -er .inference_revision
@@ -105,28 +145,125 @@ uv run --frozen --extra dev python -m bitsign_motion.local_bundle_rebind \
   --base-archive "$BASE_ARCHIVE" \
   --base-sha256 "$BASE_ARCHIVE_SHA256" \
   --base-inference-revision "$BASE_INFERENCE_REVISION" \
-  --build-record /absolute/owner-only/local-extractor.json \
-  --docker "$(command -v docker)" \
+  --build-record "$EXTRACTOR_BUILD_RECORD" \
+  --docker "$DOCKER_EXECUTABLE" \
   --output /absolute/owner-only/model-bundle
 ```
 
-Run the clean Linux/AMD64 UMI request-to-reveal E2E test against commit A. Generate
-the aggregate public E2E projection at the fixed path:
-
-```text
-release/umi-s1-public-finetune-v1-release-e2e-evidence.json
-```
-
-The E2E record must bind `A`, the public base inference revision, the locally derived
-revision, the immutable extractor image ID, and the exact UMI commit. Commit only
-that file as commit B.
-
-Set this profile before running `tests/test_umi_release_e2e.py` through the locked
-procedure in `docs/RELEASE.md`; it makes both the private run and public projection
-use the public S1 E2E schemas and release identity:
+Run the clean Linux/AMD64 request-to-reveal E2E against A. Build the test environment
+from both frozen lockfiles without editable installs:
 
 ```bash
+A="$(git rev-parse HEAD)"
+REFERENCE_ROOT="$(pwd -P)"
+UMI_ROOT="$(cd ../umi && pwd -P)"
+test -z "$(git status --porcelain=v1 --untracked-files=all)"
+test -z "$(git -C "$UMI_ROOT" status --porcelain=v1 --untracked-files=all)"
+install -d -m 700 deployment-tmp
+
+uv export --frozen --extra dev --no-dev --no-emit-project \
+  --output-file deployment-tmp/release-model-requirements.txt
+(
+  cd "$UMI_ROOT"
+  uv export --frozen --no-dev --no-emit-project \
+    --output-file "$REFERENCE_ROOT/deployment-tmp/release-umi-requirements.txt"
+)
+uv venv --clear --python 3.12 deployment-tmp/release-e2e-venv
+uv pip install --python deployment-tmp/release-e2e-venv/bin/python \
+  --require-hashes \
+  --requirement deployment-tmp/release-model-requirements.txt \
+  --requirement deployment-tmp/release-umi-requirements.txt
+E2E_PURELIB="$(
+  deployment-tmp/release-e2e-venv/bin/python -c \
+    'import sysconfig; print(sysconfig.get_paths()["purelib"])'
+)"
+printf '%s\n' "$REFERENCE_ROOT/src" > "$E2E_PURELIB/umi-reference-model-source.pth"
+printf '%s\n' "$UMI_ROOT/src" > "$E2E_PURELIB/umi-source.pth"
+chmod 600 \
+  "$E2E_PURELIB/umi-reference-model-source.pth" \
+  "$E2E_PURELIB/umi-source.pth"
+unset PYTHONPATH
+deployment-tmp/release-e2e-venv/bin/python -c \
+  'import bitsign_motion, pytest, umi; print(bitsign_motion.__file__, pytest.__file__, umi.__file__)'
+```
+
+Set the public profile and every private runtime path. The report and task model stay
+outside the repository, and the report directory must already exist with owner-only
+permissions:
+
+```bash
+RUNTIME_ASSET_DIR=/absolute/owner-only/runtime-assets
+install -d -m 700 "$RUNTIME_ASSET_DIR"
+MEDIAPIPE_TASK="$RUNTIME_ASSET_DIR/holistic_landmarker.task"
+test ! -e "$MEDIAPIPE_TASK"
+curl --fail --location --proto '=https' --tlsv1.2 \
+  'https://storage.googleapis.com/mediapipe-models/holistic_landmarker/holistic_landmarker/float16/latest/holistic_landmarker.task?generation=1703178474695092' \
+  --output "$MEDIAPIPE_TASK"
+printf '%s  %s\n' \
+  'e2dab61191e2dcd0a15f943d8e3ed1dce13c82dfa597b9dd39f562975a50c3f8' \
+  "$MEDIAPIPE_TASK" | sha256sum -c -
+chmod 600 "$MEDIAPIPE_TASK"
+
 export BITSIGN_UMI_RELEASE_PROFILE=public-s1-finetune/1
+export BITSIGN_RUN_UMI_RELEASE_E2E=1
+export BITSIGN_UMI_REPOSITORY="$UMI_ROOT"
+export BITSIGN_UMI_RELEASE_VIDEO=/absolute/private/path/to/eligible-test.mp4
+export BITSIGN_UMI_RELEASE_VIDEO_RIGHTS_CLEARED=1
+export BITSIGN_UMI_EXTRACTOR_BUILD_RECORD="$EXTRACTOR_BUILD_RECORD"
+export BITSIGN_UMI_RELEASE_E2E_REPORT=/absolute/owner-only/e2e/private-run.json
+
+export UMI_S1_BUNDLE=/absolute/owner-only/model-bundle
+export UMI_S1_BASE_INFERENCE_REVISION="$BASE_INFERENCE_REVISION"
+export UMI_S1_INFERENCE_REVISION="$(
+  jq -er .inference_revision "$UMI_S1_BUNDLE/inference-identity.json"
+)"
+export UMI_S1_EXTRACTOR_IMAGE="$(
+  jq -er .image_id "$BITSIGN_UMI_EXTRACTOR_BUILD_RECORD"
+)"
+export UMI_S1_EXTRACTOR_MODEL="$MEDIAPIPE_TASK"
+export UMI_S1_EXTRACTOR_PLATFORM=linux/amd64
+export UMI_S1_DOCKER_EXECUTABLE="$DOCKER_EXECUTABLE"
+export UMI_S1_TEMP_ROOT=/absolute/owner-only/s1-jobs
+export UMI_S1_DEVICE=cpu
+export UMI_S1_HARD_DEADLINE_SECONDS=150
+
+install -d -m 700 "$UMI_S1_TEMP_ROOT"
+deployment-tmp/release-e2e-venv/bin/python -m pytest -q \
+  tests/test_umi_release_e2e.py
+```
+
+A skipped test is not a pass. Project the owner-only run into the aggregate public
+schema, install it under the public-S1 filename, verify its source binding, and
+commit only that file as B:
+
+```bash
+PUBLIC_E2E_STAGING=/absolute/owner-only/e2e/public-s1-release-e2e.json
+test ! -e "$PUBLIC_E2E_STAGING"
+uv run --frozen --extra dev python -m bitsign_motion.s1_release_evidence \
+  release-e2e \
+  --run-report "$BITSIGN_UMI_RELEASE_E2E_REPORT" \
+  --output "$PUBLIC_E2E_STAGING"
+install -m 0644 "$PUBLIC_E2E_STAGING" \
+  release/umi-s1-public-finetune-v1-release-e2e-evidence.json
+test "$(jq -er .schema \
+  release/umi-s1-public-finetune-v1-release-e2e-evidence.json)" = \
+  "umi-s1-public-finetune-release-e2e/1"
+test "$(jq -er .release_profile \
+  release/umi-s1-public-finetune-v1-release-e2e-evidence.json)" = \
+  "public-s1-finetune/1"
+test "$(jq -er .tested_reference_model_git_revision \
+  release/umi-s1-public-finetune-v1-release-e2e-evidence.json)" = "$A"
+
+git add release/umi-s1-public-finetune-v1-release-e2e-evidence.json
+test "$(git diff --cached --name-only)" = \
+  "release/umi-s1-public-finetune-v1-release-e2e-evidence.json"
+test -z "$(git diff --name-only)"
+test -z "$(git ls-files --others --exclude-standard)"
+git diff --cached --check
+git commit -m "Record public S1 release E2E evidence"
+B="$(git rev-parse HEAD)"
+test "$(git rev-parse HEAD^)" = "$A"
+test -z "$(git status --porcelain=v1 --untracked-files=all)"
 ```
 
 ## 4. Generate commit C
@@ -166,7 +303,16 @@ Review the manifest and checksum file, then commit only those two files as commi
 Verify the complete tree and its history:
 
 ```bash
+git add release/release-manifest.json release/SHA256SUMS
+test "$(git diff --cached --name-only | LC_ALL=C sort)" = \
+  "$(printf '%s\n' release/SHA256SUMS release/release-manifest.json)"
+test -z "$(git diff --name-only)"
+test -z "$(git ls-files --others --exclude-standard)"
+git diff --cached --check
+git commit -m "Seal public S1 release metadata"
 C="$(git rev-parse HEAD)"
+test "$(git rev-parse HEAD^)" = "$B"
+test -z "$(git status --porcelain=v1 --untracked-files=all)"
 uv run --frozen --extra dev python tools/release_artifacts.py \
   --verify release/release-manifest.json \
   --artifact-directory release \

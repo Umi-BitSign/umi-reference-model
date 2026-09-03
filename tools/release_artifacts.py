@@ -141,6 +141,24 @@ PUBLIC_ARTIFACTS = {
         for label, filename in source_companions.values()
     },
 }
+RELEASE_SUPPORT_FILENAMES = frozenset(
+    {"README.md", "runtime-files.txt", "release-manifest.json", "SHA256SUMS"}
+)
+REVIEWED_RELEASE_FILENAMES = frozenset(
+    RELEASE_SUPPORT_FILENAMES | set(EXPECTED_ARTIFACTS.values()) | set(PUBLIC_ARTIFACTS.values())
+)
+PUBLIC_RUNTIME_MANIFEST_FILENAME = "runtime-files.txt"
+PUBLIC_RUNTIME_MANIFEST_SHA256 = "8dff0e4cd80162463930bf306d19d28001ce4776956bca97b11ea60c6f74ab2e"
+PUBLIC_TESTED_RELEASE_FILENAMES = (frozenset(PUBLIC_ARTIFACTS.values()) - {PUBLIC_E2E_FILENAME}) | {
+    PUBLIC_RUNTIME_MANIFEST_FILENAME
+}
+PUBLIC_SOURCE_RELEASE_FILENAMES = frozenset(PUBLIC_ARTIFACTS.values()) | {
+    PUBLIC_RUNTIME_MANIFEST_FILENAME
+}
+PUBLIC_FINAL_RELEASE_FILENAMES = frozenset(
+    set(PUBLIC_ARTIFACTS.values())
+    | {PUBLIC_RUNTIME_MANIFEST_FILENAME, "release-manifest.json", "SHA256SUMS"}
+)
 EVIDENCE_SCHEMAS = {
     "selection-ledger": SELECTION_LEDGER_SCHEMA,
     "motion-ablation-evidence": MOTION_ABLATION_SCHEMA,
@@ -1269,6 +1287,61 @@ def _require_regular_git_blob(repository: Path, revision: str, relative: str) ->
         )
 
 
+def _verify_reviewed_release_tree(repository: Path, revision: str) -> frozenset[str]:
+    raw = _git(
+        repository,
+        "ls-tree",
+        "-r",
+        "-z",
+        "--name-only",
+        revision,
+        "--",
+        "release",
+    )
+    encoded_paths = raw.split(b"\0")
+    if encoded_paths and encoded_paths[-1] == b"":
+        encoded_paths.pop()
+    for encoded in encoded_paths:
+        try:
+            relative = encoded.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise ReleaseArtifactError("release history contains a non-UTF-8 path") from exc
+        candidate = Path(relative)
+        if (
+            len(candidate.parts) != 2
+            or candidate.parts[0] != "release"
+            or candidate.name not in REVIEWED_RELEASE_FILENAMES
+        ):
+            raise ReleaseArtifactError(f"release history contains an unreviewed file: {relative}")
+        _require_regular_git_blob(repository, revision, relative)
+    return frozenset(Path(path.decode("utf-8")).name for path in encoded_paths)
+
+
+def _verify_exact_release_tree(
+    repository: Path,
+    revision: str,
+    expected_filenames: frozenset[str],
+) -> None:
+    actual = _verify_reviewed_release_tree(repository, revision)
+    if actual != expected_filenames:
+        raise ReleaseArtifactError("release history differs from its exact stage inventory")
+
+
+def _verify_public_release_tree(
+    repository: Path,
+    revision: str,
+    expected_filenames: frozenset[str],
+) -> None:
+    _verify_exact_release_tree(repository, revision, expected_filenames)
+    runtime_manifest = _git(
+        repository,
+        "show",
+        f"{revision}:release/{PUBLIC_RUNTIME_MANIFEST_FILENAME}",
+    )
+    if hashlib.sha256(runtime_manifest).hexdigest() != PUBLIC_RUNTIME_MANIFEST_SHA256:
+        raise ReleaseArtifactError("public release runtime manifest digest differs")
+
+
 def _runtime_module_path(module: object) -> str:
     if module == "bitsign_motion":
         return "src/bitsign_motion/__init__.py"
@@ -1394,6 +1467,7 @@ def _verify_public_release_commit(
     release_commit: str,
     artifact_root: Path,
 ) -> str:
+    _verify_public_release_tree(root, release_commit, PUBLIC_FINAL_RELEASE_FILENAMES)
     parent_line = _git(root, "rev-list", "--parents", "-n", "1", release_commit)
     parents = parent_line.decode("ascii").strip().split()
     if len(parents) != 2 or parents[1] != record["source_git_revision"]:
@@ -1416,11 +1490,13 @@ def _verify_public_release_commit(
             raise ReleaseArtifactError(f"working {relative_path} differs from the release commit")
 
     source_revision = str(record["source_git_revision"])
+    _verify_public_release_tree(root, source_revision, PUBLIC_SOURCE_RELEASE_FILENAMES)
     e2e_relative = f"release/{PUBLIC_E2E_FILENAME}"
     e2e = load_public_s1_finetune_release_e2e_bytes(
         _read_regular(artifact_root / PUBLIC_E2E_FILENAME)
     )
     tested_revision = str(e2e["tested_reference_model_git_revision"])
+    _verify_public_release_tree(root, tested_revision, PUBLIC_TESTED_RELEASE_FILENAMES)
     source_parent_line = _git(root, "rev-list", "--parents", "-n", "1", source_revision)
     source_parents = source_parent_line.decode("ascii").strip().split()
     if len(source_parents) != 2 or source_parents[1] != tested_revision:
@@ -1509,6 +1585,7 @@ def verify_release_commit(
             release_commit=release_commit,
             artifact_root=artifact_root,
         )
+    _verify_reviewed_release_tree(root, release_commit)
     parent_line = _git(root, "rev-list", "--parents", "-n", "1", release_commit)
     parents = parent_line.decode("ascii").strip().split()
     if len(parents) != 2 or parents[1] != record["source_git_revision"]:
@@ -1554,6 +1631,7 @@ def verify_release_commit(
         repository=root,
         source_revision=str(record["source_git_revision"]),
     )
+    _verify_reviewed_release_tree(root, str(record["source_git_revision"]))
     source_committed_filenames = (
         MODEL_FILENAME,
         *EVIDENCE_FILES.values(),
@@ -1582,6 +1660,7 @@ def verify_release_commit(
             )
     e2e = load_release_e2e_bytes(_read_regular(artifact_root / RELEASE_E2E_FILENAME))
     tested_revision = str(e2e["tested_reference_model_git_revision"])
+    _verify_reviewed_release_tree(root, tested_revision)
     source_parent_line = _git(
         root, "rev-list", "--parents", "-n", "1", str(record["source_git_revision"])
     )

@@ -41,6 +41,12 @@ The fixed artifact set contains:
 SHA-256 digest. `release/SHA256SUMS` covers the same complete set. The extractor image
 and MediaPipe task model are not distributed.
 
+The v0 archive is source-bound. Verify and run it only from the owner-approved,
+signed `umi-s1-baseline-v0` tag at commit
+`66f84e7d35b095779749b9cf5b7775fa28641f31`. Development `main` contains later
+runtime and release tooling and is intentionally not the verifier or runtime for
+this historical archive.
+
 ## Measured quality
 
 The selected epoch-20 FSboard-initialized state completed the frozen 40-epoch FLEURS

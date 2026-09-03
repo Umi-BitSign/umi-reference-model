@@ -20,6 +20,12 @@ The release history has three commits:
 An immutable release tag must point to C. Do not push, tag, or upload any release
 file until the project owner approves C and its checksum set.
 
+The reviewed v0 C is
+`66f84e7d35b095779749b9cf5b7775fa28641f31`. The owner-approved, signed
+`umi-s1-baseline-v0` tag must point exactly there. Verify and run the v0 archive
+from that source revision; later development `main` revisions intentionally do not
+stand in for its source-bound verifier or runtime.
+
 ## 1. Freeze the model and aggregate evidence
 
 The private training and evaluation authorities must be canonical and

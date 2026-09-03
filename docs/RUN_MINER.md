@@ -40,6 +40,11 @@ previously verified wheel. Then clone this repository and the public UMI reposit
 beside each other. Check out the model release tag and the UMI commit named by the
 signed inactive release.
 
+The values below identify the reviewed v0 model release. Confirm both through the
+trusted release announcement before executing code from the checkout. The signed
+`umi-s1-baseline-v0` tag must resolve to the exact reviewed release commit; a newer
+development `main` is not a substitute.
+
 Run Sections 1 through 5 in the same Bash session. The first command enables
 fail-fast handling so a failed digest, revision, import, or cleanup check stops
 setup. Section 6 saves the non-secret runtime configuration in an owner-only file,
@@ -52,6 +57,8 @@ export UMI_INACTIVE_RELEASE=/absolute/path/to/public-inactive-release
 export UMI_RELEASE_MANIFEST_SHA256=64_LOWERCASE_HEX_CHARACTERS
 export UMI_RELEASE_AUTHORITY=EXPECTED_RELEASE_AUTHORITY_SS58
 export TRUSTED_UMI_RELEASE_VERIFY=/absolute/path/to/trusted/umi-shadow-release-verify
+export MODEL_RELEASE_TAG=umi-s1-baseline-v0
+export EXPECTED_MODEL_RELEASE_GIT_REVISION=66f84e7d35b095779749b9cf5b7775fa28641f31
 test -x "$TRUSTED_UMI_RELEASE_VERIFY"
 test "$(sha256sum "$UMI_INACTIVE_RELEASE/release-manifest.json" | cut -d ' ' -f 1)" = \
   "$UMI_RELEASE_MANIFEST_SHA256"
@@ -67,9 +74,13 @@ cd "$HOME/umi-miner"
 git clone https://github.com/Umi-BitSign/umi-reference-model.git
 git clone https://github.com/Umi-BitSign/umi.git
 cd umi-reference-model
-git checkout RELEASE_TAG
+test "$(git rev-parse "$MODEL_RELEASE_TAG^{commit}")" = \
+  "$EXPECTED_MODEL_RELEASE_GIT_REVISION"
+git checkout --detach "$EXPECTED_MODEL_RELEASE_GIT_REVISION"
+test "$(git rev-parse HEAD)" = "$EXPECTED_MODEL_RELEASE_GIT_REVISION"
 SOURCE_GIT_REVISION="$(jq -r .source_git_revision release/release-manifest.json)"
 RELEASE_GIT_REVISION="$(git rev-parse HEAD)"
+test "$RELEASE_GIT_REVISION" = "$EXPECTED_MODEL_RELEASE_GIT_REVISION"
 test "$(git rev-parse HEAD^)" = "$SOURCE_GIT_REVISION"
 test "$(git rev-list --parents -n 1 HEAD | wc -w | tr -d ' ')" = 2
 test "$(git diff --name-only --no-renames "$SOURCE_GIT_REVISION" HEAD | LC_ALL=C sort)" = \
@@ -80,11 +91,11 @@ test -z "$(git status --short)"
 test -z "$(git -C ../umi status --short)"
 ```
 
-Replace the placeholders with values received through the trusted release channel
-and replace `RELEASE_TAG` with the published immutable model tag. Stop if release
-verification fails, either checkout is dirty, or a revision check fails. Follow
-UMI's `docs/SHADOW_CALIBRATION_OPERATOR.md` if the trusted verifier is not already
-installed.
+Replace the UMI release placeholders with values received through the trusted
+release channel. Stop if either model tag or commit differs from the trusted
+announcement, release verification fails, either checkout is dirty, or a revision
+check fails. Follow UMI's `docs/SHADOW_CALIBRATION_OPERATOR.md` if the trusted
+verifier is not already installed.
 
 ## 2. Install the locked environment
 

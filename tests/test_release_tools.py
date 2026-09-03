@@ -763,6 +763,10 @@ def test_public_s1_release_history_preserves_test_then_evidence_then_metadata(
     for path in staged.iterdir():
         if path.name != release_tool.PUBLIC_E2E_FILENAME:
             shutil.copyfile(path, release / path.name)
+    shutil.copyfile(
+        ROOT / "release" / release_tool.PUBLIC_RUNTIME_MANIFEST_FILENAME,
+        release / release_tool.PUBLIC_RUNTIME_MANIFEST_FILENAME,
+    )
     _git(repository, "add", ".")
     _git(repository, "commit", "-m", "tested public S1 release")
     tested_revision = _git(repository, "rev-parse", "HEAD")
@@ -848,6 +852,85 @@ def test_repository_guard_allows_only_the_two_reviewed_model_archive_paths() -> 
     assert tool._forbidden_suffix("release/unreviewed-model.zip")
 
 
+def test_release_directory_inventory_is_closed(tmp_path: Path) -> None:
+    guard = _load("repo_guard")
+    release_tool = _load("release_artifacts")
+    assert guard.REVIEWED_RELEASE_FILENAMES == release_tool.REVIEWED_RELEASE_FILENAMES
+
+    repository = tmp_path / "repository"
+    release = repository / "release"
+    release.mkdir(parents=True)
+    (release / "training-references.json").write_text(
+        '{"references":["private source reference"]}\n', encoding="utf-8"
+    )
+    _git(repository, "init", "-b", "main")
+    _git(repository, "config", "user.name", "Release Test")
+    _git(repository, "config", "user.email", "release@example.invalid")
+    _git(repository, "config", "commit.gpgsign", "false")
+    _git(repository, "add", ".")
+    _git(repository, "commit", "-m", "candidate with unreviewed release file")
+
+    with pytest.raises(guard.RepositoryGuardError, match="unreviewed file"):
+        guard.check_repository(repository)
+    with pytest.raises(release_tool.ReleaseArtifactError, match="unreviewed file"):
+        release_tool._verify_reviewed_release_tree(repository, "HEAD")
+
+
+def test_public_release_stage_rejects_an_allowed_legacy_filename(tmp_path: Path) -> None:
+    release_tool = _load("release_artifacts")
+    repository = tmp_path / "repository"
+    release = repository / "release"
+    release.mkdir(parents=True)
+    for filename in release_tool.PUBLIC_TESTED_RELEASE_FILENAMES:
+        (release / filename).write_bytes(b"reviewed public artifact\n")
+    (release / release_tool.RIGHTS_EVIDENCE_FILENAME).write_bytes(
+        b'{"references":["private source reference"]}\n'
+    )
+    _git(repository, "init", "-b", "main")
+    _git(repository, "config", "user.name", "Release Test")
+    _git(repository, "config", "user.email", "release@example.invalid")
+    _git(repository, "config", "commit.gpgsign", "false")
+    _git(repository, "add", ".")
+    _git(repository, "commit", "-m", "public A with legacy payload")
+
+    with pytest.raises(release_tool.ReleaseArtifactError, match="exact stage inventory"):
+        release_tool._verify_exact_release_tree(
+            repository,
+            "HEAD",
+            release_tool.PUBLIC_TESTED_RELEASE_FILENAMES,
+        )
+
+
+def test_repository_guard_accepts_exact_public_a_inventory(tmp_path: Path) -> None:
+    guard = _load("repo_guard")
+    release_tool = _load("release_artifacts")
+    repository = tmp_path / "repository"
+    release = repository / "release"
+    release.mkdir(parents=True)
+    for relative in guard.REQUIRED_DIGESTS:
+        destination = repository / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(ROOT / relative, destination)
+    canonical_release_files = {
+        filename: source for filename, source in release_tool.PUBLIC_CANONICAL_COMPANIONS.values()
+    }
+    for filename in release_tool.PUBLIC_TESTED_RELEASE_FILENAMES:
+        destination = release / filename
+        source = canonical_release_files.get(filename)
+        if filename == release_tool.PUBLIC_RUNTIME_MANIFEST_FILENAME:
+            shutil.copyfile(ROOT / "release" / filename, destination)
+        elif source is None:
+            destination.write_bytes(b"reviewed public release input\n")
+        else:
+            shutil.copyfile(ROOT / source, destination)
+    _git(repository, "init", "-b", "main")
+    _git(repository, "add", ".")
+
+    files, size = guard.check_repository(repository)
+    assert files > len(guard.REQUIRED_DIGESTS)
+    assert size > 10_000
+
+
 def test_runtime_file_manifest_describes_versioned_shared_source_closure() -> None:
     lines = (ROOT / "release/runtime-files.txt").read_text(encoding="utf-8").splitlines()
     assert lines[:2] == [
@@ -867,6 +950,9 @@ def test_miner_runbook_uses_locked_no_build_source_paths() -> None:
     assert ".venv/bin/python -m bitsign_motion.local_bundle_rebind" in runbook
     assert "-m bitsign_motion.umi_reference_backend probe" in runbook
     assert 'bin/python" -m umi.miner' in runbook
+    assert "umi-s1-baseline-v0" in runbook
+    assert "66f84e7d35b095779749b9cf5b7775fa28641f31" in runbook
+    assert "git checkout RELEASE_TAG" not in runbook
 
 
 def test_tooling_docs_do_not_require_unversioned_python_command() -> None:

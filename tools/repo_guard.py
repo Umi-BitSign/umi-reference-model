@@ -15,6 +15,36 @@ RELEASE_MODEL_PATHS = frozenset(
         "release/umi-s1-public-finetune-v1-portable.zip",
     }
 )
+REVIEWED_RELEASE_FILENAMES = frozenset(
+    {
+        "2M-FLORES-ASL-ATTRIBUTION.txt",
+        "2M-FLORES-ASL-LICENSE.txt",
+        "CC-BY-4.0.txt",
+        "CC-BY-SA-4.0.txt",
+        "FLEURS-ASL-ATTRIBUTION.txt",
+        "FLEURS-ASL-LICENSE.txt",
+        "FLEURS-ATTRIBUTION.txt",
+        "FSBOARD-ATTRIBUTION.txt",
+        "FSBOARD-LICENSE.txt",
+        "LICENSE",
+        "NOTICE",
+        "README.md",
+        "SHA256SUMS",
+        "TASKMASTER-ATTRIBUTION.txt",
+        "TASKMASTER-LICENSE.txt",
+        "release-manifest.json",
+        "runtime-files.txt",
+        "umi-s1-baseline-v0-motion-ablation-evidence.json",
+        "umi-s1-baseline-v0-portable.zip",
+        "umi-s1-baseline-v0-release-e2e-evidence.json",
+        "umi-s1-baseline-v0-rights-decision.json",
+        "umi-s1-baseline-v0-selection-ledger.json",
+        "umi-s1-public-finetune-v1-evidence.json",
+        "umi-s1-public-finetune-v1-intake-policy.json",
+        "umi-s1-public-finetune-v1-portable.zip",
+        "umi-s1-public-finetune-v1-release-e2e-evidence.json",
+    }
+)
 FORBIDDEN_SUFFIXES = {
     ".docker.tar",
     ".docker.tar.zst",
@@ -48,12 +78,16 @@ REQUIRED_DIGESTS = {
     "licenses/FSBOARD-ATTRIBUTION.txt": (
         "a042e85d40b25f7171c3e4cbd742cf8852361c71e72203f66e0947f0440bff21"
     ),
+}
+COMMON_RELEASE_DIGESTS = {
     "release/LICENSE": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
     "release/NOTICE": "e3742cc8272881c5736681ce8a83284b28f459deafaaff2baac31c696f046e6a",
-    "release/CC-BY-4.0.txt": ("9e5f1b3c610b9c2da5c313bf81d577a7d1acec686bdb0384edefa6df0f90cd94"),
     "release/CC-BY-SA-4.0.txt": (
         "23ee78c8bae49cf08ea2f0c84945c66b987ebe4520881fb51b3dad4fb43d07c2"
     ),
+}
+LEGACY_RELEASE_DIGESTS = {
+    "release/CC-BY-4.0.txt": ("9e5f1b3c610b9c2da5c313bf81d577a7d1acec686bdb0384edefa6df0f90cd94"),
     "release/FLEURS-ATTRIBUTION.txt": (
         "e9e6b293c5e2058d969561e8ac164add7fe1d4221e049de971ae32056e9b8a51"
     ),
@@ -113,6 +147,14 @@ def check_repository(root: Path) -> tuple[int, int]:
         candidate = Path(relative)
         if candidate.is_absolute() or ".." in candidate.parts:
             raise RepositoryGuardError("candidate Git path escapes the repository")
+        if (
+            candidate.parts
+            and candidate.parts[0] == "release"
+            and (len(candidate.parts) != 2 or candidate.name not in REVIEWED_RELEASE_FILENAMES)
+        ):
+            raise RepositoryGuardError(
+                f"repository release directory contains an unreviewed file: {relative}"
+            )
         path = repository / candidate
         metadata = path.lstat()
         if path.is_symlink() or not stat.S_ISREG(metadata.st_mode):
@@ -145,6 +187,21 @@ def check_repository(root: Path) -> tuple[int, int]:
             raise RepositoryGuardError(f"required license file is unavailable: {relative}") from exc
         if hashlib.sha256(payload).hexdigest() != expected:
             raise RepositoryGuardError(f"required license digest differs: {relative}")
+    release_digests = dict(COMMON_RELEASE_DIGESTS)
+    if (repository / "release/umi-s1-baseline-v0-portable.zip").exists():
+        release_digests.update(LEGACY_RELEASE_DIGESTS)
+    for relative, expected in release_digests.items():
+        path = repository / relative
+        if not path.exists():
+            continue
+        try:
+            payload = path.read_bytes()
+        except OSError as exc:
+            raise RepositoryGuardError(
+                f"reviewed release license is unavailable: {relative}"
+            ) from exc
+        if hashlib.sha256(payload).hexdigest() != expected:
+            raise RepositoryGuardError(f"reviewed release license differs: {relative}")
     return checked_files, checked_bytes
 
 
