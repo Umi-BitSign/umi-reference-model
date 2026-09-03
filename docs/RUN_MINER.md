@@ -9,6 +9,12 @@ The release does not distribute a Docker image. Each operator builds the extract
 from source, validates the resulting local image, and derives a new model revision
 that binds that image's immutable ID.
 
+Live calibration also requires a finalized, signed UMI inactive release. Obtain its
+location, canonical `release-manifest.json` SHA-256, and release-authority hotkey
+through a trusted channel. The `umi_git_revision` in this model's manifest records
+the UMI revision used for its published component E2E run. It does not authorize a
+live policy or replace the signed inactive release.
+
 ## Host requirements
 
 Use a Linux/AMD64 host with:
@@ -27,11 +33,12 @@ Docker socket access is usually equivalent to root access on the host. Run the m
 under a dedicated account and never mount wallet directories into the extractor
 container.
 
-## 1. Check out exact code
+## 1. Verify the inactive release and check out exact code
 
-Clone this repository and the public UMI repository beside each other. Check out the
-release tag for this repository and the exact UMI commit recorded in
-`release/release-manifest.json`.
+Verify the UMI release with a verifier from an independently trusted checkout or a
+previously verified wheel. Then clone this repository and the public UMI repository
+beside each other. Check out the model release tag and the UMI commit named by the
+signed inactive release.
 
 Run Sections 1 through 5 in the same Bash session. The first command enables
 fail-fast handling so a failed digest, revision, import, or cleanup check stops
@@ -41,6 +48,20 @@ two terminals.
 
 ```bash
 set -euo pipefail
+export UMI_INACTIVE_RELEASE=/absolute/path/to/public-inactive-release
+export UMI_RELEASE_MANIFEST_SHA256=64_LOWERCASE_HEX_CHARACTERS
+export UMI_RELEASE_AUTHORITY=EXPECTED_RELEASE_AUTHORITY_SS58
+export TRUSTED_UMI_RELEASE_VERIFY=/absolute/path/to/trusted/umi-shadow-release-verify
+test -x "$TRUSTED_UMI_RELEASE_VERIFY"
+test "$(sha256sum "$UMI_INACTIVE_RELEASE/release-manifest.json" | cut -d ' ' -f 1)" = \
+  "$UMI_RELEASE_MANIFEST_SHA256"
+"$TRUSTED_UMI_RELEASE_VERIFY" "$UMI_INACTIVE_RELEASE" \
+  --expected-authority-hotkey "$UMI_RELEASE_AUTHORITY"
+test "$(jq -r .translation_weights_active \
+  "$UMI_INACTIVE_RELEASE/release-manifest.json")" = false
+UMI_GIT_REVISION="$(jq -er .umi_git_revision \
+  "$UMI_INACTIVE_RELEASE/release-manifest.json")"
+
 mkdir -p "$HOME/umi-miner"
 cd "$HOME/umi-miner"
 git clone https://github.com/Umi-BitSign/umi-reference-model.git
@@ -48,7 +69,6 @@ git clone https://github.com/Umi-BitSign/umi.git
 cd umi-reference-model
 git checkout RELEASE_TAG
 SOURCE_GIT_REVISION="$(jq -r .source_git_revision release/release-manifest.json)"
-UMI_GIT_REVISION="$(jq -r .umi_git_revision release/release-manifest.json)"
 RELEASE_GIT_REVISION="$(git rev-parse HEAD)"
 test "$(git rev-parse HEAD^)" = "$SOURCE_GIT_REVISION"
 test "$(git rev-list --parents -n 1 HEAD | wc -w | tr -d ' ')" = 2
@@ -60,8 +80,11 @@ test -z "$(git status --short)"
 test -z "$(git -C ../umi status --short)"
 ```
 
-Replace `RELEASE_TAG` with the published immutable tag. Stop if either checkout is
-dirty or a revision check fails.
+Replace the placeholders with values received through the trusted release channel
+and replace `RELEASE_TAG` with the published immutable model tag. Stop if release
+verification fails, either checkout is dirty, or a revision check fails. Follow
+UMI's `docs/SHADOW_CALIBRATION_OPERATOR.md` if the trusted verifier is not already
+installed.
 
 ## 2. Install the locked environment
 
@@ -221,6 +244,10 @@ install -d -m 700 "$HOME/umi-miner/state"
 RUNTIME_ENV="$HOME/umi-miner/state/reference-miner.env"
 umask 077
 for NAME in \
+  UMI_INACTIVE_RELEASE \
+  UMI_RELEASE_MANIFEST_SHA256 \
+  UMI_RELEASE_AUTHORITY \
+  TRUSTED_UMI_RELEASE_VERIFY \
   UMI_S1_BUNDLE \
   UMI_S1_INFERENCE_REVISION \
   UMI_S1_EXTRACTOR_IMAGE \
@@ -254,33 +281,89 @@ cd "$HOME/umi-miner/umi-reference-model"
 Registration is coldkey-signed and spends the live cost. Stop if the client cannot
 use the required MEV-shielded path.
 
-Keep the video-host allowlist narrow. In terminal A, load the saved runtime
-configuration and start the foreground backend on port 8091. This example admits one
-validator and one HTTPS challenge host. Leave this process running.
+The miner takes its validator registry, protocol limits, finality pin, and activation
+clock from the exact signed policy. Do not edit or reserialize that policy. In
+terminal A, resolve the signed artifact paths, derive the delivery-host allowlist,
+and start the foreground backend on loopback port 8091. Leave this process running.
 
 ```bash
 set -euo pipefail
 cd "$HOME/umi-miner/umi-reference-model"
 source "$HOME/umi-miner/state/reference-miner.env"
+RELEASE_MANIFEST="$UMI_INACTIVE_RELEASE/release-manifest.json"
+test "$(sha256sum "$RELEASE_MANIFEST" | cut -d ' ' -f 1)" = \
+  "$UMI_RELEASE_MANIFEST_SHA256"
+test -x "$TRUSTED_UMI_RELEASE_VERIFY"
+"$TRUSTED_UMI_RELEASE_VERIFY" "$UMI_INACTIVE_RELEASE" \
+  --expected-authority-hotkey "$UMI_RELEASE_AUTHORITY"
+SCORING_POLICY="$UMI_INACTIVE_RELEASE/scoring-policy.json"
+SCORING_POLICY_SHA256="$(jq -er .scoring_policy_sha256 "$RELEASE_MANIFEST")"
+test "$(sha256sum "$SCORING_POLICY" | cut -d ' ' -f 1)" = \
+  "$SCORING_POLICY_SHA256"
+test "$(jq -r .translation_weights_active "$SCORING_POLICY")" = false
+TARGET_TRIPLE="$(jq -er .release_authority.intent.target_triple "$RELEASE_MANIFEST")"
+
+release_artifact() {
+  local relative
+  relative="$(jq -er --arg label "$1" \
+    '.external_artifacts[] | select(.label == $label) | .relative_path' \
+    "$RELEASE_MANIFEST")"
+  printf '%s/%s\n' "$UMI_INACTIVE_RELEASE" "$relative"
+}
+
+FINALITY_VERIFIER="$(release_artifact finality_verifier_binary)"
+FINALITY_CHAIN_SPEC="$(release_artifact finality_chain_spec)"
+MIRROR_DISCOVERY="$(release_artifact mirror_discovery_rule)"
+VIDEO_HOST_ARGS=()
+VIDEO_PORT_ARGS=()
+while IFS=$'\t' read -r HOST PORT; do
+  VIDEO_HOST_ARGS+=(--video-host "$HOST")
+  VIDEO_PORT_ARGS+=(--video-port "$PORT")
+done < <("$HOME/umi-miner/umi-reference-model/.venv/bin/python" \
+  - "$MIRROR_DISCOVERY" <<'PY'
+import json
+import sys
+from pathlib import Path
+from urllib.parse import urlsplit
+
+document = json.loads(Path(sys.argv[1]).read_bytes())
+for origin in document["delivery_origins"]:
+    parsed = urlsplit(origin)
+    if parsed.scheme != "https" or parsed.hostname is None:
+        raise SystemExit("invalid signed delivery origin")
+    print(parsed.hostname, parsed.port or 443, sep="\t")
+PY
+)
+test "${#VIDEO_HOST_ARGS[@]}" -gt 0
+test "${#VIDEO_HOST_ARGS[@]}" = "${#VIDEO_PORT_ARGS[@]}"
+
+install -d -m 700 "$HOME/umi-miner/state"
 "$HOME/umi-miner/umi-reference-model/.venv/bin/python" -m umi.miner \
   --wallet-name umi \
   --hotkey miner \
+  --policy "$SCORING_POLICY" \
+  --target-triple "$TARGET_TRIPLE" \
+  --finality-verifier-binary "$FINALITY_VERIFIER" \
+  --finality-chain-spec "$FINALITY_CHAIN_SPEC" \
+  --finality-state "$HOME/umi-miner/state/miner-finality.sqlite3" \
   --translator bitsign_motion.umi_reference_backend:translator \
   --model-revision "$UMI_S1_INFERENCE_REVISION" \
-  --validator-hotkey VALIDATOR_SS58 \
-  --video-host challenges.example.org \
+  "${VIDEO_HOST_ARGS[@]}" \
+  "${VIDEO_PORT_ARGS[@]}" \
   --nonce-db "$HOME/umi-miner/state/nonces.sqlite3" \
-  --max-inference-concurrency 1 \
+  --assignment-db "$HOME/umi-miner/state/assignments.sqlite3" \
   --inference-timeout 180 \
   --inference-admission-timeout 10 \
   --backend-lifecycle-timeout 60 \
-  --listen-host 0.0.0.0 \
+  --listen-host 127.0.0.1 \
   --port 8091
 ```
 
-Replace `VALIDATOR_SS58` and the challenge hostname with values supplied for the
-component test. The endpoint trusts only `btauth/1` requests from the explicit
-validator allowlist.
+The default inference concurrency is the number of validators in the signed policy;
+a lower value is rejected because each validator needs one schedulable slot. The
+endpoint trusts only `btauth/1` requests from that policy registry. The host and port
+allowlists come from every signed delivery origin, including IPv6 literals and
+non-default HTTPS ports.
 
 Open terminal B, load the same configuration, and check health locally:
 
@@ -288,16 +371,31 @@ Open terminal B, load the same configuration, and check health locally:
 set -euo pipefail
 cd "$HOME/umi-miner/umi-reference-model"
 source "$HOME/umi-miner/state/reference-miner.env"
-curl --fail --silent http://127.0.0.1:8091/healthz | jq .
+HEALTH="$(curl --fail --silent http://127.0.0.1:8091/healthz)"
+printf '%s\n' "$HEALTH" | jq .
+SCORING_POLICY_SHA256="$(jq -er .scoring_policy_sha256 \
+  "$UMI_INACTIVE_RELEASE/release-manifest.json")"
+printf '%s\n' "$HEALTH" | jq -e \
+  --arg policy "$SCORING_POLICY_SHA256" \
+  --arg revision "$UMI_S1_INFERENCE_REVISION" \
+  '.ok == true and
+   .translation_weights_active == false and
+   .protocol_conformance == false and
+   .runtime_mode == "inactive_shadow" and
+   .scoring_policy_sha256 == $policy and
+   .model_revision == $revision and
+   .window_authority == "ProofBackedMinerWindowAuthority" and
+   .finality_service == "running"'
 ```
 
-Expected health includes `translation_weights_active: false`,
-`protocol_conformance: false`, and the derived model revision. Those false values are
-intentional for this component-test release.
+The false weight and conformance values are intentional. A different policy hash,
+model revision, authority mode, or finality status blocks announcement.
 
-Expose the service at a stable public IP and port, then announce that exact public
-endpoint on SN78. The announced port is the ingress or proxy's public port; it may
-differ from backend port 8091.
+Expose the loopback service through a TLS edge or reverse proxy at a stable public IP
+and port, then announce that exact endpoint on SN78. The proxy must preserve the raw
+request target, authentication headers, and body bytes. It must also enforce finite
+header and body timeouts plus the signed 16 KiB header ceiling. The announced port is
+the ingress or proxy's public port; it may differ from backend port 8091.
 
 ```bash
 cd "$HOME/umi-miner/umi-reference-model"

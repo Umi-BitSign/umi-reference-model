@@ -80,6 +80,12 @@ def _load_release_dependencies() -> SimpleNamespace:
         load_translator=importlib.import_module("umi.backends").load_translator,
         Limits=importlib.import_module("umi.config").Limits,
         decrypt_response=importlib.import_module("umi.crypto").decrypt_response,
+        LocalComponentWindowAuthority=importlib.import_module(
+            "umi.miner_admission"
+        ).LocalComponentWindowAuthority,
+        SQLiteMinerResourceLedger=importlib.import_module(
+            "umi.miner_resources"
+        ).SQLiteMinerResourceLedger,
         MinerRuntime=miner.MinerRuntime,
         identity=miner._identity,
         create_app=miner.create_app,
@@ -291,6 +297,7 @@ async def _run_real_reference_model_umi_flow(
     reference_revision: str,
     umi_repository: Path,
     umi_revision: str,
+    state_root: Path,
 ) -> dict[str, Any]:
     started_at_utc = _utc_now()
     _assert_module_from_repository(dependencies.bitsign_motion, reference_repository)
@@ -325,110 +332,153 @@ async def _run_real_reference_model_umi_flow(
     task_model_sha256 = hashlib.sha256(task_model).hexdigest()
     assert task_model_sha256 == "e2dab61191e2dcd0a15f943d8e3ed1dce13c82dfa597b9dd39f562975a50c3f8"
 
-    validator_wallet = _development_wallet(dependencies, "//Alice")
+    validator_wallets = tuple(
+        _development_wallet(dependencies, seed)
+        for seed in ("//Alice", "//Charlie", "//Dave", "//Eve")
+    )
+    validator_hotkeys = frozenset(wallet.hotkey.ss58_address for wallet in validator_wallets)
     miner_wallet = _development_wallet(dependencies, "//Bob")
     miner_hotkey, signature_scheme = dependencies.identity(miner_wallet)
-    translator = dependencies.load_translator(
-        "bitsign_motion.umi_reference_backend:translator",
-        maximum_concurrency=1,
-    )
     limits = dependencies.Limits(
         inference_timeout_seconds=_UMI_INFERENCE_TIMEOUT_SECONDS,
         backend_lifecycle_timeout_seconds=_UMI_LIFECYCLE_TIMEOUT_SECONDS,
         inference_admission_timeout_seconds=_UMI_ADMISSION_TIMEOUT_SECONDS,
+        maximum_inference_concurrency=len(validator_wallets),
     )
-    runtime = dependencies.MinerRuntime(
-        wallet=miner_wallet,
-        hotkey_ss58=miner_hotkey,
-        signature_scheme=signature_scheme,
-        translator=translator,
-        video_fetcher=_ExactVideoFetcher(
-            {
-                hashlib.sha256(valid_video).hexdigest(): valid_video,
-                hashlib.sha256(invalid_video).hexdigest(): invalid_video,
-            }
-        ),
-        allowed_validator_hotkeys=frozenset({validator_wallet.hotkey.ss58_address}),
-        authenticator=dependencies.RequestAuthenticator.in_memory(miner_hotkey),
+    translator = dependencies.load_translator(
+        "bitsign_motion.umi_reference_backend:translator",
+        maximum_concurrency=limits.maximum_inference_concurrency,
+        expected_model_revision=revision,
+    )
+    state_root.mkdir(mode=0o700)
+    authenticator = dependencies.RequestAuthenticator.sqlite(
+        miner_hotkey,
+        state_root / "nonces.sqlite3",
+        max_age_seconds=limits.btauth_max_age_seconds,
+        allowed_skew_seconds=limits.btauth_allowed_skew_seconds,
+        allowed_hotkeys=validator_hotkeys,
+        maximum_nonces_per_hotkey=limits.maximum_nonce_rows_per_validator,
+        maximum_total_nonces=limits.maximum_nonce_rows_total,
+        maximum_database_bytes=limits.maximum_nonce_database_bytes,
+    )
+    resource_ledger = dependencies.SQLiteMinerResourceLedger(
+        state_root / "assignments.sqlite3",
+        miner_hotkey=miner_hotkey,
+        scoring_policy_sha256="20" * 32,
         limits=limits,
-        model_revision=revision,
-        inference_semaphore=asyncio.Semaphore(1),
     )
-    app = dependencies.create_app(runtime)
-
-    async with app.router.lifespan_context(app):
-        async with dependencies.httpx.AsyncClient(
-            base_url="http://miner.test",
-            transport=dependencies.httpx.ASGITransport(app=app),
-        ) as client:
-            health = await client.get("/healthz")
-        assert health.status_code == 200
-        assert health.json() == {
-            "ok": True,
-            "netuid": 78,
-            "translation_weights_active": False,
-            "protocol_conformance": False,
-            "model_revision": revision,
-        }
-
-        current_round = dependencies.bt.timelock.current_round()
-        response_close_round = current_round + _RESPONSE_WINDOW_ROUNDS
-        reveal_round = response_close_round + 2
-        requests = (
-            _request(
-                dependencies,
-                valid_video,
-                index=1,
-                reveal_round=reveal_round,
-                response_close_round=response_close_round,
+    try:
+        runtime = dependencies.MinerRuntime(
+            wallet=miner_wallet,
+            hotkey_ss58=miner_hotkey,
+            signature_scheme=signature_scheme,
+            translator=translator,
+            video_fetcher=_ExactVideoFetcher(
+                {
+                    hashlib.sha256(valid_video).hexdigest(): valid_video,
+                    hashlib.sha256(invalid_video).hexdigest(): invalid_video,
+                }
             ),
-            _request(
-                dependencies,
-                invalid_video,
-                index=2,
-                reveal_round=reveal_round,
-                response_close_round=response_close_round,
-            ),
+            allowed_validator_hotkeys=validator_hotkeys,
+            authenticator=authenticator,
+            limits=limits,
+            scoring_policy_sha256="20" * 32,
+            response_deadline_blocks=10,
+            resource_ledger=resource_ledger,
+            window_authority=dependencies.LocalComponentWindowAuthority(),
+            model_revision=revision,
+            inference_semaphore=asyncio.Semaphore(len(validator_wallets)),
+            work_semaphore=asyncio.Semaphore(len(validator_wallets)),
         )
-        outcomes = []
-        for request in requests:
-            outcome = await dependencies.query_miner(
-                request,
-                wallet=validator_wallet,
-                miner_url="http://miner.test",
-                miner_hotkey=miner_hotkey,
-                limits=limits,
-                timeout_seconds=_UMI_INFERENCE_TIMEOUT_SECONDS,
+        app = dependencies.create_app(runtime)
+        async with app.router.lifespan_context(app):
+            async with dependencies.httpx.AsyncClient(
+                base_url="http://miner.test",
                 transport=dependencies.httpx.ASGITransport(app=app),
-            )
-            assert outcome.failure_code is None
-            assert outcome.envelope is not None
-            assert outcome.sealed_response is not None
-            assert outcome.plaintext is None
-            assert outcome.plaintext_bytes is None
-            outcomes.append(outcome)
+            ) as client:
+                health = await client.get("/healthz")
+            assert health.status_code == 200
+            assert health.json() == {
+                "ok": True,
+                "netuid": 78,
+                "translation_weights_active": False,
+                "protocol_conformance": False,
+                "runtime_mode": "inactive_shadow",
+                "scoring_policy_sha256": "20" * 32,
+                "model_revision": revision,
+                "window_authority": "LocalComponentWindowAuthority",
+                "finality_service": "component_authority",
+            }
 
-        plaintext_bytes = []
-        plaintexts = []
-        for outcome in outcomes:
-            assert outcome.envelope is not None
-            assert outcome.sealed_response is not None
-            raw_plaintext = await asyncio.to_thread(
-                dependencies.decrypt_response,
-                outcome.sealed_response,
-                reveal_round=reveal_round,
-                sha256_hex=outcome.sealed_response.sha256_hex,
-                wait=True,
-                timeout=_REVEAL_WAIT_TIMEOUT_SECONDS,
+            current_round = dependencies.bt.timelock.current_round()
+            response_close_round = current_round + _RESPONSE_WINDOW_ROUNDS
+            reveal_round = response_close_round + 2
+            requests = (
+                _request(
+                    dependencies,
+                    valid_video,
+                    index=1,
+                    reveal_round=reveal_round,
+                    response_close_round=response_close_round,
+                ),
+                _request(
+                    dependencies,
+                    invalid_video,
+                    index=2,
+                    reveal_round=reveal_round,
+                    response_close_round=response_close_round,
+                ),
             )
-            plaintext_bytes.append(raw_plaintext)
-            plaintexts.append(
-                dependencies.validate_response_plaintext(
-                    raw_plaintext,
-                    envelope=outcome.envelope,
-                    request=outcome.request,
+            outcomes = list(
+                await asyncio.gather(
+                    *(
+                        dependencies.query_miner(
+                            request,
+                            wallet=validator_wallet,
+                            miner_url="http://miner.test",
+                            miner_hotkey=miner_hotkey,
+                            limits=limits,
+                            timeout_seconds=_UMI_INFERENCE_TIMEOUT_SECONDS,
+                            transport=dependencies.httpx.ASGITransport(app=app),
+                        )
+                        for request, validator_wallet in zip(
+                            requests,
+                            validator_wallets[:2],
+                            strict=True,
+                        )
+                    )
                 )
             )
+            for outcome in outcomes:
+                assert outcome.failure_code is None
+                assert outcome.envelope is not None
+                assert outcome.sealed_response is not None
+                assert outcome.plaintext is None
+                assert outcome.plaintext_bytes is None
+
+            plaintext_bytes = []
+            plaintexts = []
+            for outcome in outcomes:
+                assert outcome.envelope is not None
+                assert outcome.sealed_response is not None
+                raw_plaintext = await asyncio.to_thread(
+                    dependencies.decrypt_response,
+                    outcome.sealed_response,
+                    reveal_round=reveal_round,
+                    sha256_hex=outcome.sealed_response.sha256_hex,
+                    wait=True,
+                    timeout=_REVEAL_WAIT_TIMEOUT_SECONDS,
+                )
+                plaintext_bytes.append(raw_plaintext)
+                plaintexts.append(
+                    dependencies.validate_response_plaintext(
+                        raw_plaintext,
+                        envelope=outcome.envelope,
+                        request=outcome.request,
+                    )
+                )
+    finally:
+        resource_ledger.close()
 
     successful, invalid = plaintexts
     assert successful.status == "ok"
@@ -533,7 +583,7 @@ async def _run_real_reference_model_umi_flow(
     )
 
 
-def test_real_reference_model_returns_signed_timelocked_umi_responses() -> None:
+def test_real_reference_model_returns_signed_timelocked_umi_responses(tmp_path: Path) -> None:
     output = _required_output_path("BITSIGN_UMI_RELEASE_E2E_REPORT")
     reference_repository = Path(__file__).resolve().parents[1]
     umi_raw = os.environ.get("BITSIGN_UMI_REPOSITORY")
@@ -552,6 +602,7 @@ def test_real_reference_model_returns_signed_timelocked_umi_responses() -> None:
             reference_revision=reference_revision,
             umi_repository=umi_repository,
             umi_revision=umi_revision,
+            state_root=tmp_path / "miner-state",
         )
     )
     _write_private_report(
