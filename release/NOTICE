@@ -5,22 +5,11 @@ Software source in this repository is licensed under the Apache License 2.0.
 The model weights and their inference bundle are licensed under Creative Commons
 Attribution-ShareAlike 4.0 International (CC BY-SA 4.0).
 
-The weights were trained from these sources:
-
-FLEURS-ASL by Garrett Tanzer and Google AI is licensed under CC BY-SA 4.0.
-Source: https://www.kaggle.com/datasets/googleai/fleurs-asl
-Citation: Garrett Tanzer, "FLEURS-ASL: Including American Sign Language in
-Massively Multilingual Multitask Evaluation," arXiv:2408.13585 (2024).
-Changes: UMI selects 2-to-15-second segments, derives skeletal motion
-representations, trains model weights, and does not redistribute source videos or
-annotations.
-
-FSboard (daun_v3 and dmk_v3), Copyright 2025 Google, is licensed under CC BY 4.0.
-Citation: Manfred Georg et al., "FSboard: Over 3 million characters of ASL
-fingerspelling collected via smartphones," arXiv:2407.15806 (2024).
-Changes: UMI filters sensitive and over-length records, uses MediaPipe landmark
-sequences to train model weights, and does not redistribute FSboard records.
+The public S1 model has training lineage from 2M-Flores-ASL, FLEURS-ASL, FSboard,
+and Taskmaster-1. The sealed release includes the reviewed license copy and exact
+attribution companion for each source. Those source-specific companions are the
+authoritative attribution notices for this release.
 
 This repository and its release assets contain no source videos, source annotations,
-or FSboard records. The MediaPipe Holistic task model is downloaded separately by
-operators and is not distributed as a UMI release asset.
+derived source records, or FSboard records. The MediaPipe Holistic task model is
+downloaded separately by operators and is not distributed as a UMI release asset.

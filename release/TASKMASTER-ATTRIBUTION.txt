@@ -1,0 +1,1 @@
+Taskmaster-1 (TM-1-2019) by Google is licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Source: https://github.com/google-research-datasets/Taskmaster at revision d92cb6af3005f1dc09c39e75e7daf4a04905e00b. Changes: UMI filters and normalizes short English utterances for decoder-only language pretraining and does not redistribute source conversations.

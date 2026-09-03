@@ -1,7 +1,8 @@
 # Run the UMI S1 reference miner
 
-This profile serves the low-accuracy S1 integration fixture through the no-weight UMI
-component miner. It is not a usable ASL translator or accessibility tool. UMI
+This profile serves the low-accuracy S1 public bootstrap through a no-weight UMI
+miner. It is a starter model for miners to inspect and improve. It is not an ASL
+translator, accessibility tool, production service, or activation result. UMI
 translation weights are inactive, so registration and successful responses do not
 guarantee mining rewards.
 
@@ -40,10 +41,10 @@ previously verified wheel. Then clone this repository and the public UMI reposit
 beside each other. Check out the model release tag and the UMI commit named by the
 signed inactive release.
 
-The values below identify the reviewed v0 model release. Confirm both through the
-trusted release announcement before executing code from the checkout. The signed
-`umi-s1-baseline-v0` tag must resolve to the exact reviewed release commit; a newer
-development `main` is not a substitute.
+The values below identify the reviewed public-finetune v1 model release. Confirm
+both through the trusted release announcement before executing code from the
+checkout. The signed `umi-s1-public-finetune-v1` tag must resolve to the exact
+reviewed release commit; a newer development `main` is not a substitute.
 
 Run Sections 1 through 5 in the same Bash session. The first command enables
 fail-fast handling so a failed digest, revision, import, or cleanup check stops
@@ -57,8 +58,8 @@ export UMI_INACTIVE_RELEASE=/absolute/path/to/public-inactive-release
 export UMI_RELEASE_MANIFEST_SHA256=64_LOWERCASE_HEX_CHARACTERS
 export UMI_RELEASE_AUTHORITY=EXPECTED_RELEASE_AUTHORITY_SS58
 export TRUSTED_UMI_RELEASE_VERIFY=/absolute/path/to/trusted/umi-shadow-release-verify
-export MODEL_RELEASE_TAG=umi-s1-baseline-v0
-export EXPECTED_MODEL_RELEASE_GIT_REVISION=66f84e7d35b095779749b9cf5b7775fa28641f31
+export MODEL_RELEASE_TAG=umi-s1-public-finetune-v1
+export EXPECTED_MODEL_RELEASE_GIT_REVISION=cd31402c451f5da3af87fcd8c10f9ed0fbe43d27
 test -x "$TRUSTED_UMI_RELEASE_VERIFY"
 test "$(sha256sum "$UMI_INACTIVE_RELEASE/release-manifest.json" | cut -d ' ' -f 1)" = \
   "$UMI_RELEASE_MANIFEST_SHA256"
@@ -248,9 +249,9 @@ test -z "$(find "$UMI_S1_TEMP_ROOT" -mindepth 1 -print -quit)"
 test -z "$(docker ps --all --filter name=bitsign-holistic- --format '{{.ID}}')"
 ```
 
-The probe must report `status: ready`, `claim_status: component_test_no_weight`, and
-the derived revision. A package, image, task, source, or identity mismatch blocks
-startup.
+The probe must report `status: ready` and the derived revision. Check that the
+reported no-weight claim status agrees with the signed release manifest. A package,
+image, task, source, or identity mismatch blocks startup.
 
 Save the runtime variables for the two terminals used below. This file contains no
 wallet seed, but keep it owner-only because it describes the local deployment:

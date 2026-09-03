@@ -1,15 +1,15 @@
-# Model card: UMI S1 baseline
+# Model card: UMI S1 public bootstrap
 
 ## Model identity
 
-S1 is a compact skeletal-motion-to-English model released as a low-accuracy UMI
-integration fixture and miner replacement target. Each sealed release publishes its
-base inference revision in the portable bundle's `inference-identity.json`. The
-release manifest binds that revision to the model archive, source revision, aggregate
-evidence, UMI revision, and rights decision. Each operator derives another inference
-revision that binds the immutable ID of the extractor image built on that host.
+`umi-s1-public-finetune-v1` is a compact skeletal-motion-to-English public bootstrap
+for UMI miners. It is a starter model and replacement target. Its performance
+evidence is limited to the aggregate validation record below. The sealed archive
+binds the model, tokenizer, configuration, preprocessing
+contract, training-lineage review, and inference identity. Each operator derives a
+separate inference identity by binding the exact local extractor image it built.
 
-Release status: `component_test_no_weight`
+Release class: no-weight public bootstrap.
 
 ## Architecture and input
 
@@ -28,53 +28,39 @@ are separately identified and are not bit-equivalent.
 
 ## Training lineage
 
-The selected arm initializes the S1 encoder from FSboard fingerspelling pretraining,
-then trains the ASL-to-English model on FLEURS-ASL. The frozen run used seed 17,
-completed 40 epochs, selected epoch 20 from validation, and opened the held-out test
-partition once after model and postprocessing selection.
+The public training lineage includes 2M-Flores-ASL, FLEURS-ASL, FSboard, and
+Taskmaster-1. The completed run selected epoch 3 of 6 on FLEURS validation. It made
+no test or devtest inference call.
 
 The public release contains weights and inference metadata. It contains no training
-videos, source annotations, derived source records, signer identifiers, or MediaPipe
-task binary.
+videos, source annotations, derived source records, signer identifiers, references,
+or MediaPipe task binary.
 
 ## Evaluation
 
-| Evaluation | Mean normalized score |
+| Fixed FLEURS validation condition | Mean normalized score |
 |---|---:|
-| Frozen validation, raw decoder | 0.015885 |
-| Held-out test, raw decoder | 0.014881 |
-| Frozen validation, original greedy decoder plus selected eight-word cap | 0.044418 |
-| Fixed validation, beam-2/24-token/no-repeat-trigram decoder plus selected eight-word cap | 0.059346 |
-| Fixed validation, zero-motion ablation with release decoder | 0.075531 |
-| Fixed validation, permuted-motion ablation with release decoder | 0.053052 |
+| Selected epoch 3, real motion | 0.052609 |
+| Selected epoch 3, zero-motion control | 0.043834 |
+| Selected epoch 3, deterministically deranged-motion control | 0.046340 |
 
-Scores use exact single-reference WER through the pinned UMI normalization adapter.
-The output cap was selected using validation predictions before test opening. The
-later beam-decoder choice used validation behavior after the original release had
-already opened the test partition. No beam-decoder test score is reported as untouched
-evidence.
+Scores are exact mean normalized scores under the pinned UMI WER adapter. The
+selected real-motion score exceeded each control by at least the configured 0.001
+minimum. It produced 280 distinct real-motion hypotheses across 285 items, with no
+empty or unknown-token output. Candidate selection used no test or devtest inference.
 
-The public selection ledger and motion-ablation record are aggregate-only projections
-of bound private reports. They contain no per-sample source rows, references, tensor
-identities, token IDs, hypotheses, or edit distances. Independent aggregate
-reproduction requires legally obtained source data and the bound evaluators.
+The public intake evidence is an aggregate-only projection of bound private reports.
+It contains no per-sample source rows, references, tensor identities, token IDs,
+hypotheses, or edit distances. Independent aggregate reproduction requires legally
+obtained source data and the bound evaluators.
 
-The selection ledger separately records the predecessor revision used for the
-aggregate quality run and the source-rebound release revision. The latter preserves
-the selected model, config, tokenizer, decoder, and materialized-motion evaluation
-semantics while rebinding the checked-in runtime source closure. This is an explicit
-evidence transfer, not a new quality evaluation.
-
-Zero motion scored above real motion. The model reacts to motion because real motion
-scored above the deterministic permutation, but this diagnostic does not establish
-useful motion grounding. The real-motion score is below UMI's provisional 0.10 utility
-floor. These results are outside the independent WER/CER validity study, public
-calibration, ten-tempo agreement trial, and 30-day activation soak required by the UMI
-specification.
+The result is a development diagnostic. It is not an untouched confirmation result,
+an estimate of real-world accuracy, an accessibility certification, proof of
+interpreter equivalence, or evidence that UMI translation weights should activate.
 
 ## Intended use
 
-This fixture supports:
+This public bootstrap supports:
 
 - integration testing of the asynchronous UMI miner backend;
 - a common replacement target for miners developing other models;
@@ -82,15 +68,14 @@ This fixture supports:
   and post-reveal decryption.
 
 It has no validated production, accessibility, interpreter, mobile, medical, legal,
-financial, emergency, employment, or safety use.
+financial, emergency, employment, safety, or high-consequence use.
 
 ## Limitations and excluded use
 
 Outputs are often wrong, repetitive, or incomplete. The eight-word cap can truncate
 meaning. Landmark extraction can fail under occlusion, unusual framing, motion blur,
-or unsupported media. Skeletal features discard appearance cues that may matter to
-translation. The motion ablation shows that the released state relies too heavily on
-its learned language prior.
+or unsupported media. Skeletal features discard appearance and contextual cues that
+may matter to translation.
 
 Do not use this model as an ASL interpreter or accessibility tool, or as input to a
 decision affecting a person's health, legal rights, finances, safety, employment, or
@@ -100,9 +85,16 @@ unreliable.
 ## Licenses
 
 The model weights and portable bundle are licensed under CC BY-SA 4.0. Training
-lineage includes FLEURS-ASL under CC BY-SA 4.0 and FSboard under CC BY 4.0. Required
+lineage includes 2M-Flores-ASL, FLEURS-ASL, FSboard, and Taskmaster-1. Required
 license texts, attributions, and modification notices are shipped as separate sealed
 release artifacts. Runtime code is Apache-2.0.
 
 The MediaPipe Holistic task binary is not redistributed. Operators download it from
 the pinned Google storage URL and verify its SHA-256 digest.
+
+## Platform scope
+
+The published runtime supports Linux/AMD64 extraction and PyTorch inference. CUDA is
+optional when available to a miner. Native iOS, Core ML, and Android packages are not
+included or validated. A future mobile release must establish a deterministic mobile
+preprocessing contract and evaluate it independently.

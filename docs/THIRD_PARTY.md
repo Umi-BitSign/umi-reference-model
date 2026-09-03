@@ -5,12 +5,15 @@ must preserve upstream licenses, notices, and source obligations.
 
 ## Training lineage
 
-| Source | License | Distribution in this project |
+| Source | License | Role and distribution in this project |
 |---|---|---|
+| 2M-Flores-ASL (`facebook/2M-Flores-ASL`, revision `b450c1a427738e78f06362fc4619674f5d74f774`) | CC BY-SA 4.0 | Up-to-15-second `dev` views for skeletal-motion-to-English training; `devtest` hard-excluded. Dependent weights and attribution only. |
 | FLEURS-ASL | CC BY-SA 4.0 | Dependent weights and attribution only |
 | FSboard | CC BY 4.0 | Dependent weights and attribution only |
+| Taskmaster-1 (`TM-1-2019`; source repository revision `d92cb6af3005f1dc09c39e75e7daf4a04905e00b`) | CC BY 4.0 | Filtered, normalized short English utterances for decoder-only language pretraining. Dependent weights and attribution only. |
 
-Source videos, annotations, and FSboard records are excluded from the release.
+Source videos, annotations, FSboard records, and Taskmaster conversations are excluded
+from the release.
 
 ## Python runtime
 

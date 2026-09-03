@@ -1,12 +1,13 @@
 # UMI S1 Reference Model
 
-Status: `component_test_no_weight`; low-accuracy integration fixture
+Status: public no-weight bootstrap candidate (`umi-s1-public-finetune-v1`)
 
-This repository packages a compact ASL-to-English model and a reference backend for
-testing the UMI miner interface. It gives miners a common implementation to run,
-inspect, and replace. The model is not a usable ASL translator, an accessibility
-tool, activation evidence, or a guarantee of mining rewards. UMI translation weights
-remain inactive.
+This repository packages a compact ASL-to-English reference model and backend for
+UMI miners. It gives miners a working baseline to inspect, operate, and improve.
+UMI translation weights remain inactive.
+
+S1 is an early, low-accuracy model. It is not an ASL interpreter, an accessibility
+tool, activation evidence, a production service, or a guarantee of mining rewards.
 
 ## What it does
 
@@ -21,79 +22,68 @@ words.
 The UMI miner timelock-encrypts and signs the response. The model backend does not
 handle wallet keys or submit chain calls.
 
-## Sealed release set
+## Release contents
 
-The fixed artifact set contains:
+The sealed `umi-s1-public-finetune-v1` release contains:
 
-- `umi-s1-baseline-v0-portable.zip` (`model`);
-- `umi-s1-baseline-v0-selection-ledger.json` (`selection-ledger`);
-- `umi-s1-baseline-v0-motion-ablation-evidence.json`
-  (`motion-ablation-evidence`);
-- `umi-s1-baseline-v0-rights-decision.json` (`rights-evidence`);
-- `umi-s1-baseline-v0-release-e2e-evidence.json` (`release-e2e-evidence`);
+- `umi-s1-public-finetune-v1-portable.zip` (`model`);
+- `umi-s1-public-finetune-v1-evidence.json` (`intake-evidence`);
+- `umi-s1-public-finetune-v1-intake-policy.json` (`intake-policy`);
+- `umi-s1-public-finetune-v1-release-e2e-evidence.json`
+  (`release-e2e-evidence`);
 - `LICENSE` (`code-license`) and `NOTICE` (`notice`);
-- `CC-BY-SA-4.0.txt` (`model-license`) and `FLEURS-ATTRIBUTION.txt`
-  (`fleurs-attribution`);
-- `CC-BY-4.0.txt` (`fsboard-license`) and `FSBOARD-ATTRIBUTION.txt`
-  (`fsboard-attribution`).
+- `CC-BY-SA-4.0.txt` (`model-license`); and
+- one exact license and attribution companion for each source in the training
+  lineage: 2M-Flores-ASL, FLEURS-ASL, FSboard, and Taskmaster-1.
 
-`release/release-manifest.json` records each artifact's fixed name, byte length, and
-SHA-256 digest. `release/SHA256SUMS` covers the same complete set. The extractor image
-and MediaPipe task model are not distributed.
+`release/release-manifest.json` records each fixed artifact name, byte length, and
+SHA-256 digest. `release/SHA256SUMS` covers the same closed inventory. The extractor
+image and MediaPipe task model are deliberately not distributed.
 
-The v0 archive is source-bound. Verify and run it only from the owner-approved,
-signed `umi-s1-baseline-v0` tag at commit
-`66f84e7d35b095779749b9cf5b7775fa28641f31`. Development `main` contains later
-runtime and release tooling and is intentionally not the verifier or runtime for
-this historical archive.
+## Evaluation boundary
 
-## Measured quality
+The selected epoch is 3 from a completed six-epoch run. On the fixed FLEURS
+validation diagnostic, the exact mean normalized score under the pinned WER adapter
+was 0.052609 for real motion, 0.043834 for zero motion, and 0.046340 for
+deterministically deranged motion. The real-motion result exceeded both controls by
+the configured 0.001 minimum. It produced 280 distinct real-motion hypotheses across
+285 items, with no empty or unknown-token output. This supports publishing a
+motion-grounded bootstrap candidate. It does not make the model accurate enough for
+use beyond that purpose.
 
-The selected epoch-20 FSboard-initialized state completed the frozen 40-epoch FLEURS
-run. Under the exact single-reference WER adapter, its raw mean normalized score was
-0.015885 on validation and 0.014881 on the already-opened test partition. The
-validation-selected eight-word cap raised the original greedy-decoder validation
-score to 0.044418. On the same fixed 285-sample validation set, the later
-beam-2/24-token/no-repeat-trigram policy scored 0.059346. This decoder choice was
-made after the test partition had been opened; no beam-decoder test score is reported
-as untouched evidence.
+The release ships aggregate-only validation evidence. It does not publish source
+rows, references, predictions, token IDs, per-example edit distances, training
+checkpoints, or raw video. No test or devtest inference was used for candidate
+selection.
 
-The aggregate motion diagnostic scored real motion at 0.059346, zero motion at
-0.075531, and deterministically permuted motion at 0.053052. Zero motion outscoring
-real motion means useful motion grounding has not been established. The public
-selection and ablation records contain aggregate results and private-report digests,
-not per-sample source rows, references, tensor identities, token IDs, hypotheses, or
-edit distances.
-
-The selection ledger names both the revision used for the aggregate quality run and
-the source-rebound release revision. The release keeps the selected model, config,
-tokenizer, decoder, and materialized-motion evaluation semantics, but it receives a
-new identity because its checked-in runtime source closure changed. The ledger does
-not present that transfer as a fresh quality run on the release revision.
-
-The real-motion validation score is below UMI's provisional 0.10 utility floor.
-These measurements do not establish positive miner utility, expected quality,
-production quality, accessibility value, or compliance with a UMI activation gate.
-The E2E record tests the release plumbing on one Linux/AMD64 host and reports no
-translation-quality result.
+The public validation result is a development diagnostic, not an estimate of
+real-world translation quality. It does not establish positive miner utility, UMI
+activation readiness, accessibility value, production quality, or compliance with a
+UMI activation gate. The Linux/AMD64 E2E record checks the request-to-reveal release
+path, not translation quality.
 
 ## Run it
 
-Use [the miner runbook](docs/RUN_MINER.md). It builds the extractor locally, validates
-its immutable image ID and installed packages, and binds that ID into a derived model
-bundle before startup. Release owners should complete
-[the release checklist](docs/RELEASE.md). The exact-source transfer procedure is in
-[the staging procedure](docs/SOURCE_STAGING.md).
+Use [the miner runbook](docs/RUN_MINER.md). It builds the extractor locally,
+validates its immutable image ID and installed packages, then binds that ID into a
+derived model bundle before startup. The release procedure is in
+[the public S1 release guide](docs/PUBLIC_S1_RELEASE.md).
+
+## Platform support
+
+The released serving path requires a locally built Linux/AMD64 MediaPipe extractor.
+CUDA is optional for the PyTorch model when the host supports it. A native iOS or
+Core ML package is not part of this release. iOS and Android inference remain future
+work and need their own deterministic preprocessing and evaluation evidence.
 
 ## Licenses and attribution
 
-Repository code is licensed under Apache-2.0. Model weights and the portable model
-bundle are licensed under CC BY-SA 4.0 because their lineage includes FLEURS-ASL.
-FSboard is CC BY 4.0. Full license texts and source notices are included in the sealed
-artifact set and under `licenses/`; required attribution is also in `NOTICE`.
+Repository code is Apache-2.0. Model weights and the portable bundle are CC BY-SA
+4.0. The complete source lineage and required attribution are in `NOTICE` and the
+sealed release companions.
 
 Runtime dependency and local-image distribution notes are documented in
 [the third-party inventory](docs/THIRD_PARTY.md).
 
-No source videos, annotations, FSboard records, MediaPipe task binary, secrets, or
-wallet material belong in this repository or its release artifacts.
+No source videos, annotations, derived source records, MediaPipe task binary,
+secrets, or wallet material belong in this repository or its release artifacts.
