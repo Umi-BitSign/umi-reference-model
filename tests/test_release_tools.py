@@ -15,6 +15,7 @@ from types import ModuleType
 import pytest
 import torch
 
+from bitsign_motion import public_s1_release_intake as public_intake
 from bitsign_motion import s1_portable_runtime as portable_module
 from bitsign_motion import s1_release_evidence as release_evidence
 from bitsign_motion.canonical import canonical_json_bytes, canonical_json_sha256
@@ -33,6 +34,12 @@ from .release_evidence_fixtures import (
     make_rights,
     make_selection,
     write_evidence_set,
+)
+from .test_public_s1_release_intake import (
+    _build_release as _build_public_s1_release,
+)
+from .test_public_s1_release_intake import (
+    _source_license_payload,
 )
 from .test_s1_portable_runtime import (
     _experiment_rights,
@@ -423,6 +430,209 @@ def test_release_model_archive_rejects_invalid_internals(tmp_path: Path) -> None
         release_tool._validate_model_archive(archive.read_bytes(), "12" * 32)
 
 
+def _stage_public_s1_release(
+    release_tool: ModuleType,
+    root: Path,
+) -> tuple[Path, str, str, str]:
+    root.mkdir(parents=True, exist_ok=True)
+    upstream = root / "upstream"
+    upstream.mkdir()
+    source, source_policy = _build_public_s1_release(upstream)
+    intake_root = root / "intake"
+    intake_result = public_intake.intake_public_s1_finetune_release(
+        source,
+        intake_root,
+        policy_path=source_policy,
+    )
+    release = root / "release"
+    release.mkdir()
+    for path in intake_root.iterdir():
+        shutil.copyfile(path, release / path.name)
+    shutil.copyfile(source_policy, release / release_tool.PUBLIC_POLICY_FILENAME)
+    for release_filename, source_relative in release_tool.PUBLIC_CANONICAL_COMPANIONS.values():
+        shutil.copyfile(ROOT / source_relative, release / release_filename)
+    identity = json.loads((source / "portable" / "inference-identity.json").read_bytes())
+    rights_review = json.loads((source / "rights-review.json").read_bytes())
+    for source_record in rights_review["sources"]:
+        companion = release_tool.PUBLIC_SOURCE_COMPANIONS[source_record["source_id"]]
+        (release / companion["license"][1]).write_bytes(
+            _source_license_payload(source_record["source_id"])
+        )
+        (release / companion["attribution"][1]).write_bytes(
+            source_record["attribution_notice"].encode("utf-8")
+        )
+    revision = str(intake_result["inference_revision"])
+    umi_revision = "9a" * 20
+    tested_revision = "13" * 20
+    e2e = make_e2e(
+        identity,
+        revision,
+        umi_revision,
+        tested_revision,
+        release_profile=release_tool.PUBLIC_PROFILE,
+    )
+    (release / release_tool.PUBLIC_E2E_FILENAME).write_bytes(canonical_json_bytes(e2e))
+    return release, revision, umi_revision, tested_revision
+
+
+def _public_release_arguments(
+    release_tool: ModuleType,
+    release: Path,
+    revision: str,
+    umi_revision: str,
+    *,
+    source_revision: str = "78" * 20,
+) -> argparse.Namespace:
+    artifacts = release_tool.PUBLIC_ARTIFACTS
+    return argparse.Namespace(
+        release_id="umi-s1-public-finetune-v1",
+        inference_revision=revision,
+        rights_decision_sha256=None,
+        public_s1_policy=release / release_tool.PUBLIC_POLICY_FILENAME,
+        source_git_revision=source_revision,
+        umi_git_revision=umi_revision,
+        artifact=[f"{label}={release / filename}" for label, filename in artifacts.items()],
+        output_directory=release,
+        replace=False,
+    )
+
+
+def test_public_s1_release_metadata_accepts_intake_and_bound_source_companions(
+    tmp_path: Path,
+) -> None:
+    release_tool = _load("release_artifacts")
+    release, revision, umi_revision, _tested_revision = _stage_public_s1_release(
+        release_tool, tmp_path
+    )
+    created = release_tool.create_public_s1_release(
+        _public_release_arguments(release_tool, release, revision, umi_revision)
+    )
+
+    assert created["schema"] == release_tool.PUBLIC_SCHEMA
+    assert created["release_profile"] == "public-s1-finetune/1"
+    assert created["inference_revision"] == revision
+    assert release_tool.verify_release(release / "release-manifest.json") == created
+    assert {item["label"] for item in created["artifacts"]} >= set(release_tool.PUBLIC_ARTIFACTS)
+
+
+def test_public_s1_release_metadata_rejects_intake_or_policy_mutation(tmp_path: Path) -> None:
+    release_tool = _load("release_artifacts")
+    release, revision, umi_revision, _tested_revision = _stage_public_s1_release(
+        release_tool, tmp_path
+    )
+    arguments = _public_release_arguments(release_tool, release, revision, umi_revision)
+    release_tool.create_public_s1_release(arguments)
+    evidence = release / public_intake.PUBLIC_S1_FINETUNE_EVIDENCE_FILENAME
+    evidence.write_bytes(evidence.read_bytes() + b"\n")
+
+    with pytest.raises(release_tool.ReleaseArtifactError):
+        release_tool.verify_release(release / "release-manifest.json")
+
+
+def test_public_s1_release_rejects_unrecognized_or_private_source_artifacts(
+    tmp_path: Path,
+) -> None:
+    release_tool = _load("release_artifacts")
+    release, revision, umi_revision, _tested_revision = _stage_public_s1_release(
+        release_tool, tmp_path
+    )
+    leaked = release / "training-references.json"
+    leaked.write_text('{"references":["private source reference"]}\n', encoding="utf-8")
+    arguments = _public_release_arguments(release_tool, release, revision, umi_revision)
+    arguments.artifact.append(f"extra-attribution={leaked}")
+
+    with pytest.raises(release_tool.ReleaseArtifactError, match="artifact set"):
+        release_tool.create_public_s1_release(arguments)
+    assert not (release / "release-manifest.json").exists()
+    assert not (release / "SHA256SUMS").exists()
+
+
+def test_public_s1_release_rejects_source_companion_mutation(tmp_path: Path) -> None:
+    release_tool = _load("release_artifacts")
+    release, revision, umi_revision, _tested_revision = _stage_public_s1_release(
+        release_tool, tmp_path
+    )
+    companion = release / release_tool.PUBLIC_SOURCE_COMPANIONS["fleurs-asl-v1"]["attribution"][1]
+    companion.write_bytes(companion.read_bytes() + b" altered")
+
+    with pytest.raises(release_tool.ReleaseArtifactError, match="reviewed policy"):
+        release_tool.create_public_s1_release(
+            _public_release_arguments(release_tool, release, revision, umi_revision)
+        )
+
+
+def test_public_s1_release_rejects_legacy_e2e_identity(tmp_path: Path) -> None:
+    release_tool = _load("release_artifacts")
+    release, revision, umi_revision, tested_revision = _stage_public_s1_release(
+        release_tool, tmp_path
+    )
+    identity = release_tool._validate_model_archive(
+        (release / public_intake.PUBLIC_S1_FINETUNE_ARCHIVE_FILENAME).read_bytes(),
+        revision,
+    )
+    legacy = make_e2e(identity, revision, umi_revision, tested_revision)
+    (release / release_tool.PUBLIC_E2E_FILENAME).write_bytes(canonical_json_bytes(legacy))
+
+    with pytest.raises(release_tool.ReleaseArtifactError, match="E2E evidence"):
+        release_tool.create_public_s1_release(
+            _public_release_arguments(release_tool, release, revision, umi_revision)
+        )
+
+
+def test_public_s1_e2e_projection_preserves_release_profile(tmp_path: Path) -> None:
+    identity = {
+        "inference_revision": "21" * 32,
+        "preprocessing": {"supported_oci_images": {"linux/amd64": "sha256:" + "30" * 32}},
+    }
+    projected_fixture = make_e2e(
+        identity,
+        "21" * 32,
+        "22" * 20,
+        release_profile=release_evidence.PUBLIC_S1_FINETUNE_RELEASE_PROFILE,
+    )
+    capture = {
+        key: projected_fixture[key]
+        for key in (
+            "release_id",
+            "release_profile",
+            "status",
+            "base_inference_revision",
+            "derived_inference_revision",
+            "tested_reference_model_git_revision",
+            "umi_git_revision",
+            "started_at_utc",
+            "finished_at_utc",
+            "runtime",
+            "timeouts_seconds",
+            "execution",
+        )
+    }
+    capture["fixture"] = {
+        "fixture_class": "rights-cleared-private-video",
+        "video_sha256": "23" * 32,
+        "rights_cleared_for_private_testing": True,
+        "distributed": False,
+    }
+    capture["evidence"] = {
+        "extractor_build_record_content_sha256": "24" * 32,
+        "extractor_build_record_file_sha256": "25" * 32,
+        "valid_wire_response_sha256": "26" * 32,
+        "invalid_wire_response_sha256": "27" * 32,
+        "post_reveal_plaintext_set_sha256": "28" * 32,
+        "run_log_sha256": "29" * 32,
+    }
+    private = release_evidence.seal_private_release_e2e(capture)
+    private_path = tmp_path / "private-e2e.json"
+    private_path.write_bytes(canonical_json_bytes(private))
+
+    projected = release_evidence.project_release_e2e(private_path)
+
+    assert projected["schema"] == release_evidence.PUBLIC_S1_FINETUNE_RELEASE_E2E_SCHEMA
+    assert projected["release_id"] == release_evidence.PUBLIC_S1_FINETUNE_RELEASE_ID
+    assert projected["release_profile"] == release_evidence.PUBLIC_S1_FINETUNE_RELEASE_PROFILE
+    release_evidence.validate_public_s1_finetune_release_e2e(projected)
+
+
 def _git(repository: Path, *arguments: str) -> str:
     return subprocess.run(
         ["git", "-C", str(repository), *arguments],
@@ -518,6 +728,81 @@ def test_release_history_requires_tested_evidence_and_metadata_only_commits(
         )
 
 
+def test_public_s1_release_history_preserves_test_then_evidence_then_metadata(
+    tmp_path: Path,
+) -> None:
+    release_tool = _load("release_artifacts")
+    staged, revision, umi_revision, _placeholder = _stage_public_s1_release(
+        release_tool, tmp_path / "staged"
+    )
+    repository = tmp_path / "repository"
+    release = repository / "release"
+    release.mkdir(parents=True)
+    _git(repository, "init", "-b", "main")
+    _git(repository, "config", "user.name", "Release Test")
+    _git(repository, "config", "user.email", "release@example.invalid")
+    _git(repository, "config", "commit.gpgsign", "false")
+    identity = release_tool._validate_model_archive(
+        (staged / public_intake.PUBLIC_S1_FINETUNE_ARCHIVE_FILENAME).read_bytes(),
+        revision,
+    )
+    for relative in release_tool._identity_source_closure(identity):
+        destination = repository / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(ROOT / relative, destination)
+    rebinder = Path("src/bitsign_motion/local_bundle_rebind.py")
+    (repository / rebinder).parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(ROOT / rebinder, repository / rebinder)
+    for _label, (
+        _release_filename,
+        source_relative,
+    ) in release_tool.PUBLIC_CANONICAL_COMPANIONS.items():
+        destination = repository / source_relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(ROOT / source_relative, destination)
+    for path in staged.iterdir():
+        if path.name != release_tool.PUBLIC_E2E_FILENAME:
+            shutil.copyfile(path, release / path.name)
+    _git(repository, "add", ".")
+    _git(repository, "commit", "-m", "tested public S1 release")
+    tested_revision = _git(repository, "rev-parse", "HEAD")
+
+    e2e = make_e2e(
+        identity,
+        revision,
+        umi_revision,
+        tested_revision,
+        release_profile=release_tool.PUBLIC_PROFILE,
+    )
+    (release / release_tool.PUBLIC_E2E_FILENAME).write_bytes(canonical_json_bytes(e2e))
+    _git(repository, "add", f"release/{release_tool.PUBLIC_E2E_FILENAME}")
+    _git(repository, "commit", "-m", "record public S1 E2E evidence")
+    source_revision = _git(repository, "rev-parse", "HEAD")
+
+    created = release_tool.create_public_s1_release(
+        _public_release_arguments(
+            release_tool,
+            release,
+            revision,
+            umi_revision,
+            source_revision=source_revision,
+        )
+    )
+    _git(repository, "add", "release/release-manifest.json", "release/SHA256SUMS")
+    _git(repository, "commit", "-m", "seal public S1 release metadata")
+    release_revision = _git(repository, "rev-parse", "HEAD")
+
+    assert (
+        release_tool.verify_release_commit(
+            created,
+            release / "release-manifest.json",
+            repository,
+            release_revision,
+        )
+        == release_revision
+    )
+
+
 def test_runtime_staging_uses_only_manifest_paths(tmp_path: Path) -> None:
     tool = _load("stage_runtime")
     source = tmp_path / "private"
@@ -554,6 +839,13 @@ def test_repository_guard_accepts_public_tree() -> None:
     files, size = tool.check_repository(ROOT)
     assert files > 10
     assert size > 10_000
+
+
+def test_repository_guard_allows_only_the_two_reviewed_model_archive_paths() -> None:
+    tool = _load("repo_guard")
+    assert not tool._forbidden_suffix("release/umi-s1-baseline-v0-portable.zip")
+    assert not tool._forbidden_suffix("release/umi-s1-public-finetune-v1-portable.zip")
+    assert tool._forbidden_suffix("release/unreviewed-model.zip")
 
 
 def test_runtime_file_manifest_describes_versioned_shared_source_closure() -> None:

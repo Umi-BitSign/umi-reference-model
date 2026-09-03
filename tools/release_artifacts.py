@@ -17,11 +17,21 @@ from pathlib import Path
 from typing import Any, cast
 
 from bitsign_motion import s1_portable_runtime as portable
+from bitsign_motion.public_s1_release_intake import (
+    PUBLIC_S1_FINETUNE_ARCHIVE_FILENAME,
+    PUBLIC_S1_FINETUNE_EVIDENCE_FILENAME,
+    PUBLIC_S1_FINETUNE_INTAKE_POLICY_SCHEMA,
+    PUBLIC_S1_FINETUNE_INTAKE_SCHEMA,
+    PublicS1ReleaseIntakeError,
+    verify_public_s1_finetune_intake,
+)
 from bitsign_motion.s1_portable_runtime import S1PortableError, load_s1_portable_bundle
 from bitsign_motion.s1_release_evidence import (
     EVIDENCE_FILES,
     MOTION_ABLATION_FILENAME,
     MOTION_ABLATION_SCHEMA,
+    PUBLIC_S1_FINETUNE_RELEASE_ID,
+    PUBLIC_S1_FINETUNE_RELEASE_PROFILE,
     RELEASE_E2E_FILENAME,
     RELEASE_E2E_SCHEMA,
     RIGHTS_EVIDENCE_FILENAME,
@@ -30,20 +40,27 @@ from bitsign_motion.s1_release_evidence import (
     SELECTION_LEDGER_SCHEMA,
     S1ReleaseEvidenceError,
     load_motion_ablation_bytes,
+    load_public_s1_finetune_release_e2e_bytes,
     load_release_e2e_bytes,
     load_rights_evidence_bytes,
     load_selection_ledger_bytes,
 )
 
 SCHEMA = "umi-reference-model-release/2"
+PUBLIC_SCHEMA = "umi-reference-model-public-s1-release/1"
+PUBLIC_PROFILE = portable.S1_PUBLIC_FINETUNE_CLAIM_PROFILE
 STATUS = "component_test_no_weight"
+PUBLIC_STATUS = "baseline_no_weight"
 CONTENT_DOMAIN = b"umi-reference-model-release-v2\0"
+PUBLIC_CONTENT_DOMAIN = b"umi-reference-model-public-s1-release-v1\0"
 SHA256 = re.compile(r"[0-9a-f]{64}")
 GIT_REVISION = re.compile(r"[0-9a-f]{40}")
 RELEASE_ID = re.compile(r"[a-z0-9][a-z0-9._-]{0,127}")
 LABEL = re.compile(r"[a-z][a-z0-9-]{0,63}")
 MAXIMUM_ARTIFACT_BYTES = 128 * 1024 * 1024
 MODEL_FILENAME = "umi-s1-baseline-v0-portable.zip"
+PUBLIC_POLICY_FILENAME = "umi-s1-public-finetune-v1-intake-policy.json"
+PUBLIC_E2E_FILENAME = "umi-s1-public-finetune-v1-release-e2e-evidence.json"
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 COMPANION_ARTIFACT_SOURCES = {
     "code-license": ("LICENSE", "LICENSE"),
@@ -82,6 +99,46 @@ EXPECTED_ARTIFACTS = {
     **{
         label: release_filename
         for label, (release_filename, _source_path) in COMPANION_ARTIFACT_SOURCES.items()
+    },
+}
+PUBLIC_REQUIRED_ARTIFACTS = {
+    "model": PUBLIC_S1_FINETUNE_ARCHIVE_FILENAME,
+    "intake-evidence": PUBLIC_S1_FINETUNE_EVIDENCE_FILENAME,
+    "intake-policy": PUBLIC_POLICY_FILENAME,
+    "release-e2e-evidence": PUBLIC_E2E_FILENAME,
+    "code-license": "LICENSE",
+    "notice": "NOTICE",
+    "model-license": "CC-BY-SA-4.0.txt",
+}
+PUBLIC_CANONICAL_COMPANIONS = {
+    "code-license": ("LICENSE", "LICENSE"),
+    "notice": ("NOTICE", "NOTICE"),
+    "model-license": ("CC-BY-SA-4.0.txt", "licenses/CC-BY-SA-4.0.txt"),
+}
+PUBLIC_SOURCE_COMPANIONS = {
+    "facebook/2M-Flores-ASL": {
+        "license": ("two-m-flores-license", "2M-FLORES-ASL-LICENSE.txt"),
+        "attribution": ("two-m-flores-attribution", "2M-FLORES-ASL-ATTRIBUTION.txt"),
+    },
+    "fleurs-asl-v1": {
+        "license": ("fleurs-license", "FLEURS-ASL-LICENSE.txt"),
+        "attribution": ("fleurs-attribution", "FLEURS-ASL-ATTRIBUTION.txt"),
+    },
+    "fsboard-v3": {
+        "license": ("fsboard-license", "FSBOARD-LICENSE.txt"),
+        "attribution": ("fsboard-attribution", "FSBOARD-ATTRIBUTION.txt"),
+    },
+    "google-research-datasets/taskmaster/TM-1-2019": {
+        "license": ("taskmaster-license", "TASKMASTER-LICENSE.txt"),
+        "attribution": ("taskmaster-attribution", "TASKMASTER-ATTRIBUTION.txt"),
+    },
+}
+PUBLIC_ARTIFACTS = {
+    **PUBLIC_REQUIRED_ARTIFACTS,
+    **{
+        label: filename
+        for source_companions in PUBLIC_SOURCE_COMPANIONS.values()
+        for label, filename in source_companions.values()
     },
 }
 EVIDENCE_SCHEMAS = {
@@ -153,6 +210,12 @@ def _content_sha256(record: dict[str, Any]) -> str:
     unsigned = dict(record)
     unsigned.pop("content_sha256", None)
     return hashlib.sha256(CONTENT_DOMAIN + _canonical(unsigned)).hexdigest()
+
+
+def _public_content_sha256(record: dict[str, Any]) -> str:
+    unsigned = dict(record)
+    unsigned.pop("content_sha256", None)
+    return hashlib.sha256(PUBLIC_CONTENT_DOMAIN + _canonical(unsigned)).hexdigest()
 
 
 def _read_regular(path: Path, *, maximum_bytes: int = MAXIMUM_ARTIFACT_BYTES) -> bytes:
@@ -237,6 +300,107 @@ def _parse_artifacts(
             {"label": label, "filename": path.name, "size_bytes": size, "sha256": digest}
         )
     return sorted(records, key=lambda item: str(item["filename"])), payloads
+
+
+def _parse_public_artifacts(
+    values: list[str], output_directory: Path
+) -> tuple[list[dict[str, object]], dict[str, bytes]]:
+    parsed: dict[str, Path] = {}
+    filenames: set[str] = set()
+    output = output_directory.resolve(strict=True)
+    for value in values:
+        label, separator, raw_path = value.partition("=")
+        path = Path(os.path.abspath(raw_path))
+        if (
+            not separator
+            or LABEL.fullmatch(label) is None
+            or label in parsed
+            or path.parent != output
+            or Path(path.name).name != path.name
+            or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", path.name) is None
+            or path.name in filenames
+        ):
+            raise ReleaseArtifactError(f"invalid or duplicate artifact argument: {value}")
+        parsed[label] = path
+        filenames.add(path.name)
+    for label, filename in PUBLIC_ARTIFACTS.items():
+        path = parsed.get(label)
+        if path is None or path.name != filename:
+            raise ReleaseArtifactError("public S1 release requires its complete fixed artifact set")
+    if set(parsed) != set(PUBLIC_ARTIFACTS):
+        raise ReleaseArtifactError("public S1 release artifact set is not closed")
+
+    records: list[dict[str, object]] = []
+    payloads: dict[str, bytes] = {}
+    for label, path in parsed.items():
+        payload = _read_regular(path)
+        payloads[path.name] = payload
+        records.append(
+            {
+                "label": label,
+                "filename": path.name,
+                "size_bytes": len(payload),
+                "sha256": hashlib.sha256(payload).hexdigest(),
+            }
+        )
+    return sorted(records, key=lambda item: str(item["filename"])), payloads
+
+
+def _validate_public_companions(payloads: dict[str, bytes]) -> None:
+    for label, (release_filename, source_relative) in PUBLIC_CANONICAL_COMPANIONS.items():
+        if payloads.get(release_filename) != _read_regular(REPOSITORY_ROOT / source_relative):
+            raise ReleaseArtifactError(f"{label} differs from its canonical repository source")
+
+
+def _validate_public_source_companions(
+    payloads: dict[str, bytes], intake_evidence: dict[str, Any]
+) -> None:
+    rights_review = intake_evidence.get("rights_review")
+    sources = rights_review.get("sources") if isinstance(rights_review, dict) else None
+    if not isinstance(sources, list):
+        raise ReleaseArtifactError("public S1 source rights are unavailable")
+    source_rows = {row.get("source_id"): row for row in sources if isinstance(row, dict)}
+    if set(source_rows) != set(PUBLIC_SOURCE_COMPANIONS) or len(source_rows) != len(sources):
+        raise ReleaseArtifactError("public S1 source companion inventory differs")
+    for source_id, companions in PUBLIC_SOURCE_COMPANIONS.items():
+        source = source_rows[source_id]
+        license_payload = payloads[companions["license"][1]]
+        attribution_payload = payloads[companions["attribution"][1]]
+        attribution = source.get("attribution_notice")
+        if (
+            not isinstance(attribution, str)
+            or hashlib.sha256(license_payload).hexdigest() != source.get("license_sha256")
+            or attribution_payload != attribution.encode("utf-8")
+            or hashlib.sha256(attribution_payload).hexdigest()
+            != source.get("attribution_notice_sha256")
+        ):
+            raise ReleaseArtifactError(
+                f"public S1 source companion differs from reviewed policy: {source_id}"
+            )
+
+
+def _validate_public_intake(payloads: dict[str, bytes]) -> tuple[dict[str, Any], dict[str, Any]]:
+    with tempfile.TemporaryDirectory(prefix=".umi-public-release-intake-") as temporary:
+        temporary_root = Path(temporary).resolve(strict=True)
+        root = temporary_root / "intake"
+        root.mkdir(mode=0o700)
+        root.chmod(0o700)
+        for filename in (
+            PUBLIC_S1_FINETUNE_EVIDENCE_FILENAME,
+            PUBLIC_S1_FINETUNE_ARCHIVE_FILENAME,
+        ):
+            portable._write_exclusive(root / filename, payloads[filename])
+        policy_path = temporary_root / PUBLIC_POLICY_FILENAME
+        portable._write_exclusive(policy_path, payloads[PUBLIC_POLICY_FILENAME])
+        try:
+            result = verify_public_s1_finetune_intake(root, policy_path=policy_path)
+        except PublicS1ReleaseIntakeError as exc:
+            raise ReleaseArtifactError("public S1 intake failed strict validation") from exc
+    try:
+        evidence = json.loads(payloads[PUBLIC_S1_FINETUNE_EVIDENCE_FILENAME])
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:  # pragma: no cover - intake checked
+        raise ReleaseArtifactError("public S1 intake evidence is invalid") from exc
+    return result, cast(dict[str, Any], evidence)
 
 
 def _validate_model_archive(
@@ -529,6 +693,65 @@ def _validate_artifact_records(
     return expected_checksum_lines
 
 
+def _validate_public_artifact_inventory(artifacts: object) -> list[dict[str, Any]]:
+    if not isinstance(artifacts, list) or len(artifacts) != len(PUBLIC_ARTIFACTS):
+        raise ReleaseArtifactError("public S1 release artifact set differs")
+    if any(not isinstance(item, dict) for item in artifacts):
+        raise ReleaseArtifactError("public S1 release artifact record is invalid")
+    records = cast(list[dict[str, Any]], artifacts)
+    if records != sorted(records, key=lambda item: str(item.get("filename", ""))):
+        raise ReleaseArtifactError("release artifact records are not sorted by filename")
+    labels: dict[str, str] = {}
+    filenames: set[str] = set()
+    for item in records:
+        if set(item) != {"label", "filename", "size_bytes", "sha256"}:
+            raise ReleaseArtifactError("public S1 release artifact record is invalid")
+        label = item["label"]
+        filename = item["filename"]
+        if (
+            not isinstance(label, str)
+            or LABEL.fullmatch(label) is None
+            or label in labels
+            or not isinstance(filename, str)
+            or Path(filename).name != filename
+            or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", filename) is None
+            or filename in filenames
+        ):
+            raise ReleaseArtifactError("public S1 release artifact name or label differs")
+        labels[label] = filename
+        filenames.add(filename)
+    if labels != PUBLIC_ARTIFACTS:
+        raise ReleaseArtifactError("public S1 release artifact names differ")
+    return records
+
+
+def _validate_public_artifact_records(
+    artifacts: object,
+    payloads: dict[str, bytes],
+) -> list[str]:
+    records = _validate_public_artifact_inventory(artifacts)
+    filenames: set[str] = set()
+    checksum_lines: list[str] = []
+    for item in records:
+        filename = cast(str, item["filename"])
+        payload = payloads.get(filename)
+        if payload is None:
+            raise ReleaseArtifactError(f"release artifact is missing: {filename}")
+        digest = hashlib.sha256(payload).hexdigest()
+        if (
+            item["sha256"] != digest
+            or type(item["size_bytes"]) is not int
+            or item["size_bytes"] != len(payload)
+            or not 1 <= item["size_bytes"] <= MAXIMUM_ARTIFACT_BYTES
+        ):
+            raise ReleaseArtifactError(f"release artifact digest differs: {filename}")
+        filenames.add(filename)
+        checksum_lines.append(f"{digest}  {filename}\n")
+    if set(payloads) != filenames:
+        raise ReleaseArtifactError("public S1 release artifact inventory differs")
+    return checksum_lines
+
+
 def _validate_manifest_evidence(value: object) -> dict[str, dict[str, str]]:
     if not isinstance(value, dict) or set(value) != set(EVIDENCE_SCHEMAS):
         raise ReleaseArtifactError("release evidence manifest is incomplete")
@@ -642,6 +865,263 @@ def create_release(arguments: argparse.Namespace) -> dict[str, Any]:
     return record
 
 
+def create_public_s1_release(arguments: argparse.Namespace) -> dict[str, Any]:
+    for value, pattern, label in (
+        (arguments.release_id, RELEASE_ID, "release ID"),
+        (arguments.inference_revision, SHA256, "inference revision"),
+        (arguments.source_git_revision, GIT_REVISION, "source Git revision"),
+        (arguments.umi_git_revision, GIT_REVISION, "UMI Git revision"),
+    ):
+        if not isinstance(value, str) or pattern.fullmatch(value) is None:
+            raise ReleaseArtifactError(f"{label} is invalid")
+    output = arguments.output_directory.resolve(strict=True)
+    artifacts, payloads = _parse_public_artifacts(arguments.artifact, output)
+    _validate_public_companions(payloads)
+    policy_path = Path(os.path.abspath(arguments.public_s1_policy))
+    if policy_path.parent != output or policy_path.name != PUBLIC_POLICY_FILENAME:
+        raise ReleaseArtifactError("public S1 intake policy must use its fixed release path")
+    if payloads[PUBLIC_POLICY_FILENAME] != _read_regular(policy_path):
+        raise ReleaseArtifactError("public S1 intake policy artifact differs")
+    intake_result, intake_evidence = _validate_public_intake(payloads)
+    _validate_public_source_companions(payloads, intake_evidence)
+    if intake_result["inference_revision"] != arguments.inference_revision:
+        raise ReleaseArtifactError("public S1 intake revision differs")
+    model_identity = _validate_model_archive(
+        payloads[PUBLIC_S1_FINETUNE_ARCHIVE_FILENAME], arguments.inference_revision
+    )
+    try:
+        e2e = load_public_s1_finetune_release_e2e_bytes(payloads[PUBLIC_E2E_FILENAME])
+    except S1ReleaseEvidenceError as exc:
+        raise ReleaseArtifactError("public S1 release E2E evidence failed validation") from exc
+    _validate_e2e_release_binding(
+        e2e,
+        model_identity,
+        umi_git_revision=arguments.umi_git_revision,
+    )
+    if (
+        arguments.release_id != PUBLIC_S1_FINETUNE_RELEASE_ID
+        or PUBLIC_PROFILE != PUBLIC_S1_FINETUNE_RELEASE_PROFILE
+        or e2e["release_id"] != arguments.release_id
+        or e2e["release_profile"] != PUBLIC_PROFILE
+    ):
+        raise ReleaseArtifactError("public S1 release and E2E identities differ")
+    checksum_lines = _validate_public_artifact_records(artifacts, payloads)
+    rights_review = cast(dict[str, Any], intake_evidence["rights_review"])
+    release_identity = cast(dict[str, Any], intake_evidence["release_identity"])
+    sources = cast(list[dict[str, Any]], rights_review["sources"])
+    record: dict[str, Any] = {
+        "schema": PUBLIC_SCHEMA,
+        "release_profile": PUBLIC_PROFILE,
+        "release_id": arguments.release_id,
+        "status": PUBLIC_STATUS,
+        "inference_revision": arguments.inference_revision,
+        "rights_decision_sha256": release_identity["rights_review_sha256"],
+        "source_git_revision": arguments.source_git_revision,
+        "umi_git_revision": arguments.umi_git_revision,
+        "release_commit_policy": RELEASE_COMMIT_POLICY,
+        "local_extractor": LOCAL_EXTRACTOR,
+        "external_dependencies": {
+            "mediapipe_holistic_task_model": {
+                "distributed": False,
+                "sha256": TASK_MODEL_SHA256,
+                "source": TASK_MODEL_SOURCE,
+            }
+        },
+        "licenses": {
+            "runtime_code": {
+                "license_id": "Apache-2.0",
+                "license_artifact": "LICENSE",
+                "notice_artifact": "NOTICE",
+            },
+            "model_weights": {
+                "license_id": "CC-BY-SA-4.0",
+                "license_artifact": "CC-BY-SA-4.0.txt",
+            },
+            "training_lineage": [
+                {
+                    "source_id": source["source_id"],
+                    "source_version": source["source_version"],
+                    "license_id": source["license_id"],
+                    "license_artifact": PUBLIC_SOURCE_COMPANIONS[source["source_id"]]["license"][1],
+                    "attribution_notice": source["attribution_notice"],
+                    "attribution_artifact": PUBLIC_SOURCE_COMPANIONS[source["source_id"]][
+                        "attribution"
+                    ][1],
+                    "source_data_distributed": False,
+                }
+                for source in sources
+            ],
+        },
+        "intake": {
+            "policy_schema": PUBLIC_S1_FINETUNE_INTAKE_POLICY_SCHEMA,
+            "policy_sha256": intake_result["intake_policy_sha256"],
+            "policy_content_sha256": intake_result["intake_policy_content_sha256"],
+            "evidence_schema": PUBLIC_S1_FINETUNE_INTAKE_SCHEMA,
+            "evidence_sha256": intake_result["evidence_sha256"],
+            "evidence_content_sha256": intake_result["evidence_content_sha256"],
+        },
+        "release_e2e": {
+            "schema": e2e["schema"],
+            "content_sha256": e2e["content_sha256"],
+        },
+        "artifacts": artifacts,
+        "claim_boundary": intake_evidence["claim_boundary"],
+    }
+    record["content_sha256"] = _public_content_sha256(record)
+    _write_atomic(
+        output / "release-manifest.json",
+        _canonical(record) + b"\n",
+        replace=arguments.replace,
+    )
+    _write_atomic(
+        output / "SHA256SUMS",
+        "".join(checksum_lines).encode(),
+        replace=arguments.replace,
+    )
+    return record
+
+
+def _verify_public_s1_release_record(
+    record: dict[str, Any],
+    *,
+    manifest_path: Path,
+    artifact_directory: Path | None,
+) -> dict[str, Any]:
+    expected_fields = {
+        "schema",
+        "release_profile",
+        "release_id",
+        "status",
+        "inference_revision",
+        "rights_decision_sha256",
+        "source_git_revision",
+        "umi_git_revision",
+        "release_commit_policy",
+        "local_extractor",
+        "external_dependencies",
+        "licenses",
+        "intake",
+        "release_e2e",
+        "artifacts",
+        "claim_boundary",
+        "content_sha256",
+    }
+    if (
+        set(record) != expected_fields
+        or record["schema"] != PUBLIC_SCHEMA
+        or record["release_profile"] != PUBLIC_PROFILE
+        or record["status"] != PUBLIC_STATUS
+        or not isinstance(record["release_id"], str)
+        or RELEASE_ID.fullmatch(record["release_id"]) is None
+        or record["release_commit_policy"] != RELEASE_COMMIT_POLICY
+        or record["local_extractor"] != LOCAL_EXTRACTOR
+        or record["external_dependencies"]
+        != {
+            "mediapipe_holistic_task_model": {
+                "distributed": False,
+                "sha256": TASK_MODEL_SHA256,
+                "source": TASK_MODEL_SOURCE,
+            }
+        }
+        or record["content_sha256"] != _public_content_sha256(record)
+        or not isinstance(record["inference_revision"], str)
+        or SHA256.fullmatch(record["inference_revision"]) is None
+        or not isinstance(record["rights_decision_sha256"], str)
+        or SHA256.fullmatch(record["rights_decision_sha256"]) is None
+        or not isinstance(record["source_git_revision"], str)
+        or GIT_REVISION.fullmatch(record["source_git_revision"]) is None
+        or not isinstance(record["umi_git_revision"], str)
+        or GIT_REVISION.fullmatch(record["umi_git_revision"]) is None
+    ):
+        raise ReleaseArtifactError("public S1 release identity or content digest differs")
+    artifacts = record["artifacts"]
+    artifact_records = _validate_public_artifact_inventory(artifacts)
+    artifact_root = (
+        artifact_directory.resolve(strict=True)
+        if artifact_directory is not None
+        else manifest_path.parent
+    )
+    filenames = [cast(str, item["filename"]) for item in artifact_records]
+    payloads = {filename: _read_regular(artifact_root / filename) for filename in filenames}
+    _validate_public_companions(payloads)
+    checksum_lines = _validate_public_artifact_records(artifacts, payloads)
+    try:
+        checksum_payload = _read_regular(
+            manifest_path.parent / "SHA256SUMS", maximum_bytes=64 * 1024
+        ).decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ReleaseArtifactError("SHA256SUMS is not UTF-8") from exc
+    if checksum_payload != "".join(checksum_lines):
+        raise ReleaseArtifactError("SHA256SUMS differs from the manifest")
+
+    intake_result, intake_evidence = _validate_public_intake(payloads)
+    _validate_public_source_companions(payloads, intake_evidence)
+    if intake_result["inference_revision"] != record["inference_revision"]:
+        raise ReleaseArtifactError("public S1 intake revision differs")
+    model_identity = _validate_model_archive(
+        payloads[PUBLIC_S1_FINETUNE_ARCHIVE_FILENAME], record["inference_revision"]
+    )
+    try:
+        e2e = load_public_s1_finetune_release_e2e_bytes(payloads[PUBLIC_E2E_FILENAME])
+    except S1ReleaseEvidenceError as exc:
+        raise ReleaseArtifactError("public S1 release E2E evidence failed validation") from exc
+    _validate_e2e_release_binding(
+        e2e,
+        model_identity,
+        umi_git_revision=record["umi_git_revision"],
+    )
+    rights_review = cast(dict[str, Any], intake_evidence["rights_review"])
+    release_identity = cast(dict[str, Any], intake_evidence["release_identity"])
+    sources = cast(list[dict[str, Any]], rights_review["sources"])
+    expected_licenses = {
+        "runtime_code": {
+            "license_id": "Apache-2.0",
+            "license_artifact": "LICENSE",
+            "notice_artifact": "NOTICE",
+        },
+        "model_weights": {
+            "license_id": "CC-BY-SA-4.0",
+            "license_artifact": "CC-BY-SA-4.0.txt",
+        },
+        "training_lineage": [
+            {
+                "source_id": source["source_id"],
+                "source_version": source["source_version"],
+                "license_id": source["license_id"],
+                "license_artifact": PUBLIC_SOURCE_COMPANIONS[source["source_id"]]["license"][1],
+                "attribution_notice": source["attribution_notice"],
+                "attribution_artifact": PUBLIC_SOURCE_COMPANIONS[source["source_id"]][
+                    "attribution"
+                ][1],
+                "source_data_distributed": False,
+            }
+            for source in sources
+        ],
+    }
+    expected_intake = {
+        "policy_schema": PUBLIC_S1_FINETUNE_INTAKE_POLICY_SCHEMA,
+        "policy_sha256": intake_result["intake_policy_sha256"],
+        "policy_content_sha256": intake_result["intake_policy_content_sha256"],
+        "evidence_schema": PUBLIC_S1_FINETUNE_INTAKE_SCHEMA,
+        "evidence_sha256": intake_result["evidence_sha256"],
+        "evidence_content_sha256": intake_result["evidence_content_sha256"],
+    }
+    if (
+        record["rights_decision_sha256"] != release_identity["rights_review_sha256"]
+        or record["release_id"] != PUBLIC_S1_FINETUNE_RELEASE_ID
+        or record["release_profile"] != PUBLIC_S1_FINETUNE_RELEASE_PROFILE
+        or e2e["release_id"] != record["release_id"]
+        or e2e["release_profile"] != record["release_profile"]
+        or record["licenses"] != expected_licenses
+        or record["intake"] != expected_intake
+        or record["release_e2e"]
+        != {"schema": e2e["schema"], "content_sha256": e2e["content_sha256"]}
+        or record["claim_boundary"] != intake_evidence["claim_boundary"]
+    ):
+        raise ReleaseArtifactError("public S1 release binding differs")
+    return record
+
+
 def verify_release(path: Path, *, artifact_directory: Path | None = None) -> dict[str, Any]:
     manifest_path = Path(os.path.abspath(path))
     raw = _read_regular(manifest_path, maximum_bytes=1024 * 1024)
@@ -669,6 +1149,12 @@ def verify_release(path: Path, *, artifact_directory: Path | None = None) -> dic
         raise ReleaseArtifactError("release manifest is invalid JSON") from exc
     if not isinstance(record, dict) or raw != canonical + b"\n":
         raise ReleaseArtifactError("release manifest is not canonical")
+    if record.get("schema") == PUBLIC_SCHEMA:
+        return _verify_public_s1_release_record(
+            record,
+            manifest_path=manifest_path,
+            artifact_directory=artifact_directory,
+        )
     expected_fields = {
         "schema",
         "release_id",
@@ -842,6 +1328,24 @@ def _base_revision_from_source(payload: bytes) -> str:
     return values[0]
 
 
+def _rebinder_supports_explicit_base_revision(payload: bytes) -> None:
+    try:
+        module = ast.parse(payload, filename="local_bundle_rebind.py")
+    except (SyntaxError, ValueError) as exc:
+        raise ReleaseArtifactError("local rebinder source is not valid Python") from exc
+    functions = [
+        node
+        for node in module.body
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
+        and node.name == "rebind_local_extractor"
+    ]
+    if len(functions) != 1:
+        raise ReleaseArtifactError("local rebinder entry point is not unique")
+    keyword_names = {argument.arg for argument in functions[0].args.kwonlyargs}
+    if "expected_base_inference_revision" not in keyword_names:
+        raise ReleaseArtifactError("local rebinder cannot bind an explicit base revision")
+
+
 def _verify_source_revision_closure(
     identity: dict[str, Any],
     *,
@@ -863,6 +1367,104 @@ def _verify_source_revision_closure(
         raise ReleaseArtifactError(
             "source Git revision's local rebinder pins a different base inference revision"
         )
+
+
+def _verify_public_source_revision_closure(
+    identity: dict[str, Any], *, repository: Path, source_revision: str
+) -> None:
+    for relative, expected in sorted(_identity_source_closure(identity).items()):
+        payload = _git(repository, "show", f"{source_revision}:{relative}")
+        if hashlib.sha256(payload).hexdigest() != expected:
+            raise ReleaseArtifactError(
+                f"source Git revision differs from model source closure: {relative}"
+            )
+    rebinder = _git(
+        repository,
+        "show",
+        f"{source_revision}:src/bitsign_motion/local_bundle_rebind.py",
+    )
+    _rebinder_supports_explicit_base_revision(rebinder)
+
+
+def _verify_public_release_commit(
+    record: dict[str, Any],
+    *,
+    manifest: Path,
+    root: Path,
+    release_commit: str,
+    artifact_root: Path,
+) -> str:
+    parent_line = _git(root, "rev-list", "--parents", "-n", "1", release_commit)
+    parents = parent_line.decode("ascii").strip().split()
+    if len(parents) != 2 or parents[1] != record["source_git_revision"]:
+        raise ReleaseArtifactError("source Git revision is not the release commit's sole parent")
+    changed = {
+        value
+        for value in _git(root, "diff", "--name-only", "--no-renames", parents[1], release_commit)
+        .decode("utf-8")
+        .splitlines()
+        if value
+    }
+    if changed != set(RELEASE_COMMIT_POLICY["allowed_changed_paths"]):
+        raise ReleaseArtifactError("release commit is not metadata-only")
+    for relative_path, local_path in (
+        ("release/release-manifest.json", manifest),
+        ("release/SHA256SUMS", manifest.parent / "SHA256SUMS"),
+    ):
+        _require_regular_git_blob(root, release_commit, relative_path)
+        if _git(root, "show", f"{release_commit}:{relative_path}") != local_path.read_bytes():
+            raise ReleaseArtifactError(f"working {relative_path} differs from the release commit")
+
+    source_revision = str(record["source_git_revision"])
+    e2e_relative = f"release/{PUBLIC_E2E_FILENAME}"
+    e2e = load_public_s1_finetune_release_e2e_bytes(
+        _read_regular(artifact_root / PUBLIC_E2E_FILENAME)
+    )
+    tested_revision = str(e2e["tested_reference_model_git_revision"])
+    source_parent_line = _git(root, "rev-list", "--parents", "-n", "1", source_revision)
+    source_parents = source_parent_line.decode("ascii").strip().split()
+    if len(source_parents) != 2 or source_parents[1] != tested_revision:
+        raise ReleaseArtifactError("E2E-tested revision is not the evidence commit's sole parent")
+    evidence_changes = {
+        value
+        for value in _git(
+            root, "diff", "--name-only", "--no-renames", tested_revision, source_revision
+        )
+        .decode("utf-8")
+        .splitlines()
+        if value
+    }
+    if evidence_changes != {e2e_relative}:
+        raise ReleaseArtifactError("post-E2E source commit is not E2E-evidence-only")
+
+    artifact_records = cast(list[dict[str, Any]], record["artifacts"])
+    for item in artifact_records:
+        filename = cast(str, item["filename"])
+        expected_revision = source_revision if filename == PUBLIC_E2E_FILENAME else tested_revision
+        relative = f"release/{filename}"
+        _require_regular_git_blob(root, expected_revision, relative)
+        if _git(root, "show", f"{expected_revision}:{relative}") != _read_regular(
+            artifact_root / filename
+        ):
+            raise ReleaseArtifactError(f"{filename} differs from its reviewed source commit")
+    for label, (release_filename, source_relative) in PUBLIC_CANONICAL_COMPANIONS.items():
+        _require_regular_git_blob(root, tested_revision, source_relative)
+        if _git(root, "show", f"{tested_revision}:{source_relative}") != _read_regular(
+            artifact_root / release_filename
+        ):
+            raise ReleaseArtifactError(
+                f"{label} differs from its canonical source at the tested commit"
+            )
+    model_identity = _validate_model_archive(
+        _read_regular(artifact_root / PUBLIC_S1_FINETUNE_ARCHIVE_FILENAME),
+        str(record["inference_revision"]),
+    )
+    _verify_public_source_revision_closure(
+        model_identity,
+        repository=root,
+        source_revision=source_revision,
+    )
+    return release_commit
 
 
 def verify_release_commit(
@@ -894,6 +1496,19 @@ def verify_release_commit(
     )
     if GIT_REVISION.fullmatch(release_commit) is None:
         raise ReleaseArtifactError("release Git revision is invalid")
+    artifact_root = (
+        artifact_directory.resolve(strict=True)
+        if artifact_directory is not None
+        else manifest.parent
+    )
+    if record.get("schema") == PUBLIC_SCHEMA:
+        return _verify_public_release_commit(
+            record,
+            manifest=manifest,
+            root=root,
+            release_commit=release_commit,
+            artifact_root=artifact_root,
+        )
     parent_line = _git(root, "rev-list", "--parents", "-n", "1", release_commit)
     parents = parent_line.decode("ascii").strip().split()
     if len(parents) != 2 or parents[1] != record["source_git_revision"]:
@@ -925,11 +1540,6 @@ def verify_release_commit(
         committed = _git(root, "show", f"{release_commit}:{relative_path}")
         if committed != local_path.read_bytes():
             raise ReleaseArtifactError(f"working {relative_path} differs from the release commit")
-    artifact_root = (
-        artifact_directory.resolve(strict=True)
-        if artifact_directory is not None
-        else manifest.parent
-    )
     model_identity = _validate_model_archive(
         _read_regular(artifact_root / MODEL_FILENAME),
         str(record["inference_revision"]),
@@ -1010,6 +1620,11 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--release-id")
     parser.add_argument("--inference-revision")
     parser.add_argument("--rights-decision-sha256")
+    parser.add_argument(
+        "--public-s1-policy",
+        type=Path,
+        help="create a public-s1-finetune/1 release using this reviewed intake policy",
+    )
     parser.add_argument("--source-git-revision")
     parser.add_argument("--umi-git-revision")
     parser.add_argument("--artifact", action="append", default=[])
@@ -1030,6 +1645,7 @@ def main() -> int:
                         arguments.release_id,
                         arguments.inference_revision,
                         arguments.rights_decision_sha256,
+                        arguments.public_s1_policy,
                         arguments.source_git_revision,
                         arguments.umi_git_revision,
                         arguments.output_directory,
@@ -1066,14 +1682,22 @@ def main() -> int:
             required = (
                 arguments.release_id,
                 arguments.inference_revision,
-                arguments.rights_decision_sha256,
                 arguments.source_git_revision,
                 arguments.umi_git_revision,
                 arguments.output_directory,
             )
             if any(value is None for value in required):
                 parser.error("generation requires every release identity option")
-            result = create_release(arguments)
+            if arguments.public_s1_policy is not None:
+                if arguments.rights_decision_sha256 is not None:
+                    parser.error(
+                        "--rights-decision-sha256 is derived from public S1 intake evidence"
+                    )
+                result = create_public_s1_release(arguments)
+            else:
+                if arguments.rights_decision_sha256 is None:
+                    parser.error("legacy generation requires --rights-decision-sha256")
+                result = create_release(arguments)
     except (OSError, ReleaseArtifactError) as exc:
         print(f"release metadata failed: {exc}", file=sys.stderr)
         return 2

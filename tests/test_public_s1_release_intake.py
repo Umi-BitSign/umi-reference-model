@@ -34,6 +34,10 @@ def _seal(value: dict[str, Any], domain: bytes) -> None:
     value["content_sha256"] = canonical_json_sha256(value, domain=domain)
 
 
+def _source_license_payload(source_id: str) -> bytes:
+    return f"Fixture license for {source_id}.\n".encode()
+
+
 def _sources() -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for index, source_id in enumerate(intake._EXPECTED_SOURCE_IDS, start=1):
@@ -45,7 +49,7 @@ def _sources() -> list[dict[str, Any]]:
                 "source_name": f"Fixture source {index}",
                 "source_entry_sha256": f"{index:02x}" * 32,
                 "license_id": "CC-BY-SA-4.0" if index in (1, 2) else "CC-BY-4.0",
-                "license_sha256": f"{index + 16:02x}" * 32,
+                "license_sha256": hashlib.sha256(_source_license_payload(source_id)).hexdigest(),
                 "terms_sha256": f"{index + 32:02x}" * 32,
                 "source_use_policy_sha256": f"{index + 48:02x}" * 32,
                 "attribution_notice": notice,

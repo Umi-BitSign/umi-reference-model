@@ -202,3 +202,78 @@ def test_identity_comparison_rejects_unrelated_derived_change() -> None:
             derived,
             image_id="sha256:" + "78" * 32,
         )
+
+
+def test_rebinder_accepts_an_explicit_nonlegacy_base_revision(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    archive = tmp_path / "base.zip"
+    _unchecked_package(_invalid_bundle(tmp_path, "12" * 32), archive)
+    archive_digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+    docker = _executable(tmp_path / "docker")
+    record_path = tmp_path / "local-extractor.json"
+    record_path.write_bytes(canonical_json_bytes({"fixture": True}))
+    source_hash = "56" * 32
+    local_image = "sha256:" + "78" * 32
+    base_revision = "91" * 32
+    derived_revision = "cd" * 32
+    base_identity = {
+        "inference_revision": base_revision,
+        "preprocessing": {
+            "supported_oci_images": {
+                "linux/amd64": "sha256:" + "12" * 32,
+                "linux/arm64": "sha256:" + "34" * 32,
+            },
+            "sources": {
+                "amd64_container_host_source_sha256": source_hash,
+                "amd64_container_requirements_sha256": source_hash,
+                "amd64_container_worker_source_sha256": source_hash,
+            },
+        },
+    }
+    derived_identity = copy.deepcopy(base_identity)
+    derived_identity["preprocessing"]["supported_oci_images"]["linux/amd64"] = local_image
+    derived_identity["inference_revision"] = derived_revision
+    loads = iter(
+        (
+            SimpleNamespace(identity=base_identity, _model=object()),
+            SimpleNamespace(identity=derived_identity),
+        )
+    )
+    observed_revisions: list[str] = []
+
+    def load(_root: Path, *, expected_inference_revision: str) -> SimpleNamespace:
+        observed_revisions.append(expected_inference_revision)
+        return next(loads)
+
+    monkeypatch.setattr(
+        rebind_module,
+        "validate_local_extractor_record",
+        lambda *_args, **_kwargs: {
+            "image_id": local_image,
+            "sources": {
+                "amd64_container_host_source_sha256": source_hash,
+                "requirements_sha256": source_hash,
+                "worker_sha256": source_hash,
+            },
+        },
+    )
+    monkeypatch.setattr(rebind_module, "load_s1_portable_bundle", load)
+    monkeypatch.setattr(
+        rebind_module,
+        "_reseal_verified_base",
+        lambda *_args, **_kwargs: (_args[1].mkdir() or derived_revision),
+    )
+
+    result = rebind_module.rebind_local_extractor(
+        base_archive=archive,
+        expected_base_sha256=archive_digest,
+        expected_base_inference_revision=base_revision,
+        build_record_path=record_path,
+        docker_executable=docker,
+        output=tmp_path / "derived",
+    )
+
+    assert result["base_inference_revision"] == base_revision
+    assert observed_revisions == [base_revision, derived_revision]

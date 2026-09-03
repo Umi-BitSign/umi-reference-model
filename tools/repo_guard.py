@@ -9,7 +9,12 @@ from pathlib import Path
 
 MAXIMUM_GIT_FILE_BYTES = 16 * 1024 * 1024
 MAXIMUM_RELEASE_MODEL_BYTES = 128 * 1024 * 1024
-RELEASE_MODEL_PATH = "release/umi-s1-baseline-v0-portable.zip"
+RELEASE_MODEL_PATHS = frozenset(
+    {
+        "release/umi-s1-baseline-v0-portable.zip",
+        "release/umi-s1-public-finetune-v1-portable.zip",
+    }
+)
 FORBIDDEN_SUFFIXES = {
     ".docker.tar",
     ".docker.tar.zst",
@@ -68,7 +73,7 @@ class RepositoryGuardError(RuntimeError):
 
 
 def _forbidden_suffix(relative: str) -> bool:
-    if relative == RELEASE_MODEL_PATH:
+    if relative in RELEASE_MODEL_PATHS:
         return False
     lowered = relative.lower()
     return any(lowered.endswith(suffix) for suffix in FORBIDDEN_SUFFIXES)
@@ -114,7 +119,7 @@ def check_repository(root: Path) -> tuple[int, int]:
             raise RepositoryGuardError(f"repository contains a non-regular file: {relative}")
         maximum_bytes = (
             MAXIMUM_RELEASE_MODEL_BYTES
-            if relative == RELEASE_MODEL_PATH
+            if relative in RELEASE_MODEL_PATHS
             else MAXIMUM_GIT_FILE_BYTES
         )
         if metadata.st_size > maximum_bytes:

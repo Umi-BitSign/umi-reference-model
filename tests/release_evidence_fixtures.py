@@ -283,14 +283,25 @@ def make_e2e(
     revision: str,
     umi_revision: str,
     tested_revision: str = "13" * 20,
+    *,
+    release_profile: str | None = None,
 ) -> dict[str, Any]:
     extractor_image_id = "sha256:" + "12" * 32
     rebound = copy.deepcopy(identity)
     del rebound["inference_revision"]
     rebound["preprocessing"]["supported_oci_images"]["linux/amd64"] = extractor_image_id
     derived_revision = canonical_json_sha256(rebound, domain=portable._IDENTITY_DOMAIN)
+    if release_profile is None:
+        release_id = "umi-s1-baseline-v0"
+        public_schema = evidence.RELEASE_E2E_SCHEMA
+        public_domain = evidence._E2E_DOMAIN
+    else:
+        assert release_profile == evidence.PUBLIC_S1_FINETUNE_RELEASE_PROFILE
+        release_id = evidence.PUBLIC_S1_FINETUNE_RELEASE_ID
+        public_schema = evidence.PUBLIC_S1_FINETUNE_RELEASE_E2E_SCHEMA
+        public_domain = evidence._PUBLIC_S1_FINETUNE_E2E_DOMAIN
     capture = {
-        "release_id": "umi-s1-baseline-v0",
+        "release_id": release_id,
         "status": "passed",
         "base_inference_revision": revision,
         "derived_inference_revision": derived_revision,
@@ -349,9 +360,11 @@ def make_e2e(
             "run_log_sha256": "1a" * 32,
         },
     }
+    if release_profile is not None:
+        capture["release_profile"] = release_profile
     private = evidence.seal_private_release_e2e(capture)
     public = {
-        "schema": evidence.RELEASE_E2E_SCHEMA,
+        "schema": public_schema,
         "release_id": private["release_id"],
         "status": private["status"],
         "base_inference_revision": private["base_inference_revision"],
@@ -360,7 +373,7 @@ def make_e2e(
         "umi_git_revision": private["umi_git_revision"],
         "private_run": {
             "role": "release_e2e",
-            "schema": evidence.RELEASE_E2E_RUN_SCHEMA,
+            "schema": private["schema"],
             "content_sha256": private["content_sha256"],
             "file_sha256": "1b" * 32,
         },
@@ -376,7 +389,9 @@ def make_e2e(
         "execution": private["execution"],
         "claim_boundary": evidence._E2E_CLAIM_BOUNDARY,
     }
-    return _seal(public, evidence._E2E_DOMAIN)
+    if release_profile is not None:
+        public["release_profile"] = release_profile
+    return _seal(public, public_domain)
 
 
 def write_evidence_set(
