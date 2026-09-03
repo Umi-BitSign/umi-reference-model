@@ -59,6 +59,7 @@ def _load_release_dependencies() -> SimpleNamespace:
     miner = importlib.import_module("umi.miner")
     protocol = importlib.import_module("umi.protocol")
     validator = importlib.import_module("umi.validator")
+    release_evidence = importlib.import_module("bitsign_motion.s1_release_evidence")
     return SimpleNamespace(
         bitsign_motion=bitsign_motion,
         bt=bt,
@@ -73,9 +74,8 @@ def _load_release_dependencies() -> SimpleNamespace:
         validate_local_extractor_record=importlib.import_module(
             "bitsign_motion.local_extractor_release"
         ).validate_local_extractor_record,
-        seal_private_release_e2e=importlib.import_module(
-            "bitsign_motion.s1_release_evidence"
-        ).seal_private_release_e2e,
+        release_evidence=release_evidence,
+        seal_private_release_e2e=release_evidence.seal_private_release_e2e,
         RequestAuthenticator=importlib.import_module("umi.auth").RequestAuthenticator,
         load_translator=importlib.import_module("umi.backends").load_translator,
         Limits=importlib.import_module("umi.config").Limits,
@@ -530,57 +530,62 @@ async def _run_real_reference_model_umi_flow(
     }
     assert _clean_git_revision(reference_repository) == reference_revision
     assert _clean_git_revision(umi_repository) == umi_revision
-    return dependencies.seal_private_release_e2e(
-        {
-            "release_id": "umi-s1-baseline-v0",
-            "status": "passed",
-            "base_inference_revision": base_revision,
-            "derived_inference_revision": revision,
-            "tested_reference_model_git_revision": reference_revision,
-            "umi_git_revision": umi_revision,
-            "started_at_utc": started_at_utc,
-            "finished_at_utc": _utc_now(),
-            "runtime": {
-                "host_operating_system": platform.system(),
-                "host_architecture": platform.machine(),
-                "container_platform": os.environ["UMI_S1_EXTRACTOR_PLATFORM"],
-                "model_device": os.environ["UMI_S1_DEVICE"],
-                "python_version": platform.python_version(),
-                "torch_version": dependencies.torch.__version__.split("+")[0],
-                "numpy_version": dependencies.numpy.__version__,
-                "safetensors_version": dependencies.safetensors.__version__,
-                "bittensor_version": importlib.metadata.version("bittensor"),
-                "docker_engine_version": _docker_version(docker),
-                "extractor_image_id": extractor_record["image_id"],
-                "mediapipe_task_model_sha256": task_model_sha256,
-            },
-            "timeouts_seconds": {
-                "inner_model_hard_deadline": _BACKEND_HARD_DEADLINE_SECONDS,
-                "outer_inference_timeout": _UMI_INFERENCE_TIMEOUT_SECONDS,
-                "outer_admission_timeout": _UMI_ADMISSION_TIMEOUT_SECONDS,
-                "outer_lifecycle_timeout": _UMI_LIFECYCLE_TIMEOUT_SECONDS,
-            },
-            "fixture": {
-                "fixture_class": "rights-cleared-private-video",
-                "video_sha256": hashlib.sha256(valid_video).hexdigest(),
-                "rights_cleared_for_private_testing": True,
-                "distributed": False,
-            },
-            "execution": execution,
-            "evidence": {
-                "extractor_build_record_content_sha256": extractor_record["content_sha256"],
-                "extractor_build_record_file_sha256": hashlib.sha256(
-                    extractor_record_raw
-                ).hexdigest(),
-                "valid_wire_response_sha256": valid_wire_sha256,
-                "invalid_wire_response_sha256": invalid_wire_sha256,
-                "post_reveal_plaintext_set_sha256": plaintext_set_sha256,
-                "run_log_sha256": hashlib.sha256(
-                    dependencies.model_canonical_json_bytes(run_log)
-                ).hexdigest(),
-            },
-        }
-    )
+    release_profile = os.environ.get("BITSIGN_UMI_RELEASE_PROFILE")
+    if release_profile is None:
+        release_id = "umi-s1-baseline-v0"
+    else:
+        assert release_profile == dependencies.release_evidence.PUBLIC_S1_FINETUNE_RELEASE_PROFILE
+        release_id = dependencies.release_evidence.PUBLIC_S1_FINETUNE_RELEASE_ID
+    capture = {
+        "release_id": release_id,
+        "status": "passed",
+        "base_inference_revision": base_revision,
+        "derived_inference_revision": revision,
+        "tested_reference_model_git_revision": reference_revision,
+        "umi_git_revision": umi_revision,
+        "started_at_utc": started_at_utc,
+        "finished_at_utc": _utc_now(),
+        "runtime": {
+            "host_operating_system": platform.system(),
+            "host_architecture": platform.machine(),
+            "container_platform": os.environ["UMI_S1_EXTRACTOR_PLATFORM"],
+            "model_device": os.environ["UMI_S1_DEVICE"],
+            "python_version": platform.python_version(),
+            "torch_version": dependencies.torch.__version__.split("+")[0],
+            "numpy_version": dependencies.numpy.__version__,
+            "safetensors_version": dependencies.safetensors.__version__,
+            "bittensor_version": importlib.metadata.version("bittensor"),
+            "docker_engine_version": _docker_version(docker),
+            "extractor_image_id": extractor_record["image_id"],
+            "mediapipe_task_model_sha256": task_model_sha256,
+        },
+        "timeouts_seconds": {
+            "inner_model_hard_deadline": _BACKEND_HARD_DEADLINE_SECONDS,
+            "outer_inference_timeout": _UMI_INFERENCE_TIMEOUT_SECONDS,
+            "outer_admission_timeout": _UMI_ADMISSION_TIMEOUT_SECONDS,
+            "outer_lifecycle_timeout": _UMI_LIFECYCLE_TIMEOUT_SECONDS,
+        },
+        "fixture": {
+            "fixture_class": "rights-cleared-private-video",
+            "video_sha256": hashlib.sha256(valid_video).hexdigest(),
+            "rights_cleared_for_private_testing": True,
+            "distributed": False,
+        },
+        "execution": execution,
+        "evidence": {
+            "extractor_build_record_content_sha256": extractor_record["content_sha256"],
+            "extractor_build_record_file_sha256": hashlib.sha256(extractor_record_raw).hexdigest(),
+            "valid_wire_response_sha256": valid_wire_sha256,
+            "invalid_wire_response_sha256": invalid_wire_sha256,
+            "post_reveal_plaintext_set_sha256": plaintext_set_sha256,
+            "run_log_sha256": hashlib.sha256(
+                dependencies.model_canonical_json_bytes(run_log)
+            ).hexdigest(),
+        },
+    }
+    if release_profile is not None:
+        capture["release_profile"] = release_profile
+    return dependencies.seal_private_release_e2e(capture)
 
 
 def test_real_reference_model_returns_signed_timelocked_umi_responses(tmp_path: Path) -> None:

@@ -266,18 +266,23 @@ def rebind_local_extractor(
     *,
     base_archive: Path,
     expected_base_sha256: str,
+    expected_base_inference_revision: str = BASE_INFERENCE_REVISION,
     build_record_path: Path,
     docker_executable: Path,
     output: Path,
 ) -> dict[str, Any]:
     """Re-export the fixed base model with one locally built AMD64 image authority."""
 
-    if (
-        len(expected_base_sha256) != 64
-        or expected_base_sha256.lower() != expected_base_sha256
-        or any(character not in "0123456789abcdef" for character in expected_base_sha256)
+    for value, label in (
+        (expected_base_sha256, "base archive digest"),
+        (expected_base_inference_revision, "base inference revision"),
     ):
-        raise LocalBundleRebindError("base archive digest must be lowercase SHA-256")
+        if (
+            len(value) != 64
+            or value.lower() != value
+            or any(character not in "0123456789abcdef" for character in value)
+        ):
+            raise LocalBundleRebindError(f"{label} must be lowercase SHA-256")
     destination = Path(os.path.abspath(output))
     if destination.exists() or destination.is_symlink():
         raise LocalBundleRebindError("derived bundle destination must not exist")
@@ -303,7 +308,7 @@ def rebind_local_extractor(
         try:
             base_runtime = load_s1_portable_bundle(
                 base_root,
-                expected_inference_revision=BASE_INFERENCE_REVISION,
+                expected_inference_revision=expected_base_inference_revision,
             )
         except S1PortableError as exc:
             raise LocalBundleRebindError("published base bundle failed runtime validation") from exc
@@ -341,7 +346,7 @@ def rebind_local_extractor(
                 image_id=image_id,
             )
             generated = True
-            if revision == BASE_INFERENCE_REVISION:
+            if revision == expected_base_inference_revision:
                 raise LocalBundleRebindError("derived bundle did not produce a new revision")
             derived = load_s1_portable_bundle(
                 destination,
@@ -368,7 +373,7 @@ def rebind_local_extractor(
     return {
         "schema": "umi-local-extractor-rebind-result/1",
         "status": DERIVED_STATUS,
-        "base_inference_revision": BASE_INFERENCE_REVISION,
+        "base_inference_revision": expected_base_inference_revision,
         "local_extractor_image_id": image_id,
         "inference_revision": revision,
         "bundle": str(destination),
@@ -385,6 +390,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--base-archive", type=Path, required=True)
     parser.add_argument("--base-sha256", required=True)
+    parser.add_argument(
+        "--base-inference-revision",
+        default=BASE_INFERENCE_REVISION,
+        help="expected revision inside the base archive (legacy v0 by default)",
+    )
     parser.add_argument("--build-record", type=Path, required=True)
     parser.add_argument("--docker", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
@@ -393,6 +403,7 @@ def main(argv: list[str] | None = None) -> int:
         result = rebind_local_extractor(
             base_archive=arguments.base_archive,
             expected_base_sha256=arguments.base_sha256,
+            expected_base_inference_revision=arguments.base_inference_revision,
             build_record_path=arguments.build_record,
             docker_executable=arguments.docker,
             output=arguments.output,

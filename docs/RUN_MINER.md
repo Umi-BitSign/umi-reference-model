@@ -123,9 +123,9 @@ RFC 8785, and every bound source module.
 
 ## 3. Verify the sealed release artifacts
 
-The immutable release tag contains the model, four aggregate evidence records, and
-six license companions under `release/`. Verify the complete fixed set before using
-the model. `release/SHA256SUMS` contains one line for each of these eleven artifacts.
+The immutable release tag contains one manifest-defined model archive, aggregate
+evidence, and its license companions under `release/`. Verify the complete set before
+using the model. `release/SHA256SUMS` must contain one line for every manifest artifact.
 
 ```bash
 cd "$HOME/umi-miner/umi-reference-model"
@@ -137,10 +137,14 @@ BASE_MODEL_SHA256="$(
   jq -er '.artifacts[] | select(.label == "model") | .sha256' \
     release/release-manifest.json
 )"
-test "$(
-  sha256sum release/umi-s1-baseline-v0-portable.zip | cut -d ' ' -f 1
-)" = \
-  "$BASE_MODEL_SHA256"
+BASE_MODEL_FILENAME="$(
+  jq -er '.artifacts[] | select(.label == "model") | .filename' \
+    release/release-manifest.json
+)"
+test "$BASE_MODEL_FILENAME" = "$(basename "$BASE_MODEL_FILENAME")"
+BASE_MODEL_PATH="$HOME/umi-miner/umi-reference-model/release/$BASE_MODEL_FILENAME"
+test "$(sha256sum "$BASE_MODEL_PATH" | cut -d ' ' -f 1)" = "$BASE_MODEL_SHA256"
+BASE_INFERENCE_REVISION="$(jq -er .inference_revision release/release-manifest.json)"
 "$HOME/umi-miner/umi-reference-model/.venv/bin/python" \
   "$HOME/umi-miner/umi-reference-model/tools/release_artifacts.py" \
   --verify "$HOME/umi-miner/umi-reference-model/release/release-manifest.json" \
@@ -180,14 +184,15 @@ Bind the local image ID into a derived bundle:
 
 ```bash
 .venv/bin/python -m bitsign_motion.local_bundle_rebind \
-  --base-archive "$HOME/umi-miner/umi-reference-model/release/umi-s1-baseline-v0-portable.zip" \
+  --base-archive "$BASE_MODEL_PATH" \
   --base-sha256 "$BASE_MODEL_SHA256" \
+  --base-inference-revision "$BASE_INFERENCE_REVISION" \
   --build-record "$HOME/umi-miner/local-build/local-extractor.json" \
   --docker "$DOCKER_EXECUTABLE" \
   --output "$HOME/umi-miner/local-build/model-bundle"
 MODEL_BUNDLE="$HOME/umi-miner/local-build/model-bundle"
 MODEL_REVISION="$(jq -er .inference_revision "$MODEL_BUNDLE/inference-identity.json")"
-test "$MODEL_REVISION" != "$(jq -r .inference_revision release/release-manifest.json)"
+test "$MODEL_REVISION" != "$BASE_INFERENCE_REVISION"
 ```
 
 The rebinder verifies the published base bundle, copies its model, tokenizer, config,

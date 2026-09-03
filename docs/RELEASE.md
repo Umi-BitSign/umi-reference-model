@@ -1,5 +1,9 @@
 # Release checklist
 
+This checklist preserves the legacy `umi-s1-baseline-v0` release procedure. New
+`public-s1-finetune/1` candidates use [the public S1 release procedure](PUBLIC_S1_RELEASE.md).
+Both profiles use the same strict release verifier and the same A -> B -> C history.
+
 A release may be labeled `component_test_no_weight` only after every item below
 passes. The released model remains a low-accuracy integration fixture. This process
 does not activate UMI translation weights or establish useful ASL translation.

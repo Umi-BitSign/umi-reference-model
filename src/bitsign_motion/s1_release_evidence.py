@@ -24,6 +24,10 @@ RIGHTS_EVIDENCE_FILENAME: Final = "umi-s1-baseline-v0-rights-decision.json"
 RELEASE_E2E_SCHEMA: Final = "umi-s1-public-release-e2e/1"
 RELEASE_E2E_FILENAME: Final = "umi-s1-baseline-v0-release-e2e-evidence.json"
 RELEASE_E2E_RUN_SCHEMA: Final = "umi-s1-release-e2e-run/1"
+PUBLIC_S1_FINETUNE_RELEASE_E2E_SCHEMA: Final = "umi-s1-public-finetune-release-e2e/1"
+PUBLIC_S1_FINETUNE_RELEASE_E2E_RUN_SCHEMA: Final = "umi-s1-public-finetune-release-e2e-run/1"
+PUBLIC_S1_FINETUNE_RELEASE_ID: Final = "umi-s1-public-finetune-v1"
+PUBLIC_S1_FINETUNE_RELEASE_PROFILE: Final = "public-s1-finetune/1"
 
 EVIDENCE_FILES: Final = {
     "selection-ledger": SELECTION_LEDGER_FILENAME,
@@ -37,6 +41,8 @@ _MOTION_DOMAIN: Final = b"umi-s1-public-motion-ablation-v1\0"
 _RIGHTS_DOMAIN: Final = b"umi-s1-public-rights-decision-v1\0"
 _E2E_DOMAIN: Final = b"umi-s1-public-release-e2e-v1\0"
 _PRIVATE_E2E_DOMAIN: Final = b"umi-s1-release-e2e-run-v1\0"
+_PUBLIC_S1_FINETUNE_E2E_DOMAIN: Final = b"umi-s1-public-finetune-release-e2e-v1\0"
+_PUBLIC_S1_FINETUNE_PRIVATE_E2E_DOMAIN: Final = b"umi-s1-public-finetune-release-e2e-run-v1\0"
 _MOTION_SAMPLE_SET_DOMAIN: Final = b"umi-s1-validation-motion-ablation-samples-v1\0"
 _MOTION_RANK_DOMAIN: Final = b"umi-s1-validation-motion-ablation-rank-v1\0"
 _MOTION_PERMUTATION_DOMAIN: Final = b"umi-s1-validation-motion-ablation-permutation-v1\0"
@@ -71,6 +77,7 @@ _PRIVATE_REPORT_DOMAINS: Final = {
     "umi-s1-validation-motion-ablation/2": (b"umi-s1-validation-motion-ablation-v1\0"),
     "umi-s1-final-rights-review/1": b"umi-s1-final-rights-review-v1\0",
     RELEASE_E2E_RUN_SCHEMA: _PRIVATE_E2E_DOMAIN,
+    PUBLIC_S1_FINETUNE_RELEASE_E2E_RUN_SCHEMA: _PUBLIC_S1_FINETUNE_PRIVATE_E2E_DOMAIN,
 }
 
 _SELECTION_PRIVATE_SCHEMAS: Final = (
@@ -2267,8 +2274,8 @@ def load_rights_evidence_bytes(raw: bytes) -> dict[str, Any]:
     return report
 
 
-def _validate_e2e_common(report: dict[str, Any]) -> None:
-    if report.get("release_id") != _RELEASE_ID or report.get("status") != "passed":
+def _validate_e2e_common(report: dict[str, Any], *, expected_release_id: str) -> None:
+    if report.get("release_id") != expected_release_id or report.get("status") != "passed":
         raise S1ReleaseEvidenceError("release E2E identity differs")
     base = _require_sha256(report.get("base_inference_revision"), "E2E base inference")
     derived = _require_sha256(report.get("derived_inference_revision"), "E2E derived inference")
@@ -2349,8 +2356,15 @@ def _validate_e2e_common(report: dict[str, Any]) -> None:
         raise S1ReleaseEvidenceError("release E2E timeout settings differ")
 
 
-def validate_private_release_e2e(value: object) -> str:
-    if not isinstance(value, dict) or set(value) != {
+def _validate_private_release_e2e_profile(
+    value: object,
+    *,
+    schema: str,
+    domain: bytes,
+    expected_release_id: str,
+    expected_release_profile: str | None,
+) -> str:
+    fields = {
         "schema",
         "release_id",
         "status",
@@ -2366,16 +2380,22 @@ def validate_private_release_e2e(value: object) -> str:
         "execution",
         "evidence",
         "content_sha256",
-    }:
+    }
+    if expected_release_profile is not None:
+        fields.add("release_profile")
+    if not isinstance(value, dict) or set(value) != fields:
         raise S1ReleaseEvidenceError("private release E2E field set differs")
-    if value["schema"] != RELEASE_E2E_RUN_SCHEMA:
+    if value["schema"] != schema or (
+        expected_release_profile is not None
+        and value["release_profile"] != expected_release_profile
+    ):
         raise S1ReleaseEvidenceError("private release E2E schema differs")
     supplied = _require_sha256(value["content_sha256"], "private E2E content")
     unsigned = dict(value)
     del unsigned["content_sha256"]
-    if canonical_json_sha256(unsigned, domain=_PRIVATE_E2E_DOMAIN) != supplied:
+    if canonical_json_sha256(unsigned, domain=domain) != supplied:
         raise S1ReleaseEvidenceError("private release E2E content digest differs")
-    _validate_e2e_common(value)
+    _validate_e2e_common(value, expected_release_id=expected_release_id)
     fixture = value["fixture"]
     if (
         not isinstance(fixture, dict)
@@ -2408,12 +2428,43 @@ def validate_private_release_e2e(value: object) -> str:
     return supplied
 
 
+def validate_private_release_e2e(value: object) -> str:
+    return _validate_private_release_e2e_profile(
+        value,
+        schema=RELEASE_E2E_RUN_SCHEMA,
+        domain=_PRIVATE_E2E_DOMAIN,
+        expected_release_id=_RELEASE_ID,
+        expected_release_profile=None,
+    )
+
+
+def validate_private_public_s1_finetune_release_e2e(value: object) -> str:
+    return _validate_private_release_e2e_profile(
+        value,
+        schema=PUBLIC_S1_FINETUNE_RELEASE_E2E_RUN_SCHEMA,
+        domain=_PUBLIC_S1_FINETUNE_PRIVATE_E2E_DOMAIN,
+        expected_release_id=PUBLIC_S1_FINETUNE_RELEASE_ID,
+        expected_release_profile=PUBLIC_S1_FINETUNE_RELEASE_PROFILE,
+    )
+
+
 def seal_private_release_e2e(capture: object) -> dict[str, Any]:
     if not isinstance(capture, dict) or "schema" in capture or "content_sha256" in capture:
         raise S1ReleaseEvidenceError("release E2E capture must be an unsealed object")
-    report = {"schema": RELEASE_E2E_RUN_SCHEMA, **capture}
-    report["content_sha256"] = canonical_json_sha256(report, domain=_PRIVATE_E2E_DOMAIN)
-    validate_private_release_e2e(report)
+    release_profile = capture.get("release_profile")
+    if release_profile is None:
+        schema = RELEASE_E2E_RUN_SCHEMA
+        domain = _PRIVATE_E2E_DOMAIN
+        validator = validate_private_release_e2e
+    elif release_profile == PUBLIC_S1_FINETUNE_RELEASE_PROFILE:
+        schema = PUBLIC_S1_FINETUNE_RELEASE_E2E_RUN_SCHEMA
+        domain = _PUBLIC_S1_FINETUNE_PRIVATE_E2E_DOMAIN
+        validator = validate_private_public_s1_finetune_release_e2e
+    else:
+        raise S1ReleaseEvidenceError("release E2E profile is unsupported")
+    report = {"schema": schema, **capture}
+    report["content_sha256"] = canonical_json_sha256(report, domain=domain)
+    validator(report)
     return report
 
 
@@ -2430,11 +2481,13 @@ def build_unsealed_release_e2e_capture(
     fixture: dict[str, Any],
     execution: dict[str, Any],
     evidence: dict[str, str],
+    release_id: str = _RELEASE_ID,
+    release_profile: str | None = None,
 ) -> dict[str, Any]:
     """Build and validate the exact unsealed capture consumed by the sealing CLI."""
 
     capture: dict[str, Any] = {
-        "release_id": _RELEASE_ID,
+        "release_id": release_id,
         "status": "passed",
         "base_inference_revision": base_inference_revision,
         "derived_inference_revision": derived_inference_revision,
@@ -2448,15 +2501,38 @@ def build_unsealed_release_e2e_capture(
         "execution": dict(execution),
         "evidence": dict(evidence),
     }
+    if release_profile is not None:
+        capture["release_profile"] = release_profile
     seal_private_release_e2e(capture)
     return capture
 
 
 def project_release_e2e(private_run_path: Path) -> dict[str, Any]:
-    private, file_digest = _private_report(private_run_path, RELEASE_E2E_RUN_SCHEMA)
-    validate_private_release_e2e(private)
+    candidate, _raw = _strict_json(
+        private_run_path,
+        label="private release E2E report",
+        maximum_bytes=_MAXIMUM_PRIVATE_REPORT_BYTES,
+    )
+    if candidate.get("schema") == RELEASE_E2E_RUN_SCHEMA:
+        private_schema = RELEASE_E2E_RUN_SCHEMA
+        public_schema = RELEASE_E2E_SCHEMA
+        public_domain = _E2E_DOMAIN
+        release_profile = None
+        validate_private = validate_private_release_e2e
+        validate_public = validate_release_e2e
+    elif candidate.get("schema") == PUBLIC_S1_FINETUNE_RELEASE_E2E_RUN_SCHEMA:
+        private_schema = PUBLIC_S1_FINETUNE_RELEASE_E2E_RUN_SCHEMA
+        public_schema = PUBLIC_S1_FINETUNE_RELEASE_E2E_SCHEMA
+        public_domain = _PUBLIC_S1_FINETUNE_E2E_DOMAIN
+        release_profile = PUBLIC_S1_FINETUNE_RELEASE_PROFILE
+        validate_private = validate_private_public_s1_finetune_release_e2e
+        validate_public = validate_public_s1_finetune_release_e2e
+    else:
+        raise S1ReleaseEvidenceError("private release E2E schema differs")
+    private, file_digest = _private_report(private_run_path, private_schema)
+    validate_private(private)
     report = {
-        "schema": RELEASE_E2E_SCHEMA,
+        "schema": public_schema,
         "release_id": private["release_id"],
         "status": private["status"],
         "base_inference_revision": private["base_inference_revision"],
@@ -2476,39 +2552,58 @@ def project_release_e2e(private_run_path: Path) -> dict[str, Any]:
         "execution": private["execution"],
         "claim_boundary": _E2E_CLAIM_BOUNDARY,
     }
-    report["content_sha256"] = canonical_json_sha256(report, domain=_E2E_DOMAIN)
-    validate_release_e2e(report)
+    if release_profile is not None:
+        report["release_profile"] = release_profile
+    report["content_sha256"] = canonical_json_sha256(report, domain=public_domain)
+    validate_public(report)
     return report
 
 
-def validate_release_e2e(value: object) -> str:
+def _validate_public_release_e2e_profile(
+    value: object,
+    *,
+    schema: str,
+    domain: bytes,
+    expected_release_id: str,
+    expected_release_profile: str | None,
+    private_schema: str,
+) -> str:
+    fields = {
+        "schema",
+        "release_id",
+        "status",
+        "base_inference_revision",
+        "derived_inference_revision",
+        "tested_reference_model_git_revision",
+        "umi_git_revision",
+        "private_run",
+        "test_fixture",
+        "started_at_utc",
+        "finished_at_utc",
+        "runtime",
+        "timeouts_seconds",
+        "execution",
+        "claim_boundary",
+        "content_sha256",
+    }
+    if expected_release_profile is not None:
+        fields.add("release_profile")
     report, supplied = _verify_content(
         value,
-        schema=RELEASE_E2E_SCHEMA,
-        domain=_E2E_DOMAIN,
-        fields={
-            "schema",
-            "release_id",
-            "status",
-            "base_inference_revision",
-            "derived_inference_revision",
-            "tested_reference_model_git_revision",
-            "umi_git_revision",
-            "private_run",
-            "test_fixture",
-            "started_at_utc",
-            "finished_at_utc",
-            "runtime",
-            "timeouts_seconds",
-            "execution",
-            "claim_boundary",
-            "content_sha256",
-        },
+        schema=schema,
+        domain=domain,
+        fields=fields,
     )
-    if report["claim_boundary"] != _E2E_CLAIM_BOUNDARY:
+    if report["claim_boundary"] != _E2E_CLAIM_BOUNDARY or (
+        expected_release_profile is not None
+        and report["release_profile"] != expected_release_profile
+    ):
         raise S1ReleaseEvidenceError("release E2E claim boundary differs")
-    _validate_e2e_common(report)
-    _validate_binding(report["private_run"], "release_e2e", RELEASE_E2E_RUN_SCHEMA)
+    _validate_e2e_common(report, expected_release_id=expected_release_id)
+    binding = report["private_run"]
+    _validate_binding(binding, "release_e2e", private_schema)
+    if not isinstance(binding, dict) or binding.get("schema") != private_schema:
+        raise S1ReleaseEvidenceError("release E2E private-run schema differs")
     if not _strict_equal(
         report["test_fixture"],
         {
@@ -2519,6 +2614,28 @@ def validate_release_e2e(value: object) -> str:
     ):
         raise S1ReleaseEvidenceError("release E2E test-fixture disclosure differs")
     return supplied
+
+
+def validate_release_e2e(value: object) -> str:
+    return _validate_public_release_e2e_profile(
+        value,
+        schema=RELEASE_E2E_SCHEMA,
+        domain=_E2E_DOMAIN,
+        expected_release_id=_RELEASE_ID,
+        expected_release_profile=None,
+        private_schema=RELEASE_E2E_RUN_SCHEMA,
+    )
+
+
+def validate_public_s1_finetune_release_e2e(value: object) -> str:
+    return _validate_public_release_e2e_profile(
+        value,
+        schema=PUBLIC_S1_FINETUNE_RELEASE_E2E_SCHEMA,
+        domain=_PUBLIC_S1_FINETUNE_E2E_DOMAIN,
+        expected_release_id=PUBLIC_S1_FINETUNE_RELEASE_ID,
+        expected_release_profile=PUBLIC_S1_FINETUNE_RELEASE_PROFILE,
+        private_schema=PUBLIC_S1_FINETUNE_RELEASE_E2E_RUN_SCHEMA,
+    )
 
 
 def load_release_e2e(path: Path) -> dict[str, Any]:
@@ -2534,6 +2651,16 @@ def load_release_e2e_bytes(raw: bytes) -> dict[str, Any]:
         raw, label="public release E2E evidence", maximum_bytes=_MAXIMUM_PUBLIC_REPORT_BYTES
     )
     validate_release_e2e(report)
+    return report
+
+
+def load_public_s1_finetune_release_e2e_bytes(raw: bytes) -> dict[str, Any]:
+    report = _strict_json_bytes(
+        raw,
+        label="public S1 fine-tune release E2E evidence",
+        maximum_bytes=_MAXIMUM_PUBLIC_REPORT_BYTES,
+    )
+    validate_public_s1_finetune_release_e2e(report)
     return report
 
 
