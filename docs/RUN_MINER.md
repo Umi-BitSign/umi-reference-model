@@ -59,7 +59,7 @@ export UMI_RELEASE_MANIFEST_SHA256=64_LOWERCASE_HEX_CHARACTERS
 export UMI_RELEASE_AUTHORITY=EXPECTED_RELEASE_AUTHORITY_SS58
 export TRUSTED_UMI_RELEASE_VERIFY=/absolute/path/to/trusted/umi-shadow-release-verify
 export MODEL_RELEASE_TAG=umi-s1-public-finetune-v1
-export EXPECTED_MODEL_RELEASE_GIT_REVISION=cd31402c451f5da3af87fcd8c10f9ed0fbe43d27
+export EXPECTED_MODEL_RELEASE_GIT_REVISION=40_LOWERCASE_HEX_CHARACTERS_FROM_TRUSTED_ANNOUNCEMENT
 test -x "$TRUSTED_UMI_RELEASE_VERIFY"
 test "$(sha256sum "$UMI_INACTIVE_RELEASE/release-manifest.json" | cut -d ' ' -f 1)" = \
   "$UMI_RELEASE_MANIFEST_SHA256"
@@ -75,6 +75,7 @@ cd "$HOME/umi-miner"
 git clone https://github.com/Umi-BitSign/umi-reference-model.git
 git clone https://github.com/Umi-BitSign/umi.git
 cd umi-reference-model
+git verify-tag "$MODEL_RELEASE_TAG"
 test "$(git rev-parse "$MODEL_RELEASE_TAG^{commit}")" = \
   "$EXPECTED_MODEL_RELEASE_GIT_REVISION"
 git checkout --detach "$EXPECTED_MODEL_RELEASE_GIT_REVISION"
@@ -243,15 +244,25 @@ export UMI_S1_TEMP_ROOT="$HOME/umi-miner/s1-jobs"
 export UMI_S1_DEVICE='cpu'
 export UMI_S1_HARD_DEADLINE_SECONDS='150'
 install -d -m 700 "$UMI_S1_TEMP_ROOT"
-"$HOME/umi-miner/umi-reference-model/.venv/bin/python" \
-  -m bitsign_motion.umi_reference_backend probe
+PROBE="$(
+  "$HOME/umi-miner/umi-reference-model/.venv/bin/python" \
+    -m bitsign_motion.umi_reference_backend probe
+)"
+printf '%s\n' "$PROBE" | jq .
+printf '%s\n' "$PROBE" | jq -e \
+  --arg revision "$MODEL_REVISION" \
+  '.status == "ready" and
+   .claim_status == "component_test_no_weight" and
+   .inference_revision == $revision'
+test "$(jq -er .status release/release-manifest.json)" = "baseline_no_weight"
 test -z "$(find "$UMI_S1_TEMP_ROOT" -mindepth 1 -print -quit)"
 test -z "$(docker ps --all --filter name=bitsign-holistic- --format '{{.ID}}')"
 ```
 
-The probe must report `status: ready` and the derived revision. Check that the
-reported no-weight claim status agrees with the signed release manifest. A package,
-image, task, source, or identity mismatch blocks startup.
+The probe must report `status: ready`, `claim_status: component_test_no_weight`, and
+the derived revision. The separately verified public release remains
+`status: baseline_no_weight`. A package, image, task, source, or identity mismatch
+blocks startup.
 
 Save the runtime variables for the two terminals used below. This file contains no
 wallet seed, but keep it owner-only because it describes the local deployment:

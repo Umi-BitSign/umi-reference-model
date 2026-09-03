@@ -77,17 +77,16 @@ additional, renamed, or digest-mismatched companion.
 
 ## 2. Create and test commit A
 
-Remove the previous v0 payloads, release README, and metadata. Keep the reviewed
-`runtime-files.txt`; the public-S1 history pins its digest and uses an exact
-release-directory inventory at every stage. Retaining or repurposing any other
-legacy filename makes verification fail.
+Remove the previous v0 payloads and metadata. Keep the reviewed `README.md` and
+`runtime-files.txt`; the public-S1 history uses an exact release-directory inventory
+at every stage. Retaining or repurposing any other legacy filename makes
+verification fail.
 
 ```bash
 git rm -- \
   release/CC-BY-4.0.txt \
   release/FLEURS-ATTRIBUTION.txt \
   release/FSBOARD-ATTRIBUTION.txt \
-  release/README.md \
   release/SHA256SUMS \
   release/release-manifest.json \
   release/umi-s1-baseline-v0-motion-ablation-evidence.json \
@@ -273,7 +272,10 @@ artifact arguments are rejected.
 
 ```bash
 B="$(git rev-parse HEAD)"
-UMI_GIT_REVISION="$(git -C ../umi rev-parse HEAD)"
+PUBLIC_E2E=release/umi-s1-public-finetune-v1-release-e2e-evidence.json
+UMI_GIT_REVISION="$(jq -er .umi_git_revision "$PUBLIC_E2E")"
+test "$(git -C ../umi rev-parse HEAD)" = "$UMI_GIT_REVISION"
+test -z "$(git -C ../umi status --porcelain=v1 --untracked-files=all)"
 
 uv run --frozen --extra dev python tools/release_artifacts.py \
   --release-id umi-s1-public-finetune-v1 \

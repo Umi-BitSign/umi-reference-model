@@ -767,6 +767,7 @@ def test_public_s1_release_history_preserves_test_then_evidence_then_metadata(
         ROOT / "release" / release_tool.PUBLIC_RUNTIME_MANIFEST_FILENAME,
         release / release_tool.PUBLIC_RUNTIME_MANIFEST_FILENAME,
     )
+    shutil.copyfile(ROOT / "release" / "README.md", release / "README.md")
     _git(repository, "add", ".")
     _git(repository, "commit", "-m", "tested public S1 release")
     tested_revision = _git(repository, "rev-parse", "HEAD")
@@ -901,6 +902,14 @@ def test_public_release_stage_rejects_an_allowed_legacy_filename(tmp_path: Path)
         )
 
 
+def test_public_release_stage_inventories_retain_reviewed_support_files() -> None:
+    release_tool = _load("release_artifacts")
+
+    assert {"README.md", "runtime-files.txt"} <= release_tool.PUBLIC_TESTED_RELEASE_FILENAMES
+    assert {"README.md", "runtime-files.txt"} <= release_tool.PUBLIC_SOURCE_RELEASE_FILENAMES
+    assert release_tool.RELEASE_SUPPORT_FILENAMES <= release_tool.PUBLIC_FINAL_RELEASE_FILENAMES
+
+
 def test_repository_guard_accepts_exact_public_a_inventory(tmp_path: Path) -> None:
     guard = _load("repo_guard")
     release_tool = _load("release_artifacts")
@@ -916,6 +925,8 @@ def test_repository_guard_accepts_exact_public_a_inventory(tmp_path: Path) -> No
     }
     for filename in release_tool.PUBLIC_TESTED_RELEASE_FILENAMES:
         destination = release / filename
+        if destination.exists():
+            continue
         source = canonical_release_files.get(filename)
         if filename == release_tool.PUBLIC_RUNTIME_MANIFEST_FILENAME:
             shutil.copyfile(ROOT / "release" / filename, destination)
@@ -950,8 +961,12 @@ def test_miner_runbook_uses_locked_no_build_source_paths() -> None:
     assert ".venv/bin/python -m bitsign_motion.local_bundle_rebind" in runbook
     assert "-m bitsign_motion.umi_reference_backend probe" in runbook
     assert 'bin/python" -m umi.miner' in runbook
-    assert "umi-s1-baseline-v0" in runbook
-    assert "66f84e7d35b095779749b9cf5b7775fa28641f31" in runbook
+    assert "umi-s1-public-finetune-v1" in runbook
+    assert "40_LOWERCASE_HEX_CHARACTERS_FROM_TRUSTED_ANNOUNCEMENT" in runbook
+    assert 'git verify-tag "$MODEL_RELEASE_TAG"' in runbook
+    assert "cd31402c451f5da3af87fcd8c10f9ed0fbe43d27" not in runbook
+    assert '.claim_status == "component_test_no_weight"' in runbook
+    assert '= "baseline_no_weight"' in runbook
     assert "git checkout RELEASE_TAG" not in runbook
 
 
