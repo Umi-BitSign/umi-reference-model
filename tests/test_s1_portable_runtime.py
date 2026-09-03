@@ -231,7 +231,7 @@ def test_decode_only_tokenizer_matches_sentencepiece_piece_semantics() -> None:
         tokenizer.decode([260] * 129)
 
 
-def test_portable_bundle_loads_without_training_or_source_data_and_runs_greedy_motion(
+def test_portable_bundle_loads_without_training_or_source_data_and_runs_beam_motion(
     portable_bundle: tuple[Path, dict[str, Any]],
 ) -> None:
     root, report = portable_bundle
@@ -315,6 +315,57 @@ def test_portable_runtime_identity_binds_every_local_inference_dependency(
         "bitsign_motion.umi_reference_backend",
     }
     assert runtime.identity["runtime"]["rfc8785_version"] == "0.1.4"
+    assert runtime.identity["runtime"]["decoding"] == {
+        "algorithm": "beam-search",
+        "beam_width": 2,
+        "default_maximum_decode_tokens": 24,
+        "eos_token_id": 2,
+        "length_normalization": False,
+        "no_repeat_ngram_size": 3,
+        "score": "cumulative-log-probability",
+        "suppressed_token_ids": [0, 1],
+        "tie_break": "lexicographically-smallest-token-sequence",
+    }
+
+
+def test_portable_runtime_uses_bound_beam_controls_and_configurable_token_budget(
+    portable_bundle: tuple[Path, dict[str, Any]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, report = portable_bundle
+    runtime = load_s1_portable_bundle(
+        root, expected_inference_revision=report["inference_revision"]
+    )
+    calls: list[tuple[int | None, int, int]] = []
+
+    def beam_decode(
+        model: PortableS1,
+        motion: torch.Tensor,
+        frame_mask: torch.Tensor,
+        *,
+        max_new_tokens: int | None,
+        beam_width: int,
+        no_repeat_ngram_size: int,
+    ) -> torch.Tensor:
+        del model, frame_mask
+        calls.append((max_new_tokens, beam_width, no_repeat_ngram_size))
+        assert max_new_tokens is not None
+        result = torch.zeros(
+            (motion.shape[0], max_new_tokens), dtype=torch.int64, device=motion.device
+        )
+        result[:, 0] = 2
+        return result
+
+    monkeypatch.setattr(PortableS1, "beam_decode", beam_decode)
+    motion = np.zeros((120, MOTION_FEATURE_DIM), dtype=np.float32)
+    frame_mask = np.zeros(120, dtype=np.int32)
+    frame_mask[:8] = 1
+
+    default = runtime.infer_motion(motion, frame_mask)
+    overridden = runtime.infer_motion(motion, frame_mask, max_new_tokens=7)
+
+    assert default.token_ids == (2,)
+    assert overridden.token_ids == (2,)
+    assert calls == [(24, 2, 3), (7, 2, 3)]
 
 
 @pytest.mark.parametrize("extra_name", ["extra", "nested"])

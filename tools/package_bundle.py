@@ -5,20 +5,14 @@ import hashlib
 import json
 import os
 import re
-import stat
 import sys
 import zipfile
 from pathlib import Path
 
-EXPECTED_FILES = (
-    "bundle-manifest.json",
-    "inference-identity.json",
-    "model-config.json",
-    "model.safetensors",
-    "tokenizer.json",
-    "tokenizer.model",
-)
-MAXIMUM_FILE_BYTES = 64 * 1024 * 1024
+from bitsign_motion import s1_portable_runtime as portable
+from bitsign_motion.s1_portable_runtime import S1PortableError, load_s1_portable_bundle
+
+EXPECTED_FILES = portable._EXPECTED_FILES
 MAXIMUM_TOTAL_BYTES = 80 * 1024 * 1024
 SHA256 = re.compile(r"[0-9a-f]{64}")
 FIXED_ZIP_TIME = (1980, 1, 1, 0, 0, 0)
@@ -35,34 +29,28 @@ def _read_bundle(root: Path) -> tuple[dict[str, bytes], str]:
     bundle = direct.resolve(strict=True)
     if not bundle.is_dir():
         raise BundlePackagingError("bundle root must be a direct directory")
-    if tuple(sorted(item.name for item in bundle.iterdir())) != EXPECTED_FILES:
-        raise BundlePackagingError("portable bundle has an unexpected file set")
-    payloads: dict[str, bytes] = {}
-    total = 0
-    for name in EXPECTED_FILES:
-        path = bundle / name
-        metadata = path.lstat()
-        if (
-            path.is_symlink()
-            or not stat.S_ISREG(metadata.st_mode)
-            or metadata.st_nlink != 1
-            or not 1 <= metadata.st_size <= MAXIMUM_FILE_BYTES
-        ):
-            raise BundlePackagingError(f"bundle file violates its contract: {name}")
-        payload = path.read_bytes()
-        if len(payload) != metadata.st_size:
-            raise BundlePackagingError(f"bundle file changed while being read: {name}")
-        payloads[name] = payload
-        total += len(payload)
-    if total > MAXIMUM_TOTAL_BYTES:
-        raise BundlePackagingError("portable bundle exceeds its release ceiling")
     try:
-        identity = json.loads(payloads["inference-identity.json"])
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise BundlePackagingError("inference identity is not JSON") from exc
+        payloads = portable._read_bundle_files(bundle)
+        identity = portable._strict_json(
+            payloads["inference-identity.json"],
+            maximum_bytes=portable._MAXIMUM_FILE_BYTES["inference-identity.json"],
+            label="packaged inference identity",
+        )
+    except S1PortableError as exc:
+        raise BundlePackagingError("portable bundle failed strict input validation") from exc
     revision = identity.get("inference_revision") if isinstance(identity, dict) else None
     if not isinstance(revision, str) or SHA256.fullmatch(revision) is None:
         raise BundlePackagingError("inference identity has no valid revision")
+    try:
+        loaded = load_s1_portable_bundle(bundle, expected_inference_revision=revision)
+        final_payloads = portable._read_bundle_files(bundle)
+    except S1PortableError as exc:
+        raise BundlePackagingError("portable bundle failed strict runtime loading") from exc
+    if loaded.identity != identity or final_payloads != payloads:
+        raise BundlePackagingError("portable bundle changed during strict runtime loading")
+    del loaded
+    if sum(len(payload) for payload in payloads.values()) > MAXIMUM_TOTAL_BYTES:
+        raise BundlePackagingError("portable bundle exceeds its release ceiling")
     return payloads, revision
 
 

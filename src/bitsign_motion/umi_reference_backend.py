@@ -617,16 +617,12 @@ async def _docker_container_exists(docker_executable: Path, container_name: str)
     return False
 
 
-async def _require_docker_container_absent(
-    docker_executable: Path, container_name: str
-) -> None:
+async def _require_docker_container_absent(docker_executable: Path, container_name: str) -> None:
     if await _docker_container_exists(docker_executable, container_name):
         raise UmiReferenceBackendError("isolated translation container name already exists")
 
 
-async def _force_remove_docker_container(
-    docker_executable: Path, container_name: str
-) -> None:
+async def _force_remove_docker_container(docker_executable: Path, container_name: str) -> None:
     if not await _docker_container_exists(docker_executable, container_name):
         return
     await _run_killable_process(
@@ -642,9 +638,7 @@ async def _finish_container_cleanup(
 ) -> tuple[BaseException | None, asyncio.CancelledError | None]:
     """Finish daemon-side cleanup even if the caller is canceled again."""
 
-    task = asyncio.create_task(
-        _force_remove_docker_container(docker_executable, container_name)
-    )
+    task = asyncio.create_task(_force_remove_docker_container(docker_executable, container_name))
     cancellation: asyncio.CancelledError | None = None
     while not task.done():
         try:

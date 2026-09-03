@@ -21,9 +21,7 @@ from .local_extractor_release import (
 )
 from .s1_portable_runtime import S1PortableError, load_s1_portable_bundle
 
-BASE_INFERENCE_REVISION: Final = (
-    "a4fcd32ebb108afeadb36c338607e162998e20e1a593c1b3da75a3ee4d74bb99"
-)
+BASE_INFERENCE_REVISION: Final = "2ead0d2d870c082ae7796f7055cdc360fc3ded7f156a98b247d5d554c79cd752"
 DERIVED_STATUS: Final = "component_test_no_weight"
 
 _EXPECTED_FILES: Final = (
@@ -139,10 +137,7 @@ def _extract_base_archive(
                 target = destination / info.filename
                 descriptor = os.open(
                     target,
-                    os.O_WRONLY
-                    | os.O_CREAT
-                    | os.O_EXCL
-                    | getattr(os, "O_CLOEXEC", 0),
+                    os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_CLOEXEC", 0),
                     0o600,
                 )
                 try:

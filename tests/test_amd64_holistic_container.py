@@ -192,8 +192,7 @@ def test_real_amd64_whole_video_fleurs_smoke(tmp_path: Path) -> None:
     raw_model = os.environ.get("BITSIGN_AMD64_MEDIAPIPE_TASK")
     if raw_video is None or raw_model is None:
         pytest.fail(
-            "integration requires BITSIGN_AMD64_MEDIAPIPE_VIDEO and "
-            "BITSIGN_AMD64_MEDIAPIPE_TASK"
+            "integration requires BITSIGN_AMD64_MEDIAPIPE_VIDEO and BITSIGN_AMD64_MEDIAPIPE_TASK"
         )
     video = Path(raw_video)
     model = Path(raw_model)

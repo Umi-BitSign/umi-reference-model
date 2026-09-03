@@ -68,34 +68,18 @@ def _source_record() -> dict[str, str]:
         / "src"
         / "bitsign_motion"
         / "amd64_holistic_container.py",
-        "dockerfile_sha256": root
-        / "docker"
-        / "mediapipe-holistic"
-        / "Dockerfile.amd64",
-        "requirements_sha256": root
-        / "docker"
-        / "mediapipe-holistic"
-        / "requirements.amd64.lock",
-        "worker_sha256": root
-        / "docker"
-        / "mediapipe-holistic"
-        / "worker.amd64.py",
+        "dockerfile_sha256": root / "docker" / "mediapipe-holistic" / "Dockerfile.amd64",
+        "requirements_sha256": root / "docker" / "mediapipe-holistic" / "requirements.amd64.lock",
+        "worker_sha256": root / "docker" / "mediapipe-holistic" / "worker.amd64.py",
     }
     return {
-        name: _sha256(
-            _read_regular(path, maximum_bytes=_MAXIMUM_SOURCE_BYTES, label=name)
-        )
+        name: _sha256(_read_regular(path, maximum_bytes=_MAXIMUM_SOURCE_BYTES, label=name))
         for name, path in source_paths.items()
     }
 
 
 def _locked_packages() -> dict[str, str]:
-    lock_path = (
-        _source_root()
-        / "docker"
-        / "mediapipe-holistic"
-        / "requirements.amd64.lock"
-    )
+    lock_path = _source_root() / "docker" / "mediapipe-holistic" / "requirements.amd64.lock"
     payload = _read_regular(
         lock_path,
         maximum_bytes=_MAXIMUM_SOURCE_BYTES,
@@ -331,8 +315,7 @@ def validate_local_extractor_record(
         or record["platform"] != LOCAL_EXTRACTOR_PLATFORM
         or record["claim_boundary"] != _CLAIM_BOUNDARY
         or not isinstance(supplied_digest, str)
-        or supplied_digest
-        != canonical_json_sha256(unsigned, domain=_CONTENT_DOMAIN)
+        or supplied_digest != canonical_json_sha256(unsigned, domain=_CONTENT_DOMAIN)
         or record["sources"] != _source_record()
     ):
         raise LocalExtractorReleaseError("local extractor record identity differs")

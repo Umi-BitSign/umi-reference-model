@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from dataclasses import asdict, dataclass
 
 import torch
@@ -524,6 +525,129 @@ class PortableS1(nn.Module):
                 break
             if position + 1 < self.config.max_output_tokens:
                 decoder_input_ids[:, position + 1] = next_token
+        return generated
+
+    @torch.no_grad()
+    def beam_decode(
+        self,
+        motion: Tensor,
+        frame_mask: Tensor,
+        *,
+        max_new_tokens: int | None = None,
+        beam_width: int = 2,
+        no_repeat_ngram_size: int = 3,
+    ) -> Tensor:
+        """Decode with deterministic cumulative-log-probability beam search.
+
+        PAD and BOS are never emitted.  EOS terminates a beam, while the
+        no-repeat constraint considers generated output tokens only. Equal-score
+        candidates are ordered lexicographically by token ID so tied logits do
+        not inherit a backend-specific ``topk`` ordering.
+        """
+
+        token_count = self.config.max_output_tokens if max_new_tokens is None else max_new_tokens
+        if type(token_count) is not int or not 1 <= token_count <= self.config.max_output_tokens:
+            raise ValueError("max_new_tokens must be within the configured output window")
+        if type(beam_width) is not int or not 1 <= beam_width <= self.config.vocabulary_size - 2:
+            raise ValueError("beam_width must fit the non-padding vocabulary")
+        if type(no_repeat_ngram_size) is not int or no_repeat_ngram_size < 2:
+            raise ValueError("no_repeat_ngram_size must be an integer of at least two")
+
+        memory = self.encode(motion, frame_mask)
+        batch_size = motion.shape[0]
+        generated = torch.full(
+            (batch_size, token_count),
+            PAD_TOKEN_ID,
+            dtype=torch.int64,
+            device=motion.device,
+        )
+
+        # Each beam is (cumulative log probability, generated token IDs, finished).
+        # Beam competition remains independent per sample. At each token position,
+        # only the model evaluation is shared by flattening every live beam across
+        # the batch into one decode call.
+        beams_by_sample: list[list[tuple[float, tuple[int, ...], bool]]] = [
+            [(0.0, (), False)] for _ in range(batch_size)
+        ]
+        for position in range(token_count):
+            live: list[tuple[int, tuple[float, tuple[int, ...], bool]]] = []
+            candidates_by_sample: list[list[tuple[float, tuple[int, ...], bool]]] = []
+            for sample_index, beams in enumerate(beams_by_sample):
+                candidates_by_sample.append([beam for beam in beams if beam[2]])
+                live.extend((sample_index, beam) for beam in beams if not beam[2])
+            if not live:
+                break
+
+            decoder_input_ids = torch.full(
+                (len(live), self.config.max_output_tokens),
+                PAD_TOKEN_ID,
+                dtype=torch.int64,
+                device=motion.device,
+            )
+            decoder_input_ids[:, 0] = BOS_TOKEN_ID
+            for row, (_, (_, tokens, _)) in enumerate(live):
+                if tokens:
+                    decoder_input_ids[row, 1 : len(tokens) + 1] = torch.tensor(
+                        tokens,
+                        dtype=torch.int64,
+                        device=motion.device,
+                    )
+            sample_indices = torch.tensor(
+                [sample_index for sample_index, _ in live],
+                dtype=torch.int64,
+                device=motion.device,
+            )
+            logits = self.decode(
+                decoder_input_ids,
+                memory.index_select(0, sample_indices),
+                frame_mask.index_select(0, sample_indices),
+            )[:, position]
+            log_probabilities = torch.log_softmax(logits, dim=-1)
+
+            for row, (sample_index, (score, tokens, _)) in enumerate(live):
+                banned = {PAD_TOKEN_ID, BOS_TOKEN_ID}
+                if len(tokens) >= no_repeat_ngram_size - 1:
+                    suffix = tokens[-(no_repeat_ngram_size - 1) :]
+                    for start in range(len(tokens) - no_repeat_ngram_size + 1):
+                        if tokens[start : start + no_repeat_ngram_size - 1] == suffix:
+                            banned.add(tokens[start + no_repeat_ngram_size - 1])
+
+                # Stable argsort preserves ascending token ID for equal logits.
+                # Constraints are applied after log-softmax so scores remain
+                # probabilities under the unmodified model distribution.
+                ordered_tokens = torch.argsort(
+                    log_probabilities[row], descending=True, stable=True
+                ).to(device="cpu")
+                accepted = 0
+                for raw_token in ordered_tokens.tolist():
+                    token = int(raw_token)
+                    if token in banned:
+                        continue
+                    token_score = float(log_probabilities[row, token].item())
+                    if not math.isfinite(token_score):
+                        continue
+                    next_tokens = (*tokens, token)
+                    candidates_by_sample[sample_index].append(
+                        (score + token_score, next_tokens, token == EOS_TOKEN_ID)
+                    )
+                    accepted += 1
+                    if accepted == beam_width:
+                        break
+                if accepted == 0:
+                    raise RuntimeError("beam search has no finite token candidate")
+
+            for sample_index, candidates in enumerate(candidates_by_sample):
+                candidates.sort(key=lambda beam: (-beam[0], beam[1]))
+                beams_by_sample[sample_index] = candidates[:beam_width]
+
+        for sample_index, beams in enumerate(beams_by_sample):
+            best_tokens = beams[0][1]
+            if best_tokens:
+                generated[sample_index, : len(best_tokens)] = torch.tensor(
+                    best_tokens,
+                    dtype=torch.int64,
+                    device=motion.device,
+                )
         return generated
 
     @property

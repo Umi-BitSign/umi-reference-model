@@ -15,7 +15,7 @@ from bitsign_motion.canonical import canonical_json_bytes
 from bitsign_motion.local_bundle_rebind import LocalBundleRebindError
 from bitsign_motion.local_extractor_release import LocalExtractorReleaseError
 
-from .test_release_tools import _bundle, _load
+from .test_release_tools import _invalid_bundle, _unchecked_package
 
 
 def _executable(path: Path) -> Path:
@@ -85,9 +85,8 @@ def test_local_build_record_binds_source_image_and_packages(
 
 
 def test_rebinder_extracts_only_the_deterministic_published_bundle(tmp_path: Path) -> None:
-    package_tool = _load("package_bundle")
     archive = tmp_path / "base.zip"
-    package_tool.package_bundle(_bundle(tmp_path, "12" * 32), archive)
+    _unchecked_package(_invalid_bundle(tmp_path, "12" * 32), archive)
     digest = hashlib.sha256(archive.read_bytes()).hexdigest()
     destination = tmp_path / "extracted"
     destination.mkdir(mode=0o700)
@@ -112,9 +111,8 @@ def test_rebinder_preserves_every_identity_field_except_local_amd64_image(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    package_tool = _load("package_bundle")
     archive = tmp_path / "base.zip"
-    package_tool.package_bundle(_bundle(tmp_path, "12" * 32), archive)
+    _unchecked_package(_invalid_bundle(tmp_path, "12" * 32), archive)
     archive_digest = hashlib.sha256(archive.read_bytes()).hexdigest()
     docker = _executable(tmp_path / "docker")
     record_path = tmp_path / "local-extractor.json"
@@ -169,9 +167,7 @@ def test_rebinder_preserves_every_identity_field_except_local_amd64_image(
     monkeypatch.setattr(
         rebind_module,
         "_reseal_verified_base",
-        lambda *_args, **_kwargs: (
-            _args[1].mkdir() or derived_revision
-        ),
+        lambda *_args, **_kwargs: (_args[1].mkdir() or derived_revision),
     )
     output = tmp_path / "derived"
     result = rebind_module.rebind_local_extractor(
@@ -193,9 +189,7 @@ def test_identity_comparison_rejects_unrelated_derived_change() -> None:
     }
     derived = copy.deepcopy(base)
     derived["inference_revision"] = "56" * 32
-    derived["preprocessing"]["supported_oci_images"]["linux/amd64"] = (
-        "sha256:" + "78" * 32
-    )
+    derived["preprocessing"]["supported_oci_images"]["linux/amd64"] = "sha256:" + "78" * 32
     rebind_module._assert_preserved_identity(
         base,
         derived,

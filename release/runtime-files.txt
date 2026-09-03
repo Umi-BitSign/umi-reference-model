@@ -1,5 +1,5 @@
 # Frozen source closure for portable revision
-# a4fcd32ebb108afeadb36c338607e162998e20e1a593c1b3da75a3ee4d74bb99.
+# 2ead0d2d870c082ae7796f7055cdc360fc3ded7f156a98b247d5d554c79cd752.
 src/bitsign_motion/__init__.py
 src/bitsign_motion/amd64_holistic_container.py
 src/bitsign_motion/canonical.py
@@ -23,5 +23,6 @@ docker/mediapipe-holistic/worker.amd64.py
 tests/__init__.py
 tests/test_holistic_motion.py
 tests/test_mediapipe_mapping.py
+tests/test_portable_model.py
 tests/test_s1_portable_runtime.py
 tests/test_umi_release_e2e.py

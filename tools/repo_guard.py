@@ -8,6 +8,8 @@ import sys
 from pathlib import Path
 
 MAXIMUM_GIT_FILE_BYTES = 16 * 1024 * 1024
+MAXIMUM_RELEASE_MODEL_BYTES = 128 * 1024 * 1024
+RELEASE_MODEL_PATH = "release/umi-s1-baseline-v0-portable.zip"
 FORBIDDEN_SUFFIXES = {
     ".docker.tar",
     ".docker.tar.zst",
@@ -27,14 +29,31 @@ SECRET_NAME = re.compile(
 )
 REQUIRED_DIGESTS = {
     "LICENSE": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
-    "licenses/CC-BY-4.0.txt": (
-        "9e5f1b3c610b9c2da5c313bf81d577a7d1acec686bdb0384edefa6df0f90cd94"
-    ),
+    "licenses/CC-BY-4.0.txt": ("9e5f1b3c610b9c2da5c313bf81d577a7d1acec686bdb0384edefa6df0f90cd94"),
     "licenses/CC-BY-SA-4.0.txt": (
         "23ee78c8bae49cf08ea2f0c84945c66b987ebe4520881fb51b3dad4fb43d07c2"
     ),
     "licenses/FSBOARD-SOURCE-NOTICE.txt": (
         "96218feb836f9005261b0346501f349d11e4019deb6bbfce899483d94639c7dd"
+    ),
+    "NOTICE": "e3742cc8272881c5736681ce8a83284b28f459deafaaff2baac31c696f046e6a",
+    "licenses/FLEURS-ATTRIBUTION.txt": (
+        "e9e6b293c5e2058d969561e8ac164add7fe1d4221e049de971ae32056e9b8a51"
+    ),
+    "licenses/FSBOARD-ATTRIBUTION.txt": (
+        "a042e85d40b25f7171c3e4cbd742cf8852361c71e72203f66e0947f0440bff21"
+    ),
+    "release/LICENSE": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+    "release/NOTICE": "e3742cc8272881c5736681ce8a83284b28f459deafaaff2baac31c696f046e6a",
+    "release/CC-BY-4.0.txt": ("9e5f1b3c610b9c2da5c313bf81d577a7d1acec686bdb0384edefa6df0f90cd94"),
+    "release/CC-BY-SA-4.0.txt": (
+        "23ee78c8bae49cf08ea2f0c84945c66b987ebe4520881fb51b3dad4fb43d07c2"
+    ),
+    "release/FLEURS-ATTRIBUTION.txt": (
+        "e9e6b293c5e2058d969561e8ac164add7fe1d4221e049de971ae32056e9b8a51"
+    ),
+    "release/FSBOARD-ATTRIBUTION.txt": (
+        "a042e85d40b25f7171c3e4cbd742cf8852361c71e72203f66e0947f0440bff21"
     ),
 }
 FORBIDDEN_TEXT = (
@@ -48,8 +67,10 @@ class RepositoryGuardError(RuntimeError):
     pass
 
 
-def _forbidden_suffix(name: str) -> bool:
-    lowered = name.lower()
+def _forbidden_suffix(relative: str) -> bool:
+    if relative == RELEASE_MODEL_PATH:
+        return False
+    lowered = relative.lower()
     return any(lowered.endswith(suffix) for suffix in FORBIDDEN_SUFFIXES)
 
 
@@ -91,9 +112,16 @@ def check_repository(root: Path) -> tuple[int, int]:
         metadata = path.lstat()
         if path.is_symlink() or not stat.S_ISREG(metadata.st_mode):
             raise RepositoryGuardError(f"repository contains a non-regular file: {relative}")
-        if metadata.st_size > MAXIMUM_GIT_FILE_BYTES:
-            raise RepositoryGuardError(f"repository file exceeds 16 MiB: {relative}")
-        if _forbidden_suffix(path.name):
+        maximum_bytes = (
+            MAXIMUM_RELEASE_MODEL_BYTES
+            if relative == RELEASE_MODEL_PATH
+            else MAXIMUM_GIT_FILE_BYTES
+        )
+        if metadata.st_size > maximum_bytes:
+            raise RepositoryGuardError(
+                f"repository file exceeds its {maximum_bytes}-byte ceiling: {relative}"
+            )
+        if _forbidden_suffix(relative):
             raise RepositoryGuardError(f"repository contains a forbidden artifact: {relative}")
         if SECRET_NAME.search(path.name):
             raise RepositoryGuardError(f"repository contains a secret-like filename: {relative}")

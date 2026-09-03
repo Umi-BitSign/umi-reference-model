@@ -57,7 +57,7 @@ from .motion_artifact import (
     POINT_FIELDS,
     S1_TARGET_FEATURE_PROFILE,
 )
-from .portable_model import MOTION_FEATURE_DIM, PortableS1, PortableS1Config
+from .portable_model import EOS_TOKEN_ID, MOTION_FEATURE_DIM, PortableS1, PortableS1Config
 from .s1_decode_tokenizer import (
     S1_TOKENIZER_MAXIMUM_MODEL_BYTES,
     S1_TOKENIZER_MAXIMUM_RECORD_BYTES,
@@ -77,7 +77,10 @@ S1_RAW_TEXT_POSTPROCESS_REVISION: Final = "raw-tokenizer-output/1"
 S1_WORD_PREFIX_SELECTION_SCHEMA: Final = "umi-s1-word-prefix-selection/1"
 S1_VALIDATION_WORD_PREFIX_REVISION: Final = "validation-whitespace-word-prefix/1"
 S1_PORTABLE_MODEL_CLASS: Final = "bitsign_motion.portable_model.PortableS1"
-S1_PORTABLE_RUNTIME_REVISION: Final = "s1-pytorch-greedy-runtime/1"
+S1_PORTABLE_RUNTIME_REVISION: Final = "s1-pytorch-beam-runtime/1"
+S1_PORTABLE_BEAM_WIDTH: Final = 2
+S1_PORTABLE_MAXIMUM_DECODE_TOKENS: Final = 24
+S1_PORTABLE_NO_REPEAT_NGRAM_SIZE: Final = 3
 
 _IDENTITY_DOMAIN = b"umi-s1-portable-v1\0"
 _MANIFEST_DOMAIN = b"umi-s1-portable-manifest-v1\0"
@@ -233,6 +236,17 @@ def _runtime_contract() -> dict[str, Any]:
         "rfc8785_version": importlib.metadata.version("rfc8785"),
         "safetensors_version": importlib.metadata.version("safetensors"),
         "tensor_format": S1_PORTABLE_TENSOR_SCHEMA,
+        "decoding": {
+            "algorithm": "beam-search",
+            "beam_width": S1_PORTABLE_BEAM_WIDTH,
+            "default_maximum_decode_tokens": S1_PORTABLE_MAXIMUM_DECODE_TOKENS,
+            "score": "cumulative-log-probability",
+            "length_normalization": False,
+            "suppressed_token_ids": [0, 1],
+            "eos_token_id": 2,
+            "no_repeat_ngram_size": S1_PORTABLE_NO_REPEAT_NGRAM_SIZE,
+            "tie_break": "lexicographically-smallest-token-sequence",
+        },
         "modules": modules,
     }
 
@@ -1153,10 +1167,13 @@ def export_s1_portable_bundle(
             "text_postprocess": text_postprocess_record,
             "rights": rights_record,
             "claim_boundary": (
-                "This is a motion-to-text bootstrap inference artifact. Its exact ARM64 training "
-                "frontend and AMD64 reference-miner frontend are not tensor-equivalent. The AMD64 "
-                "path is a component-test baseline, not UMI activation evidence, accessibility "
-                "certification, or production-quality translation."
+                "This is an integration fixture and replacement target, not a usable ASL "
+                "translator. On the bound fixed-validation diagnostic, zero motion outscored "
+                "real motion, so the checkpoint has not established useful motion grounding. "
+                "Its exact ARM64 training frontend and AMD64 reference-miner frontend are not "
+                "tensor-equivalent. The AMD64 path is a component-test baseline, not UMI "
+                "activation evidence, accessibility certification, or production-quality "
+                "translation."
             ),
         }
         identity["inference_revision"] = canonical_json_sha256(identity, domain=_IDENTITY_DOMAIN)
@@ -1272,12 +1289,23 @@ class S1PortableRuntime:
             not torch.all(padded == 0).item() or torch.signbit(padded).any().item()
         ):
             raise S1PortableError("padded motion rows must be positive zero")
-        generated = self._model.greedy_decode(
+        decode_tokens = (
+            S1_PORTABLE_MAXIMUM_DECODE_TOKENS if max_new_tokens is None else max_new_tokens
+        )
+        generated = self._model.beam_decode(
             motion_tensor.unsqueeze(0).to(self.device),
             mask_tensor.unsqueeze(0).to(self.device),
-            max_new_tokens=max_new_tokens,
+            max_new_tokens=decode_tokens,
+            beam_width=S1_PORTABLE_BEAM_WIDTH,
+            no_repeat_ngram_size=S1_PORTABLE_NO_REPEAT_NGRAM_SIZE,
         )[0]
-        token_ids = tuple(int(value) for value in generated.to(device="cpu").tolist())
+        generated_ids = tuple(int(value) for value in generated.to(device="cpu").tolist())
+        try:
+            eos_index = generated_ids.index(EOS_TOKEN_ID)
+        except ValueError:
+            token_ids = generated_ids
+        else:
+            token_ids = generated_ids[: eos_index + 1]
         try:
             raw_text = self.tokenizer.decode(token_ids)
         except S1DecodeTokenizerError as exc:

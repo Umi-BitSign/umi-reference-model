@@ -1,6 +1,7 @@
 # Run the UMI S1 reference miner
 
-This profile serves a real model through the no-weight UMI component miner. UMI
+This profile serves the low-accuracy S1 integration fixture through the no-weight UMI
+component miner. It is not a usable ASL translator or accessibility tool. UMI
 translation weights are inactive, so registration and successful responses do not
 guarantee mining rewards.
 
@@ -32,8 +33,11 @@ Clone this repository and the public UMI repository beside each other. Check out
 release tag for this repository and the exact UMI commit recorded in
 `release/release-manifest.json`.
 
-Run every block below in the same Bash session. The first command enables fail-fast
-handling so a failed digest, revision, import, or cleanup check stops setup.
+Run Sections 1 through 5 in the same Bash session. The first command enables
+fail-fast handling so a failed digest, revision, import, or cleanup check stops
+setup. Section 6 saves the non-secret runtime configuration in an owner-only file,
+then deliberately splits the foreground miner and the verification commands between
+two terminals.
 
 ```bash
 set -euo pipefail
@@ -94,32 +98,37 @@ Keep `uv.lock` from both repositories unchanged. A dependency conflict or lock d
 blocks startup. The portable identity pins Python 3.12, NumPy, PyTorch, Safetensors,
 RFC 8785, and every bound source module.
 
-## 3. Download the base model
+## 3. Verify the sealed release artifacts
 
-Download `umi-s1-baseline-v0-portable.zip`, `SHA256SUMS`, and
-`release-manifest.json` from the same GitHub release into an owner-only directory.
+The immutable release tag contains the model, four aggregate evidence records, and
+six license companions under `release/`. Verify the complete fixed set before using
+the model. `release/SHA256SUMS` contains one line for each of these eleven artifacts.
 
 ```bash
-install -d -m 700 "$HOME/umi-miner/release-assets"
-cd "$HOME/umi-miner/release-assets"
-shasum -a 256 -c SHA256SUMS
+cd "$HOME/umi-miner/umi-reference-model"
+(
+  cd release
+  sha256sum -c SHA256SUMS
+)
 BASE_MODEL_SHA256="$(
-  jq -er '.artifacts[] | select(.label == "model") | .sha256' release-manifest.json
+  jq -er '.artifacts[] | select(.label == "model") | .sha256' \
+    release/release-manifest.json
 )"
-test "$(shasum -a 256 umi-s1-baseline-v0-portable.zip | cut -d ' ' -f 1)" = \
+test "$(
+  sha256sum release/umi-s1-baseline-v0-portable.zip | cut -d ' ' -f 1
+)" = \
   "$BASE_MODEL_SHA256"
-cmp release-manifest.json \
-  "$HOME/umi-miner/umi-reference-model/release/release-manifest.json"
-cmp SHA256SUMS "$HOME/umi-miner/umi-reference-model/release/SHA256SUMS"
 "$HOME/umi-miner/umi-reference-model/.venv/bin/python" \
   "$HOME/umi-miner/umi-reference-model/tools/release_artifacts.py" \
   --verify "$HOME/umi-miner/umi-reference-model/release/release-manifest.json" \
-  --artifact-directory "$HOME/umi-miner/release-assets" \
+  --artifact-directory "$HOME/umi-miner/umi-reference-model/release" \
   --repository "$HOME/umi-miner/umi-reference-model" \
   --release-git-revision "$RELEASE_GIT_REVISION"
 ```
 
-No extractor archive or MediaPipe task binary belongs in this release.
+The verifier checks the A -> B -> C commit history, the aggregate-only evidence,
+license copies, source closure, artifact names, and every digest. No extractor archive
+or MediaPipe task binary belongs in the release.
 
 ## 4. Build and bind the local extractor
 
@@ -148,7 +157,7 @@ Bind the local image ID into a derived bundle:
 
 ```bash
 .venv/bin/python -m bitsign_motion.local_bundle_rebind \
-  --base-archive "$HOME/umi-miner/release-assets/umi-s1-baseline-v0-portable.zip" \
+  --base-archive "$HOME/umi-miner/umi-reference-model/release/umi-s1-baseline-v0-portable.zip" \
   --base-sha256 "$BASE_MODEL_SHA256" \
   --build-record "$HOME/umi-miner/local-build/local-extractor.json" \
   --docker "$DOCKER_EXECUTABLE" \
@@ -170,13 +179,14 @@ Download the task model directly from Google and verify its fixed digest. UMI do
 redistribute this file.
 
 ```bash
-MEDIAPIPE_TASK="$HOME/umi-miner/release-assets/holistic_landmarker.task"
+install -d -m 700 "$HOME/umi-miner/runtime-assets"
+MEDIAPIPE_TASK="$HOME/umi-miner/runtime-assets/holistic_landmarker.task"
 curl --fail --location --proto '=https' --tlsv1.2 \
   'https://storage.googleapis.com/mediapipe-models/holistic_landmarker/holistic_landmarker/float16/latest/holistic_landmarker.task?generation=1703178474695092' \
   --output "$MEDIAPIPE_TASK"
 printf '%s  %s\n' \
   'e2dab61191e2dcd0a15f943d8e3ed1dce13c82dfa597b9dd39f562975a50c3f8' \
-  "$MEDIAPIPE_TASK" | shasum -a 256 -c -
+  "$MEDIAPIPE_TASK" | sha256sum -c -
 chmod 600 "$MEDIAPIPE_TASK"
 ```
 
@@ -191,7 +201,7 @@ export UMI_S1_EXTRACTOR_PLATFORM='linux/amd64'
 export UMI_S1_DOCKER_EXECUTABLE="$DOCKER_EXECUTABLE"
 export UMI_S1_TEMP_ROOT="$HOME/umi-miner/s1-jobs"
 export UMI_S1_DEVICE='cpu'
-export UMI_S1_HARD_DEADLINE_SECONDS='120'
+export UMI_S1_HARD_DEADLINE_SECONDS='150'
 install -d -m 700 "$UMI_S1_TEMP_ROOT"
 "$HOME/umi-miner/umi-reference-model/.venv/bin/python" \
   -m bitsign_motion.umi_reference_backend probe
@@ -203,14 +213,55 @@ The probe must report `status: ready`, `claim_status: component_test_no_weight`,
 the derived revision. A package, image, task, source, or identity mismatch blocks
 startup.
 
-## 6. Start the UMI miner
-
-Create or select a Bittensor wallet and hotkey using the public UMI instructions. Keep
-the video-host allowlist narrow. This example listens on all interfaces and admits one
-validator and one HTTPS challenge host.
+Save the runtime variables for the two terminals used below. This file contains no
+wallet seed, but keep it owner-only because it describes the local deployment:
 
 ```bash
 install -d -m 700 "$HOME/umi-miner/state"
+RUNTIME_ENV="$HOME/umi-miner/state/reference-miner.env"
+umask 077
+for NAME in \
+  UMI_S1_BUNDLE \
+  UMI_S1_INFERENCE_REVISION \
+  UMI_S1_EXTRACTOR_IMAGE \
+  UMI_S1_EXTRACTOR_MODEL \
+  UMI_S1_EXTRACTOR_PLATFORM \
+  UMI_S1_DOCKER_EXECUTABLE \
+  UMI_S1_TEMP_ROOT \
+  UMI_S1_DEVICE \
+  UMI_S1_HARD_DEADLINE_SECONDS
+do
+  printf 'export %s=%q\n' "$NAME" "${!NAME}"
+done > "$RUNTIME_ENV"
+chmod 600 "$RUNTIME_ENV"
+```
+
+## 6. Register, start, and announce the UMI miner
+
+Create or select a Bittensor wallet and hotkey. Register that hotkey on SN78 once,
+after reviewing the live registration cost:
+
+```bash
+cd "$HOME/umi-miner/umi-reference-model"
+.venv/bin/btcli subnets register \
+  --netuid 78 \
+  --network finney \
+  --wallet umi \
+  --wallet-hotkey miner \
+  --mev-shield
+```
+
+Registration is coldkey-signed and spends the live cost. Stop if the client cannot
+use the required MEV-shielded path.
+
+Keep the video-host allowlist narrow. In terminal A, load the saved runtime
+configuration and start the foreground backend on port 8091. This example admits one
+validator and one HTTPS challenge host. Leave this process running.
+
+```bash
+set -euo pipefail
+cd "$HOME/umi-miner/umi-reference-model"
+source "$HOME/umi-miner/state/reference-miner.env"
 "$HOME/umi-miner/umi-reference-model/.venv/bin/python" -m umi.miner \
   --wallet-name umi \
   --hotkey miner \
@@ -220,18 +271,23 @@ install -d -m 700 "$HOME/umi-miner/state"
   --video-host challenges.example.org \
   --nonce-db "$HOME/umi-miner/state/nonces.sqlite3" \
   --max-inference-concurrency 1 \
-  --inference-timeout 120 \
+  --inference-timeout 180 \
+  --inference-admission-timeout 10 \
+  --backend-lifecycle-timeout 60 \
   --listen-host 0.0.0.0 \
   --port 8091
 ```
 
 Replace `VALIDATOR_SS58` and the challenge hostname with values supplied for the
-component test. Put TLS and public ingress in front of port 8091. The endpoint trusts
-only `btauth/1` requests from the explicit validator allowlist.
+component test. The endpoint trusts only `btauth/1` requests from the explicit
+validator allowlist.
 
-Check health locally:
+Open terminal B, load the same configuration, and check health locally:
 
 ```bash
+set -euo pipefail
+cd "$HOME/umi-miner/umi-reference-model"
+source "$HOME/umi-miner/state/reference-miner.env"
 curl --fail --silent http://127.0.0.1:8091/healthz | jq .
 ```
 
@@ -239,11 +295,40 @@ Expected health includes `translation_weights_active: false`,
 `protocol_conformance: false`, and the derived model revision. Those false values are
 intentional for this component-test release.
 
-## Registration and failure handling
+Expose the service at a stable public IP and port, then announce that exact public
+endpoint on SN78. The announced port is the ingress or proxy's public port; it may
+differ from backend port 8091.
 
-Registration spends the live SN78 registration cost. Review the current cost and UMI
-instructions before submitting a transaction. The reference backend performs no chain
-write; wallet signing stays in the UMI miner and `btcli` processes.
+```bash
+cd "$HOME/umi-miner/umi-reference-model"
+source "$HOME/umi-miner/state/reference-miner.env"
+PUBLIC_IP=203.0.113.10
+PUBLIC_PORT=8091
+
+.venv/bin/btcli tx serve-axon \
+  --netuid 78 \
+  --ip "$PUBLIC_IP" \
+  --port "$PUBLIC_PORT" \
+  --network finney \
+  --wallet umi \
+  --wallet-hotkey miner \
+  --no-mev-shield
+```
+
+`serve-axon` is hotkey-signed. The reference miner itself still performs no chain
+write. Verify discovery from another host with the same pinned environment:
+
+```bash
+export MINER_HOTKEY_SS58=YOUR_MINER_HOTKEY_SS58
+.venv/bin/python -c \
+  'import asyncio, os; from umi.chain import discover_miner; print(asyncio.run(discover_miner(os.environ["MINER_HOTKEY_SS58"])))'
+```
+
+The returned hotkey, UID, and endpoint must match the registration and public
+ingress. Then fetch `/healthz` through that public endpoint and have the validator run
+once without an explicit `--miner-url`; this exercises read-only metagraph discovery.
+
+## 7. Failure handling
 
 A missing model, hash mismatch, extractor failure, timeout, or invalid video produces
 an explicit encrypted error response and scores zero. Do not add a text fallback. After

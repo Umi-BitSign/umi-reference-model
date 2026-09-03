@@ -63,11 +63,12 @@ def _regular_payload(root: Path, relative: PurePosixPath) -> bytes:
         raise StagingError(f"staging source parent contains a symlink: {relative}")
     payload = path.read_bytes()
     after = path.lstat()
-    if (
-        len(payload) != before.st_size
-        or (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns)
-        != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns)
-    ):
+    if len(payload) != before.st_size or (
+        before.st_dev,
+        before.st_ino,
+        before.st_size,
+        before.st_mtime_ns,
+    ) != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns):
         raise StagingError(f"staging source changed while being read: {relative}")
     return payload
 
