@@ -41,7 +41,7 @@ REQUIRED_DIGESTS = {
     "licenses/FSBOARD-SOURCE-NOTICE.txt": (
         "96218feb836f9005261b0346501f349d11e4019deb6bbfce899483d94639c7dd"
     ),
-    "NOTICE": "e3742cc8272881c5736681ce8a83284b28f459deafaaff2baac31c696f046e6a",
+    "NOTICE": "74be8e3f4f30280f77ee026268ef81c6d7acc450100120731235a994e3338935",
     "licenses/FLEURS-ATTRIBUTION.txt": (
         "e9e6b293c5e2058d969561e8ac164add7fe1d4221e049de971ae32056e9b8a51"
     ),
@@ -49,16 +49,33 @@ REQUIRED_DIGESTS = {
         "a042e85d40b25f7171c3e4cbd742cf8852361c71e72203f66e0947f0440bff21"
     ),
     "release/LICENSE": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
-    "release/NOTICE": "e3742cc8272881c5736681ce8a83284b28f459deafaaff2baac31c696f046e6a",
-    "release/CC-BY-4.0.txt": ("9e5f1b3c610b9c2da5c313bf81d577a7d1acec686bdb0384edefa6df0f90cd94"),
+    "release/NOTICE": "74be8e3f4f30280f77ee026268ef81c6d7acc450100120731235a994e3338935",
     "release/CC-BY-SA-4.0.txt": (
         "23ee78c8bae49cf08ea2f0c84945c66b987ebe4520881fb51b3dad4fb43d07c2"
     ),
-    "release/FLEURS-ATTRIBUTION.txt": (
-        "e9e6b293c5e2058d969561e8ac164add7fe1d4221e049de971ae32056e9b8a51"
+    "release/2M-FLORES-ASL-LICENSE.txt": (
+        "23ee78c8bae49cf08ea2f0c84945c66b987ebe4520881fb51b3dad4fb43d07c2"
+    ),
+    "release/2M-FLORES-ASL-ATTRIBUTION.txt": (
+        "541c723652f261dbf9cc8bbe812476a5e821348f7f73d421415ba99d027e7640"
+    ),
+    "release/FLEURS-ASL-LICENSE.txt": (
+        "23ee78c8bae49cf08ea2f0c84945c66b987ebe4520881fb51b3dad4fb43d07c2"
+    ),
+    "release/FLEURS-ASL-ATTRIBUTION.txt": (
+        "df4d82cf63e09d0513ac08ab4ff01141583ea7774b6abfe2bad2a99c6b8bebe3"
+    ),
+    "release/FSBOARD-LICENSE.txt": (
+        "96218feb836f9005261b0346501f349d11e4019deb6bbfce899483d94639c7dd"
     ),
     "release/FSBOARD-ATTRIBUTION.txt": (
-        "a042e85d40b25f7171c3e4cbd742cf8852361c71e72203f66e0947f0440bff21"
+        "0cfe5b50a410a6fd9d2a6101de37cc9c0a98e1478761b1bf4e5acf9d0a7cd88f"
+    ),
+    "release/TASKMASTER-LICENSE.txt": (
+        "05e1bc05724716ca7905f567a2ec30d99c8d2f5f58e926c2ca7d9da116002446"
+    ),
+    "release/TASKMASTER-ATTRIBUTION.txt": (
+        "0bff2f85846a14f4c85088ab1f70d3ace952926136c98d7592ac9a10b9bf11e5"
     ),
 }
 FORBIDDEN_TEXT = (

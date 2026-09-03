@@ -1,7 +1,8 @@
 # Run the UMI S1 reference miner
 
-This profile serves the low-accuracy S1 integration fixture through the no-weight UMI
-component miner. It is not a usable ASL translator or accessibility tool. UMI
+This profile serves the low-accuracy S1 public bootstrap through a no-weight UMI
+miner. It is a starter model for miners to inspect and improve. It is not an ASL
+translator, accessibility tool, production service, or activation result. UMI
 translation weights are inactive, so registration and successful responses do not
 guarantee mining rewards.
 
@@ -214,9 +215,9 @@ test -z "$(find "$UMI_S1_TEMP_ROOT" -mindepth 1 -print -quit)"
 test -z "$(docker ps --all --filter name=bitsign-holistic- --format '{{.ID}}')"
 ```
 
-The probe must report `status: ready`, `claim_status: component_test_no_weight`, and
-the derived revision. A package, image, task, source, or identity mismatch blocks
-startup.
+The probe must report `status: ready` and the derived revision. Check that the
+reported no-weight claim status agrees with the signed release manifest. A package,
+image, task, source, or identity mismatch blocks startup.
 
 Save the runtime variables for the two terminals used below. This file contains no
 wallet seed, but keep it owner-only because it describes the local deployment:
@@ -284,7 +285,7 @@ source "$HOME/umi-miner/state/reference-miner.env"
 ```
 
 Replace `VALIDATOR_SS58` and the challenge hostname with values supplied for the
-component test. The endpoint trusts only `btauth/1` requests from the explicit
+evaluation window. The endpoint trusts only `btauth/1` requests from the explicit
 validator allowlist.
 
 Open terminal B, load the same configuration, and check health locally:
@@ -298,7 +299,7 @@ curl --fail --silent http://127.0.0.1:8091/healthz | jq .
 
 Expected health includes `translation_weights_active: false`,
 `protocol_conformance: false`, and the derived model revision. Those false values are
-intentional for this component-test release.
+intentional for this public bootstrap release.
 
 Expose the service at a stable public IP and port, then announce that exact public
 endpoint on SN78. The announced port is the ingress or proxy's public port; it may
