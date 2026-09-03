@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import hashlib
 import importlib.util
 import json
 import shutil
@@ -14,14 +15,17 @@ from types import ModuleType
 import pytest
 import torch
 
+from bitsign_motion import s1_portable_runtime as portable_module
 from bitsign_motion import s1_release_evidence as release_evidence
 from bitsign_motion.canonical import canonical_json_bytes, canonical_json_sha256
 from bitsign_motion.portable_model import PortableS1, PortableS1Config
 from bitsign_motion.s1_portable_runtime import (
+    S1_PUBLIC_FINETUNE_CLAIM_PROFILE,
     build_s1_validation_word_prefix_contract,
     export_s1_portable_bundle,
     seal_s1_validation_word_prefix_selection,
 )
+from bitsign_motion.s1_state_digest import s1_tensor_set_sha256
 
 from .release_evidence_fixtures import (
     make_e2e,
@@ -30,7 +34,13 @@ from .release_evidence_fixtures import (
     make_selection,
     write_evidence_set,
 )
-from .test_s1_portable_runtime import _preprocessing, _rights, _synthetic_tokenizer
+from .test_s1_portable_runtime import (
+    _experiment_rights,
+    _preprocessing,
+    _public_finetune_claim_fixture,
+    _rights,
+    _synthetic_tokenizer,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -200,6 +210,49 @@ def test_bundle_package_is_deterministic(
     second = tool.package_bundle(bundle, tmp_path / "second.zip")
     assert first["sha256"] == second["sha256"]
     assert (tmp_path / "first.zip").read_bytes() == (tmp_path / "second.zip").read_bytes()
+
+
+def test_bundle_packager_accepts_public_finetune_profile(tmp_path: Path) -> None:
+    tool = _load("package_bundle")
+    tokenizer_model, tokenizer_record = _synthetic_tokenizer()
+    tokenizer_model_path = tmp_path / "tokenizer.model"
+    tokenizer_record_path = tmp_path / "tokenizer.json"
+    tokenizer_model_path.write_bytes(tokenizer_model)
+    tokenizer_record_path.write_bytes(tokenizer_record)
+    model = PortableS1(PortableS1Config()).eval()
+    model_state_sha256 = s1_tensor_set_sha256(model.state_dict())
+    rights = _experiment_rights()
+    rights_sha256 = canonical_json_sha256(rights)
+    evidence, arguments = _public_finetune_claim_fixture()
+    evidence["candidate"]["selected_model_state_sha256"] = model_state_sha256
+    evidence["tokenizer"]["model_sha256"] = hashlib.sha256(tokenizer_model).hexdigest()
+    evidence["tokenizer"]["record_sha256"] = hashlib.sha256(tokenizer_record).hexdigest()
+    evidence["rights_record_sha256"] = rights_sha256
+    evidence["content_sha256"] = canonical_json_sha256(
+        {key: value for key, value in evidence.items() if key != "content_sha256"},
+        domain=portable_module._PUBLIC_FINETUNE_RELEASE_IDENTITY_DOMAIN,
+    )
+    upstream_identity_sha256 = canonical_json_sha256(evidence)
+    report = export_s1_portable_bundle(
+        model,
+        tmp_path / "public-finetune-bundle",
+        tokenizer_model_path=tokenizer_model_path,
+        tokenizer_record_path=tokenizer_record_path,
+        preprocessing=_preprocessing(),
+        rights=rights,
+        upstream_release_identity_sha256=upstream_identity_sha256,
+        text_postprocess=arguments["text_postprocess"],
+        claim_boundary_profile=S1_PUBLIC_FINETUNE_CLAIM_PROFILE,
+        claim_boundary_evidence=evidence,
+    )
+
+    packaged = tool.package_bundle(
+        tmp_path / "public-finetune-bundle",
+        tmp_path / "public-finetune.zip",
+    )
+
+    assert packaged["inference_revision"] == report["inference_revision"]
+    assert packaged["archive"] == "public-finetune.zip"
 
 
 def test_selection_evidence_discloses_source_rebind_transfer(
@@ -503,14 +556,13 @@ def test_repository_guard_accepts_public_tree() -> None:
     assert size > 10_000
 
 
-def test_runtime_file_manifest_names_exact_current_bundle_revision() -> None:
-    from bitsign_motion.local_bundle_rebind import BASE_INFERENCE_REVISION
-
+def test_runtime_file_manifest_describes_versioned_shared_source_closure() -> None:
     lines = (ROOT / "release/runtime-files.txt").read_text(encoding="utf-8").splitlines()
     assert lines[:2] == [
-        "# Frozen source closure for portable revision",
-        f"# {BASE_INFERENCE_REVISION}.",
+        "# Reviewed source-closure allowlist for v0 and public-s1-finetune/1 runtimes.",
+        "# Each release binds its exact source bytes through its inference identity.",
     ]
+    assert "src/bitsign_motion/s1_portable_runtime.py" in lines
 
 
 def test_miner_runbook_uses_locked_no_build_source_paths() -> None:
