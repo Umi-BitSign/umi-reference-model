@@ -12,8 +12,8 @@ The release history has three commits:
 3. commit C is the sole child of B and changes only `release/release-manifest.json`
    and `release/SHA256SUMS`.
 
-The immutable release tag points to C. Do not push, tag, or upload any release file
-until the project owner approves C and its checksum set.
+An immutable release tag must point to C. Do not push, tag, or upload any release
+file until the project owner approves C and its checksum set.
 
 ## 1. Freeze the model and aggregate evidence
 

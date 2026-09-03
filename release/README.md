@@ -31,7 +31,8 @@ record covers the functional release path on one Linux/AMD64 host and reports no
 translation-quality result.
 
 Release history is fixed as source commit A, E2E-evidence-only commit B, then
-metadata-only commit C. The tag points to C. Generate and verify C with
+metadata-only commit C. An owner-approved immutable release tag must point to C.
+Generate and verify C with
 `tools/release_artifacts.py` after completing `docs/RELEASE.md`; do not hand-edit the
 manifest or checksum file.
 
