@@ -342,12 +342,17 @@ def _pid_exists(pid: int) -> bool:
     return True
 
 
-async def _wait_for_file(path: Path) -> None:
+async def _wait_for_file(path: Path) -> str:
     for _ in range(200):
-        if path.exists():
-            return
+        try:
+            value = path.read_text()
+        except FileNotFoundError:
+            pass
+        else:
+            if value:
+                return value
         await asyncio.sleep(0.01)
-    raise AssertionError("child PID file was not created")
+    raise AssertionError("child PID file was not populated")
 
 
 async def _wait_for_exit(pid: int) -> None:
@@ -373,8 +378,8 @@ def test_cancellation_kills_and_reaps_the_native_process_group(tmp_path: Path) -
                 deadline_seconds=30,
             )
         )
-        await _wait_for_file(pid_path)
-        parent_pid, child_pid = (int(value) for value in pid_path.read_text().split())
+        pid_record = await _wait_for_file(pid_path)
+        parent_pid, child_pid = (int(value) for value in pid_record.split())
         task.cancel()
         with pytest.raises(asyncio.CancelledError):
             await task
@@ -395,10 +400,10 @@ def test_hard_timeout_kills_and_reaps_worker(tmp_path: Path) -> None:
         with pytest.raises(TimeoutError):
             await backend_module._run_killable_process(
                 [sys.executable, "-c", script, str(pid_path)],
-                deadline_seconds=0.2,
+                deadline_seconds=2.0,
             )
-        await _wait_for_file(pid_path)
-        await _wait_for_exit(int(pid_path.read_text()))
+        pid_record = await _wait_for_file(pid_path)
+        await _wait_for_exit(int(pid_record))
 
     asyncio.run(scenario())
 
