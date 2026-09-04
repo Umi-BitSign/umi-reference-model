@@ -23,8 +23,10 @@ whitespace-delimited output words.
 
 The reference miner uses a locally built Linux/AMD64 MediaPipe Holistic extractor
 image. The derived bundle binds its exact local image ID. Independently built images
-are not assumed to have identical bytes. Linux/AMD64 and Linux/ARM64 landmark tensors
-are separately identified and are not bit-equivalent.
+are not assumed to have identical bytes. Linux/AMD64 hosts run PyTorch on CPU or
+CUDA. Apple Silicon macOS hosts use the same Linux/AMD64 worker through Docker
+Desktop and run PyTorch natively on MPS or CPU. The repository's older Linux/ARM64
+worker does not implement the release miner's whole-video contract.
 
 ## Training lineage
 
@@ -94,7 +96,10 @@ the pinned Google storage URL and verify its SHA-256 digest.
 
 ## Platform scope
 
-The published runtime supports Linux/AMD64 extraction and PyTorch inference. CUDA is
-optional when available to a miner. Native iOS, Core ML, and Android packages are not
-included or validated. A future mobile release must establish a deterministic mobile
-preprocessing contract and evaluate it independently.
+The published runtime supports Linux/AMD64 extraction on Linux/AMD64 and Apple
+Silicon macOS hosts. CUDA is optional on Linux. MPS and CPU are supported on macOS,
+but extraction remains an emulated Linux/AMD64 Docker workload. macOS deployment
+evidence is additive and does not alter the sealed r2 artifacts or establish burst
+capacity. Native iOS, Core ML, and Android packages are not included or validated. A
+future mobile release must establish a deterministic mobile preprocessing contract
+and evaluate it independently.

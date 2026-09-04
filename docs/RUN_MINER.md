@@ -18,6 +18,10 @@ live policy or replace the signed inactive release.
 
 ## Host requirements
 
+This procedure is for Linux/AMD64. Apple Silicon operators must use the separate
+[macOS procedure](RUN_MINER_MACOS.md), which keeps extraction in the same pinned
+Linux/AMD64 Docker worker and runs PyTorch natively through MPS or CPU.
+
 Use a Linux/AMD64 host with:
 
 - Python 3.12 and `uv`;
@@ -192,8 +196,9 @@ EXTRACTOR_IMAGE="$(
 docker image inspect --format '{{.Id}} {{.Os}}/{{.Architecture}}' "$EXTRACTOR_IMAGE"
 ```
 
-The observed platform must be `linux/amd64`. Do not tag or substitute another image
-after the build record is written.
+The observed container platform must be `linux/amd64`. Build record schema
+`umi-local-extractor-build/2` also binds the host platform. Do not transfer the record
+across host platforms, or tag or substitute another image after it is written.
 
 Bind the local image ID into a derived bundle:
 
@@ -344,28 +349,21 @@ release_artifact() {
 FINALITY_VERIFIER="$(release_artifact finality_verifier_binary)"
 FINALITY_CHAIN_SPEC="$(release_artifact finality_chain_spec)"
 MIRROR_DISCOVERY="$(release_artifact mirror_discovery_rule)"
-VIDEO_HOST_ARGS=()
-VIDEO_PORT_ARGS=()
-while IFS=$'\t' read -r HOST PORT; do
-  VIDEO_HOST_ARGS+=(--video-host "$HOST")
-  VIDEO_PORT_ARGS+=(--video-port "$PORT")
+VIDEO_ORIGIN_ARGS=()
+while IFS= read -r ORIGIN; do
+  VIDEO_ORIGIN_ARGS+=(--video-origin "$ORIGIN")
 done < <("$HOME/umi-miner/umi-reference-model/.venv/bin/python" \
   - "$MIRROR_DISCOVERY" <<'PY'
 import json
 import sys
 from pathlib import Path
-from urllib.parse import urlsplit
 
 document = json.loads(Path(sys.argv[1]).read_bytes())
 for origin in document["delivery_origins"]:
-    parsed = urlsplit(origin)
-    if parsed.scheme != "https" or parsed.hostname is None:
-        raise SystemExit("invalid signed delivery origin")
-    print(parsed.hostname, parsed.port or 443, sep="\t")
+    print(origin)
 PY
 )
-test "${#VIDEO_HOST_ARGS[@]}" -gt 0
-test "${#VIDEO_HOST_ARGS[@]}" = "${#VIDEO_PORT_ARGS[@]}"
+test "${#VIDEO_ORIGIN_ARGS[@]}" -gt 0
 
 install -d -m 700 "$HOME/umi-miner/state"
 "$HOME/umi-miner/umi-reference-model/.venv/bin/python" -m umi.miner \
@@ -378,8 +376,9 @@ install -d -m 700 "$HOME/umi-miner/state"
   --finality-state "$HOME/umi-miner/state/miner-finality.sqlite3" \
   --translator bitsign_motion.umi_reference_backend:translator \
   --model-revision "$UMI_S1_INFERENCE_REVISION" \
-  "${VIDEO_HOST_ARGS[@]}" \
-  "${VIDEO_PORT_ARGS[@]}" \
+  --coalesce-window-video-inference \
+  --max-backend-workers 4 \
+  "${VIDEO_ORIGIN_ARGS[@]}" \
   --nonce-db "$HOME/umi-miner/state/nonces.sqlite3" \
   --assignment-db "$HOME/umi-miner/state/assignments.sqlite3" \
   --inference-timeout 180 \

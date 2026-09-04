@@ -295,6 +295,13 @@ def rebind_local_extractor(
         docker_executable=docker_executable,
     )
     image_id = cast(str, build_record["image_id"])
+    container_platform = cast(
+        str,
+        build_record.get("container_platform", build_record.get("platform")),
+    )
+    host_platform = cast(str, build_record.get("host_platform", "unrecorded-v1"))
+    if container_platform != "linux/amd64":
+        raise LocalBundleRebindError("local extractor is not the Linux/AMD64 worker")
 
     generated = False
     with tempfile.TemporaryDirectory(prefix=".umi-base-bundle-", dir=parent) as temporary:
@@ -371,22 +378,28 @@ def rebind_local_extractor(
     if not generated:
         raise LocalBundleRebindError("derived bundle was not generated")
     return {
-        "schema": "umi-local-extractor-rebind-result/1",
+        "schema": "umi-local-extractor-rebind-result/2",
         "status": DERIVED_STATUS,
         "base_inference_revision": expected_base_inference_revision,
+        "host_platform": host_platform,
+        "container_platform": container_platform,
         "local_extractor_image_id": image_id,
         "inference_revision": revision,
         "bundle": str(destination),
         "claim_boundary": (
             "This derived component-test bundle changes only the locally built Linux/AMD64 "
-            "extractor image authority. It is not byte-equivalence or UMI activation evidence."
+            "extractor image authority. The recorded host platform does not change the "
+            "container platform. This is not cross-host byte-equivalence or UMI activation "
+            "evidence."
         ),
     }
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Bind a locally built extractor into the published component-test bundle"
+        description=(
+            "Bind a locally built Linux/AMD64 extractor into the published component-test bundle"
+        )
     )
     parser.add_argument("--base-archive", type=Path, required=True)
     parser.add_argument("--base-sha256", required=True)

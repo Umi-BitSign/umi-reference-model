@@ -28,6 +28,9 @@ PUBLIC_S1_FINETUNE_RELEASE_E2E_SCHEMA: Final = "umi-s1-public-finetune-release-e
 PUBLIC_S1_FINETUNE_RELEASE_E2E_RUN_SCHEMA: Final = "umi-s1-public-finetune-release-e2e-run/1"
 PUBLIC_S1_FINETUNE_RELEASE_ID: Final = "umi-s1-public-finetune-v1-r2"
 PUBLIC_S1_FINETUNE_RELEASE_PROFILE: Final = "public-s1-finetune/1"
+MACOS_MINER_E2E_SCHEMA: Final = "umi-s1-macos-miner-e2e/1"
+MACOS_MINER_E2E_RUN_SCHEMA: Final = "umi-s1-macos-miner-e2e-run/1"
+MACOS_MINER_DEPLOYMENT_PROFILE: Final = "macos-apple-silicon/1"
 
 EVIDENCE_FILES: Final = {
     "selection-ledger": SELECTION_LEDGER_FILENAME,
@@ -43,6 +46,8 @@ _E2E_DOMAIN: Final = b"umi-s1-public-release-e2e-v1\0"
 _PRIVATE_E2E_DOMAIN: Final = b"umi-s1-release-e2e-run-v1\0"
 _PUBLIC_S1_FINETUNE_E2E_DOMAIN: Final = b"umi-s1-public-finetune-release-e2e-v1\0"
 _PUBLIC_S1_FINETUNE_PRIVATE_E2E_DOMAIN: Final = b"umi-s1-public-finetune-release-e2e-run-v1\0"
+_MACOS_MINER_E2E_DOMAIN: Final = b"umi-s1-macos-miner-e2e-v1\0"
+_MACOS_MINER_PRIVATE_E2E_DOMAIN: Final = b"umi-s1-macos-miner-e2e-run-v1\0"
 _MOTION_SAMPLE_SET_DOMAIN: Final = b"umi-s1-validation-motion-ablation-samples-v1\0"
 _MOTION_RANK_DOMAIN: Final = b"umi-s1-validation-motion-ablation-rank-v1\0"
 _MOTION_PERMUTATION_DOMAIN: Final = b"umi-s1-validation-motion-ablation-permutation-v1\0"
@@ -78,6 +83,7 @@ _PRIVATE_REPORT_DOMAINS: Final = {
     "umi-s1-final-rights-review/1": b"umi-s1-final-rights-review-v1\0",
     RELEASE_E2E_RUN_SCHEMA: _PRIVATE_E2E_DOMAIN,
     PUBLIC_S1_FINETUNE_RELEASE_E2E_RUN_SCHEMA: _PUBLIC_S1_FINETUNE_PRIVATE_E2E_DOMAIN,
+    MACOS_MINER_E2E_RUN_SCHEMA: _MACOS_MINER_PRIVATE_E2E_DOMAIN,
 }
 
 _SELECTION_PRIVATE_SCHEMAS: Final = (
@@ -215,6 +221,14 @@ _E2E_CLAIM_BOUNDARY: Final = (
     "success and failure responses, response sealing, post-reveal decryption, and cleanup for "
     "the bound run. It reports no translation quality, cross-host image equivalence, UMI "
     "activation evidence, accessibility certification, or reward guarantee."
+)
+_MACOS_MINER_E2E_CLAIM_BOUNDARY: Final = (
+    "Functional Apple Silicon macOS deployment evidence for one locally built Linux/AMD64 "
+    "extractor image, native PyTorch inference, and one rights-cleared private video fixture. "
+    "It establishes raw-video execution, bounded success and failure responses, response "
+    "sealing, post-reveal decryption, and cleanup for the bound run. It reports no native "
+    "ARM64 extractor equivalence, translation quality, UMI activation evidence, accessibility "
+    "certification, or reward guarantee."
 )
 
 
@@ -2274,7 +2288,12 @@ def load_rights_evidence_bytes(raw: bytes) -> dict[str, Any]:
     return report
 
 
-def _validate_e2e_common(report: dict[str, Any], *, expected_release_id: str) -> None:
+def _validate_e2e_common(
+    report: dict[str, Any],
+    *,
+    expected_release_id: str,
+    runtime_profile: str,
+) -> None:
     if report.get("release_id") != expected_release_id or report.get("status") != "passed":
         raise S1ReleaseEvidenceError("release E2E identity differs")
     base = _require_sha256(report.get("base_inference_revision"), "E2E base inference")
@@ -2305,6 +2324,12 @@ def _validate_e2e_common(report: dict[str, Any], *, expected_release_id: str) ->
         "extractor_image_id",
         "mediapipe_task_model_sha256",
     }
+    if runtime_profile == MACOS_MINER_DEPLOYMENT_PROFILE:
+        runtime_fields |= {
+            "model_execution",
+            "mps_is_built",
+            "mps_is_available",
+        }
     version_fields = (
         "python_version",
         "torch_version",
@@ -2312,20 +2337,42 @@ def _validate_e2e_common(report: dict[str, Any], *, expected_release_id: str) ->
         "safetensors_version",
         "bittensor_version",
     )
+    string_fields = runtime_fields - {"mps_is_built", "mps_is_available"}
     if (
         not isinstance(runtime, dict)
         or set(runtime) != runtime_fields
-        or any(not isinstance(item, str) or not item for item in runtime.values())
+        or any(not isinstance(runtime[name], str) or not runtime[name] for name in string_fields)
         or any(_NUMERIC_VERSION.fullmatch(runtime[name]) is None for name in version_fields)
         or _DOCKER_VERSION.fullmatch(runtime["docker_engine_version"]) is None
-        or runtime["host_operating_system"] != "Linux"
-        or runtime["host_architecture"] != "x86_64"
         or runtime["container_platform"] != "linux/amd64"
-        or runtime["model_device"] != "cpu"
         or runtime["mediapipe_task_model_sha256"] != _TASK_MODEL_SHA256
         or re.fullmatch(r"sha256:[0-9a-f]{64}", runtime["extractor_image_id"]) is None
     ):
         raise S1ReleaseEvidenceError("release E2E runtime differs")
+    if runtime_profile == "linux-amd64-cpu/1":
+        if (
+            runtime["host_operating_system"] != "Linux"
+            or runtime["host_architecture"] != "x86_64"
+            or runtime["model_device"] != "cpu"
+        ):
+            raise S1ReleaseEvidenceError("release E2E runtime differs")
+    elif runtime_profile == MACOS_MINER_DEPLOYMENT_PROFILE:
+        device = runtime["model_device"]
+        if (
+            runtime["host_operating_system"] != "Darwin"
+            or runtime["host_architecture"] != "arm64"
+            or device not in {"cpu", "mps"}
+            or runtime["model_execution"] != f"native-pytorch-{device}"
+            or type(runtime["mps_is_built"]) is not bool
+            or type(runtime["mps_is_available"]) is not bool
+            or (
+                device == "mps"
+                and (runtime["mps_is_built"] is not True or runtime["mps_is_available"] is not True)
+            )
+        ):
+            raise S1ReleaseEvidenceError("macOS miner E2E runtime differs")
+    else:
+        raise S1ReleaseEvidenceError("release E2E runtime profile is unsupported")
     required_execution = {
         "request_count": 2,
         "valid_video_status": "ok",
@@ -2363,6 +2410,8 @@ def _validate_private_release_e2e_profile(
     domain: bytes,
     expected_release_id: str,
     expected_release_profile: str | None,
+    expected_deployment_profile: str | None,
+    runtime_profile: str,
 ) -> str:
     fields = {
         "schema",
@@ -2383,11 +2432,20 @@ def _validate_private_release_e2e_profile(
     }
     if expected_release_profile is not None:
         fields.add("release_profile")
+    if expected_deployment_profile is not None:
+        fields.add("deployment_profile")
     if not isinstance(value, dict) or set(value) != fields:
         raise S1ReleaseEvidenceError("private release E2E field set differs")
-    if value["schema"] != schema or (
-        expected_release_profile is not None
-        and value["release_profile"] != expected_release_profile
+    if (
+        value["schema"] != schema
+        or (
+            expected_release_profile is not None
+            and value["release_profile"] != expected_release_profile
+        )
+        or (
+            expected_deployment_profile is not None
+            and value["deployment_profile"] != expected_deployment_profile
+        )
     ):
         raise S1ReleaseEvidenceError("private release E2E schema differs")
     supplied = _require_sha256(value["content_sha256"], "private E2E content")
@@ -2395,7 +2453,11 @@ def _validate_private_release_e2e_profile(
     del unsigned["content_sha256"]
     if canonical_json_sha256(unsigned, domain=domain) != supplied:
         raise S1ReleaseEvidenceError("private release E2E content digest differs")
-    _validate_e2e_common(value, expected_release_id=expected_release_id)
+    _validate_e2e_common(
+        value,
+        expected_release_id=expected_release_id,
+        runtime_profile=runtime_profile,
+    )
     fixture = value["fixture"]
     if (
         not isinstance(fixture, dict)
@@ -2435,6 +2497,8 @@ def validate_private_release_e2e(value: object) -> str:
         domain=_PRIVATE_E2E_DOMAIN,
         expected_release_id=_RELEASE_ID,
         expected_release_profile=None,
+        expected_deployment_profile=None,
+        runtime_profile="linux-amd64-cpu/1",
     )
 
 
@@ -2445,6 +2509,20 @@ def validate_private_public_s1_finetune_release_e2e(value: object) -> str:
         domain=_PUBLIC_S1_FINETUNE_PRIVATE_E2E_DOMAIN,
         expected_release_id=PUBLIC_S1_FINETUNE_RELEASE_ID,
         expected_release_profile=PUBLIC_S1_FINETUNE_RELEASE_PROFILE,
+        expected_deployment_profile=None,
+        runtime_profile="linux-amd64-cpu/1",
+    )
+
+
+def validate_private_macos_miner_e2e(value: object) -> str:
+    return _validate_private_release_e2e_profile(
+        value,
+        schema=MACOS_MINER_E2E_RUN_SCHEMA,
+        domain=_MACOS_MINER_PRIVATE_E2E_DOMAIN,
+        expected_release_id=PUBLIC_S1_FINETUNE_RELEASE_ID,
+        expected_release_profile=PUBLIC_S1_FINETUNE_RELEASE_PROFILE,
+        expected_deployment_profile=MACOS_MINER_DEPLOYMENT_PROFILE,
+        runtime_profile=MACOS_MINER_DEPLOYMENT_PROFILE,
     )
 
 
@@ -2452,7 +2530,16 @@ def seal_private_release_e2e(capture: object) -> dict[str, Any]:
     if not isinstance(capture, dict) or "schema" in capture or "content_sha256" in capture:
         raise S1ReleaseEvidenceError("release E2E capture must be an unsealed object")
     release_profile = capture.get("release_profile")
-    if release_profile is None:
+    deployment_profile = capture.get("deployment_profile")
+    if deployment_profile == MACOS_MINER_DEPLOYMENT_PROFILE:
+        if release_profile != PUBLIC_S1_FINETUNE_RELEASE_PROFILE:
+            raise S1ReleaseEvidenceError("macOS miner E2E requires the public S1 release profile")
+        schema = MACOS_MINER_E2E_RUN_SCHEMA
+        domain = _MACOS_MINER_PRIVATE_E2E_DOMAIN
+        validator = validate_private_macos_miner_e2e
+    elif deployment_profile is not None:
+        raise S1ReleaseEvidenceError("release E2E deployment profile is unsupported")
+    elif release_profile is None:
         schema = RELEASE_E2E_RUN_SCHEMA
         domain = _PRIVATE_E2E_DOMAIN
         validator = validate_private_release_e2e
@@ -2483,6 +2570,7 @@ def build_unsealed_release_e2e_capture(
     evidence: dict[str, str],
     release_id: str = _RELEASE_ID,
     release_profile: str | None = None,
+    deployment_profile: str | None = None,
 ) -> dict[str, Any]:
     """Build and validate the exact unsealed capture consumed by the sealing CLI."""
 
@@ -2503,6 +2591,8 @@ def build_unsealed_release_e2e_capture(
     }
     if release_profile is not None:
         capture["release_profile"] = release_profile
+    if deployment_profile is not None:
+        capture["deployment_profile"] = deployment_profile
     seal_private_release_e2e(capture)
     return capture
 
@@ -2513,6 +2603,8 @@ def project_release_e2e(private_run_path: Path) -> dict[str, Any]:
         label="private release E2E report",
         maximum_bytes=_MAXIMUM_PRIVATE_REPORT_BYTES,
     )
+    deployment_profile = None
+    claim_boundary = _E2E_CLAIM_BOUNDARY
     if candidate.get("schema") == RELEASE_E2E_RUN_SCHEMA:
         private_schema = RELEASE_E2E_RUN_SCHEMA
         public_schema = RELEASE_E2E_SCHEMA
@@ -2527,6 +2619,15 @@ def project_release_e2e(private_run_path: Path) -> dict[str, Any]:
         release_profile = PUBLIC_S1_FINETUNE_RELEASE_PROFILE
         validate_private = validate_private_public_s1_finetune_release_e2e
         validate_public = validate_public_s1_finetune_release_e2e
+    elif candidate.get("schema") == MACOS_MINER_E2E_RUN_SCHEMA:
+        private_schema = MACOS_MINER_E2E_RUN_SCHEMA
+        public_schema = MACOS_MINER_E2E_SCHEMA
+        public_domain = _MACOS_MINER_E2E_DOMAIN
+        release_profile = PUBLIC_S1_FINETUNE_RELEASE_PROFILE
+        deployment_profile = MACOS_MINER_DEPLOYMENT_PROFILE
+        claim_boundary = _MACOS_MINER_E2E_CLAIM_BOUNDARY
+        validate_private = validate_private_macos_miner_e2e
+        validate_public = validate_macos_miner_e2e
     else:
         raise S1ReleaseEvidenceError("private release E2E schema differs")
     private, file_digest = _private_report(private_run_path, private_schema)
@@ -2550,10 +2651,12 @@ def project_release_e2e(private_run_path: Path) -> dict[str, Any]:
         "runtime": private["runtime"],
         "timeouts_seconds": private["timeouts_seconds"],
         "execution": private["execution"],
-        "claim_boundary": _E2E_CLAIM_BOUNDARY,
+        "claim_boundary": claim_boundary,
     }
     if release_profile is not None:
         report["release_profile"] = release_profile
+    if deployment_profile is not None:
+        report["deployment_profile"] = deployment_profile
     report["content_sha256"] = canonical_json_sha256(report, domain=public_domain)
     validate_public(report)
     return report
@@ -2566,7 +2669,10 @@ def _validate_public_release_e2e_profile(
     domain: bytes,
     expected_release_id: str,
     expected_release_profile: str | None,
+    expected_deployment_profile: str | None,
     private_schema: str,
+    runtime_profile: str,
+    claim_boundary: str,
 ) -> str:
     fields = {
         "schema",
@@ -2588,18 +2694,31 @@ def _validate_public_release_e2e_profile(
     }
     if expected_release_profile is not None:
         fields.add("release_profile")
+    if expected_deployment_profile is not None:
+        fields.add("deployment_profile")
     report, supplied = _verify_content(
         value,
         schema=schema,
         domain=domain,
         fields=fields,
     )
-    if report["claim_boundary"] != _E2E_CLAIM_BOUNDARY or (
-        expected_release_profile is not None
-        and report["release_profile"] != expected_release_profile
+    if (
+        report["claim_boundary"] != claim_boundary
+        or (
+            expected_release_profile is not None
+            and report["release_profile"] != expected_release_profile
+        )
+        or (
+            expected_deployment_profile is not None
+            and report["deployment_profile"] != expected_deployment_profile
+        )
     ):
         raise S1ReleaseEvidenceError("release E2E claim boundary differs")
-    _validate_e2e_common(report, expected_release_id=expected_release_id)
+    _validate_e2e_common(
+        report,
+        expected_release_id=expected_release_id,
+        runtime_profile=runtime_profile,
+    )
     binding = report["private_run"]
     _validate_binding(binding, "release_e2e", private_schema)
     if not isinstance(binding, dict) or binding.get("schema") != private_schema:
@@ -2623,7 +2742,10 @@ def validate_release_e2e(value: object) -> str:
         domain=_E2E_DOMAIN,
         expected_release_id=_RELEASE_ID,
         expected_release_profile=None,
+        expected_deployment_profile=None,
         private_schema=RELEASE_E2E_RUN_SCHEMA,
+        runtime_profile="linux-amd64-cpu/1",
+        claim_boundary=_E2E_CLAIM_BOUNDARY,
     )
 
 
@@ -2634,7 +2756,24 @@ def validate_public_s1_finetune_release_e2e(value: object) -> str:
         domain=_PUBLIC_S1_FINETUNE_E2E_DOMAIN,
         expected_release_id=PUBLIC_S1_FINETUNE_RELEASE_ID,
         expected_release_profile=PUBLIC_S1_FINETUNE_RELEASE_PROFILE,
+        expected_deployment_profile=None,
         private_schema=PUBLIC_S1_FINETUNE_RELEASE_E2E_RUN_SCHEMA,
+        runtime_profile="linux-amd64-cpu/1",
+        claim_boundary=_E2E_CLAIM_BOUNDARY,
+    )
+
+
+def validate_macos_miner_e2e(value: object) -> str:
+    return _validate_public_release_e2e_profile(
+        value,
+        schema=MACOS_MINER_E2E_SCHEMA,
+        domain=_MACOS_MINER_E2E_DOMAIN,
+        expected_release_id=PUBLIC_S1_FINETUNE_RELEASE_ID,
+        expected_release_profile=PUBLIC_S1_FINETUNE_RELEASE_PROFILE,
+        expected_deployment_profile=MACOS_MINER_DEPLOYMENT_PROFILE,
+        private_schema=MACOS_MINER_E2E_RUN_SCHEMA,
+        runtime_profile=MACOS_MINER_DEPLOYMENT_PROFILE,
+        claim_boundary=_MACOS_MINER_E2E_CLAIM_BOUNDARY,
     )
 
 
@@ -2661,6 +2800,16 @@ def load_public_s1_finetune_release_e2e_bytes(raw: bytes) -> dict[str, Any]:
         maximum_bytes=_MAXIMUM_PUBLIC_REPORT_BYTES,
     )
     validate_public_s1_finetune_release_e2e(report)
+    return report
+
+
+def load_macos_miner_e2e_bytes(raw: bytes) -> dict[str, Any]:
+    report = _strict_json_bytes(
+        raw,
+        label="macOS miner E2E evidence",
+        maximum_bytes=_MAXIMUM_PUBLIC_REPORT_BYTES,
+    )
+    validate_macos_miner_e2e(report)
     return report
 
 

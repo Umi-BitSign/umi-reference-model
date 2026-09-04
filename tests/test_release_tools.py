@@ -633,6 +633,92 @@ def test_public_s1_e2e_projection_preserves_release_profile(tmp_path: Path) -> N
     release_evidence.validate_public_s1_finetune_release_e2e(projected)
 
 
+def test_macos_miner_e2e_projection_binds_split_host_and_container_runtime(
+    tmp_path: Path,
+) -> None:
+    identity = {
+        "inference_revision": "21" * 32,
+        "preprocessing": {"supported_oci_images": {"linux/amd64": "sha256:" + "30" * 32}},
+    }
+    linux_fixture = make_e2e(
+        identity,
+        "21" * 32,
+        "22" * 20,
+        release_profile=release_evidence.PUBLIC_S1_FINETUNE_RELEASE_PROFILE,
+    )
+    capture = {
+        key: copy.deepcopy(linux_fixture[key])
+        for key in (
+            "release_id",
+            "release_profile",
+            "status",
+            "base_inference_revision",
+            "derived_inference_revision",
+            "tested_reference_model_git_revision",
+            "umi_git_revision",
+            "started_at_utc",
+            "finished_at_utc",
+            "runtime",
+            "timeouts_seconds",
+            "execution",
+        )
+    }
+    capture["deployment_profile"] = release_evidence.MACOS_MINER_DEPLOYMENT_PROFILE
+    capture["runtime"].update(
+        {
+            "host_operating_system": "Darwin",
+            "host_architecture": "arm64",
+            "model_device": "mps",
+            "model_execution": "native-pytorch-mps",
+            "mps_is_built": True,
+            "mps_is_available": True,
+        }
+    )
+    capture["fixture"] = {
+        "fixture_class": "rights-cleared-private-video",
+        "video_sha256": "23" * 32,
+        "rights_cleared_for_private_testing": True,
+        "distributed": False,
+    }
+    capture["evidence"] = {
+        "extractor_build_record_content_sha256": "24" * 32,
+        "extractor_build_record_file_sha256": "25" * 32,
+        "valid_wire_response_sha256": "26" * 32,
+        "invalid_wire_response_sha256": "27" * 32,
+        "post_reveal_plaintext_set_sha256": "28" * 32,
+        "run_log_sha256": "29" * 32,
+    }
+    private = release_evidence.seal_private_release_e2e(capture)
+    assert private["schema"] == release_evidence.MACOS_MINER_E2E_RUN_SCHEMA
+    private_path = tmp_path / "macos-private-e2e.json"
+    private_path.write_bytes(canonical_json_bytes(private))
+
+    projected = release_evidence.project_release_e2e(private_path)
+
+    assert projected["schema"] == release_evidence.MACOS_MINER_E2E_SCHEMA
+    assert projected["deployment_profile"] == release_evidence.MACOS_MINER_DEPLOYMENT_PROFILE
+    assert projected["runtime"]["container_platform"] == "linux/amd64"
+    release_evidence.validate_macos_miner_e2e(projected)
+
+    invalid = copy.deepcopy(capture)
+    invalid["runtime"]["mps_is_available"] = False
+    with pytest.raises(release_evidence.S1ReleaseEvidenceError, match="macOS miner"):
+        release_evidence.seal_private_release_e2e(invalid)
+
+    cpu = copy.deepcopy(capture)
+    cpu["runtime"].update(
+        {
+            "model_device": "cpu",
+            "model_execution": "native-pytorch-cpu",
+            "mps_is_built": False,
+            "mps_is_available": False,
+        }
+    )
+    release_evidence.validate_private_macos_miner_e2e(
+        release_evidence.seal_private_release_e2e(cpu)
+    )
+
+
 def _git(repository: Path, *arguments: str) -> str:
     return subprocess.run(
         ["git", "-C", str(repository), *arguments],

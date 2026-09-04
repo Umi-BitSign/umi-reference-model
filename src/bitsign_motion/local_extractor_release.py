@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import os
+import platform
 import re
 import stat
 import sys
@@ -14,24 +15,52 @@ from typing import Any, Final, cast
 from . import amd64_holistic_container as extractor
 from .canonical import canonical_json_bytes, canonical_json_sha256
 
-LOCAL_EXTRACTOR_SCHEMA: Final = "umi-local-extractor-build/1"
+LEGACY_LOCAL_EXTRACTOR_SCHEMA: Final = "umi-local-extractor-build/1"
+LOCAL_EXTRACTOR_SCHEMA: Final = "umi-local-extractor-build/2"
 LOCAL_EXTRACTOR_STATUS: Final = "component_test_no_weight"
 LOCAL_EXTRACTOR_PLATFORM: Final = "linux/amd64"
 
-_CONTENT_DOMAIN = b"umi-local-extractor-build-v1\0"
+_LEGACY_CONTENT_DOMAIN = b"umi-local-extractor-build-v1\0"
+_CONTENT_DOMAIN = b"umi-local-extractor-build-v2\0"
 _PACKAGE_LINE = re.compile(r"([A-Za-z0-9][A-Za-z0-9._-]*)==([^ \\]+) \\")
 _HASH_LINE = re.compile(r"--hash=sha256:[0-9a-f]{64}")
 _MAXIMUM_SOURCE_BYTES: Final = 4 * 1024 * 1024
 _MAXIMUM_RECORD_BYTES: Final = 1024 * 1024
-_CLAIM_BOUNDARY: Final = (
+_LEGACY_CLAIM_BOUNDARY: Final = (
     "This Linux/AMD64 extractor was built and checked on the operator's machine. Its immutable "
     "image ID is locally bound into a derived model bundle. No byte-equivalence claim is made "
     "against an image built on another machine."
 )
+_CLAIM_BOUNDARY: Final = (
+    "This Linux/AMD64 extractor was built and checked through Docker on the recorded host "
+    "platform. Its immutable image ID is locally bound into a derived model bundle. A "
+    "Darwin/ARM64 host still runs the pinned Linux/AMD64 container worker; this record makes no "
+    "native ARM64 extractor or cross-host byte-equivalence claim."
+)
+
+_HOST_PLATFORMS: Final = {
+    ("Darwin", "arm64"): "darwin/arm64",
+    ("Linux", "aarch64"): "linux/arm64",
+    ("Linux", "arm64"): "linux/arm64",
+    ("Linux", "amd64"): "linux/amd64",
+    ("Linux", "x86_64"): "linux/amd64",
+}
 
 
 class LocalExtractorReleaseError(RuntimeError):
     """Raised when a local extractor build cannot be bound safely."""
+
+
+def local_host_platform() -> str:
+    """Return the normalized platform on which a local build record is created."""
+
+    identity = (platform.system(), platform.machine())
+    try:
+        return _HOST_PLATFORMS[identity]
+    except KeyError as exc:
+        raise LocalExtractorReleaseError(
+            f"extractor build host is unsupported: {identity[0]}/{identity[1]}"
+        ) from exc
 
 
 def _source_root() -> Path:
@@ -276,7 +305,8 @@ def build_local_extractor(
     record: dict[str, Any] = {
         "schema": LOCAL_EXTRACTOR_SCHEMA,
         "status": LOCAL_EXTRACTOR_STATUS,
-        "platform": LOCAL_EXTRACTOR_PLATFORM,
+        "host_platform": local_host_platform(),
+        "container_platform": LOCAL_EXTRACTOR_PLATFORM,
         "image_id": image.image_id,
         "dependencies": dependencies,
         "sources": _source_record(),
@@ -294,28 +324,55 @@ def validate_local_extractor_record(
 ) -> dict[str, Any]:
     """Validate a build record against checked-in sources and the current Docker image."""
 
-    if not isinstance(value, dict) or set(value) != {
-        "schema",
-        "status",
-        "platform",
-        "image_id",
-        "dependencies",
-        "sources",
-        "claim_boundary",
-        "content_sha256",
-    }:
+    if not isinstance(value, dict):
         raise LocalExtractorReleaseError("local extractor record field set differs")
     record = cast(dict[str, Any], value)
+    schema = record.get("schema")
+    if schema == LEGACY_LOCAL_EXTRACTOR_SCHEMA:
+        expected_fields = {
+            "schema",
+            "status",
+            "platform",
+            "image_id",
+            "dependencies",
+            "sources",
+            "claim_boundary",
+            "content_sha256",
+        }
+        expected_domain = _LEGACY_CONTENT_DOMAIN
+        platform_matches = record.get("platform") == LOCAL_EXTRACTOR_PLATFORM
+        claim_matches = record.get("claim_boundary") == _LEGACY_CLAIM_BOUNDARY
+    elif schema == LOCAL_EXTRACTOR_SCHEMA:
+        expected_fields = {
+            "schema",
+            "status",
+            "host_platform",
+            "container_platform",
+            "image_id",
+            "dependencies",
+            "sources",
+            "claim_boundary",
+            "content_sha256",
+        }
+        expected_domain = _CONTENT_DOMAIN
+        platform_matches = (
+            record.get("host_platform") == local_host_platform()
+            and record.get("container_platform") == LOCAL_EXTRACTOR_PLATFORM
+        )
+        claim_matches = record.get("claim_boundary") == _CLAIM_BOUNDARY
+    else:
+        raise LocalExtractorReleaseError("local extractor record schema differs")
+    if set(record) != expected_fields:
+        raise LocalExtractorReleaseError("local extractor record field set differs")
     supplied_digest = record["content_sha256"]
     unsigned = dict(record)
     del unsigned["content_sha256"]
     if (
-        record["schema"] != LOCAL_EXTRACTOR_SCHEMA
-        or record["status"] != LOCAL_EXTRACTOR_STATUS
-        or record["platform"] != LOCAL_EXTRACTOR_PLATFORM
-        or record["claim_boundary"] != _CLAIM_BOUNDARY
+        record["status"] != LOCAL_EXTRACTOR_STATUS
+        or not platform_matches
+        or not claim_matches
         or not isinstance(supplied_digest, str)
-        or supplied_digest != canonical_json_sha256(unsigned, domain=_CONTENT_DOMAIN)
+        or supplied_digest != canonical_json_sha256(unsigned, domain=expected_domain)
         or record["sources"] != _source_record()
     ):
         raise LocalExtractorReleaseError("local extractor record identity differs")
@@ -367,7 +424,9 @@ def _write_record(path: Path, record: dict[str, Any]) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Build and validate the component-test Linux/AMD64 extractor locally"
+        description=(
+            "Build and validate the component-test Linux/AMD64 extractor on a supported host"
+        )
     )
     parser.add_argument("--docker", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)

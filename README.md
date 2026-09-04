@@ -66,17 +66,21 @@ path, not translation quality.
 
 ## Run it
 
-Use [the miner runbook](docs/RUN_MINER.md). It builds the extractor locally,
-validates its immutable image ID and installed packages, then binds that ID into a
-derived model bundle before startup. The release procedure is in
+Linux operators use [the miner runbook](docs/RUN_MINER.md). Apple Silicon operators
+use [the macOS miner runbook](docs/RUN_MINER_MACOS.md). Both paths build the
+extractor locally, validate its immutable image ID and installed packages, then bind
+that ID into a derived model bundle before startup. The release procedure is in
 [the public S1 release guide](docs/PUBLIC_S1_RELEASE.md).
 
 ## Platform support
 
-The released serving path requires a locally built Linux/AMD64 MediaPipe extractor.
-CUDA is optional for the PyTorch model when the host supports it. A native iOS or
-Core ML package is not part of this release. iOS and Android inference remain future
-work and need their own deterministic preprocessing and evaluation evidence.
+The released serving path supports Linux/AMD64 and Apple Silicon macOS hosts. Both
+run the pinned Linux/AMD64 MediaPipe worker in Docker. Linux may run the PyTorch
+model on CPU or CUDA; macOS may run it natively on MPS or CPU. The ARM64 Docker
+worker in this repository does not implement the release miner's whole-video
+contract and is not a substitute. A native iOS or Core ML package is not part of
+this release. iOS and Android inference remain future work and need their own
+deterministic preprocessing and evaluation evidence.
 
 ## Licenses and attribution
 

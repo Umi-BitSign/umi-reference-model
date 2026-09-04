@@ -71,6 +71,7 @@ def _load_release_dependencies() -> SimpleNamespace:
         model_canonical_json_bytes=importlib.import_module(
             "bitsign_motion.canonical"
         ).canonical_json_bytes,
+        umi_canonical_json_bytes=protocol.canonical_json_bytes,
         validate_local_extractor_record=importlib.import_module(
             "bitsign_motion.local_extractor_release"
         ).validate_local_extractor_record,
@@ -78,6 +79,9 @@ def _load_release_dependencies() -> SimpleNamespace:
         seal_private_release_e2e=release_evidence.seal_private_release_e2e,
         RequestAuthenticator=importlib.import_module("umi.auth").RequestAuthenticator,
         load_translator=importlib.import_module("umi.backends").load_translator,
+        WindowCoalescingTranslator=importlib.import_module(
+            "umi.model_scheduler"
+        ).WindowCoalescingTranslator,
         Limits=importlib.import_module("umi.config").Limits,
         decrypt_response=importlib.import_module("umi.crypto").decrypt_response,
         LocalComponentWindowAuthority=importlib.import_module(
@@ -301,7 +305,21 @@ async def _run_real_reference_model_umi_flow(
 ) -> dict[str, Any]:
     started_at_utc = _utc_now()
     _assert_module_from_repository(dependencies.bitsign_motion, reference_repository)
-    _assert_module_from_repository(dependencies.umi, umi_repository)
+    deployment_profile = os.environ.get("BITSIGN_UMI_DEPLOYMENT_PROFILE")
+    if deployment_profile is None:
+        _assert_module_from_repository(dependencies.umi, umi_repository)
+    else:
+        resolved_path = _required_path("BITSIGN_UMI_RESOLVED_MINER_RELEASE")
+        resolved_bytes = resolved_path.read_bytes()
+        resolved_model = importlib.import_module("umi.shadow_release").ResolvedMinerRelease
+        resolved = resolved_model.model_validate_json(resolved_bytes)
+        assert dependencies.umi_canonical_json_bytes(resolved) == resolved_bytes
+        assert resolved.umi_git_revision == umi_revision
+        assert importlib.import_module("umi.policy").umi_source_tree_sha256() == (
+            resolved.umi_source_tree_sha256
+        )
+        umi_origin = Path(dependencies.umi.__file__).resolve(strict=True)
+        assert not umi_origin.is_relative_to((umi_repository / "src").resolve(strict=True))
     _assert_bittensor_matches_umi_lock(umi_repository)
 
     video_path = _required_path("BITSIGN_UMI_RELEASE_VIDEO")
@@ -314,12 +332,23 @@ async def _run_real_reference_model_umi_flow(
     assert base_revision is not None and base_revision != revision
     assert os.environ.get("BITSIGN_UMI_RELEASE_VIDEO_RIGHTS_CLEARED") == "1"
 
-    assert platform.system() == "Linux"
-    assert platform.machine() == "x86_64"
+    if deployment_profile is None:
+        assert platform.system() == "Linux"
+        assert platform.machine() == "x86_64"
+        assert os.environ.get("UMI_S1_DEVICE") == "cpu"
+    else:
+        assert deployment_profile == dependencies.release_evidence.MACOS_MINER_DEPLOYMENT_PROFILE
+        assert platform.system() == "Darwin"
+        assert platform.machine() == "arm64"
+        assert os.environ.get("BITSIGN_UMI_RELEASE_PROFILE") == (
+            dependencies.release_evidence.PUBLIC_S1_FINETUNE_RELEASE_PROFILE
+        )
+        assert os.environ.get("UMI_S1_DEVICE") in {"cpu", "mps"}
+        if os.environ.get("UMI_S1_DEVICE") == "mps":
+            assert dependencies.torch.backends.mps.is_built()
+            assert dependencies.torch.backends.mps.is_available()
     assert os.environ.get("UMI_S1_EXTRACTOR_PLATFORM") == "linux/amd64"
-    assert os.environ.get("UMI_S1_DEVICE") == "cpu"
     assert os.environ.get("UMI_S1_HARD_DEADLINE_SECONDS") == str(_BACKEND_HARD_DEADLINE_SECONDS)
-
     docker = os.environ["UMI_S1_DOCKER_EXECUTABLE"]
     extractor_record_raw = build_record_path.read_bytes()
     extractor_record_value = json.loads(extractor_record_raw)
@@ -536,6 +565,28 @@ async def _run_real_reference_model_umi_flow(
     else:
         assert release_profile == dependencies.release_evidence.PUBLIC_S1_FINETUNE_RELEASE_PROFILE
         release_id = dependencies.release_evidence.PUBLIC_S1_FINETUNE_RELEASE_ID
+    runtime_evidence = {
+        "host_operating_system": platform.system(),
+        "host_architecture": platform.machine(),
+        "container_platform": os.environ["UMI_S1_EXTRACTOR_PLATFORM"],
+        "model_device": os.environ["UMI_S1_DEVICE"],
+        "python_version": platform.python_version(),
+        "torch_version": dependencies.torch.__version__.split("+")[0],
+        "numpy_version": dependencies.numpy.__version__,
+        "safetensors_version": dependencies.safetensors.__version__,
+        "bittensor_version": importlib.metadata.version("bittensor"),
+        "docker_engine_version": _docker_version(docker),
+        "extractor_image_id": extractor_record["image_id"],
+        "mediapipe_task_model_sha256": task_model_sha256,
+    }
+    if deployment_profile is not None:
+        runtime_evidence.update(
+            {
+                "model_execution": f"native-pytorch-{os.environ['UMI_S1_DEVICE']}",
+                "mps_is_built": dependencies.torch.backends.mps.is_built(),
+                "mps_is_available": dependencies.torch.backends.mps.is_available(),
+            }
+        )
     capture = {
         "release_id": release_id,
         "status": "passed",
@@ -545,20 +596,7 @@ async def _run_real_reference_model_umi_flow(
         "umi_git_revision": umi_revision,
         "started_at_utc": started_at_utc,
         "finished_at_utc": _utc_now(),
-        "runtime": {
-            "host_operating_system": platform.system(),
-            "host_architecture": platform.machine(),
-            "container_platform": os.environ["UMI_S1_EXTRACTOR_PLATFORM"],
-            "model_device": os.environ["UMI_S1_DEVICE"],
-            "python_version": platform.python_version(),
-            "torch_version": dependencies.torch.__version__.split("+")[0],
-            "numpy_version": dependencies.numpy.__version__,
-            "safetensors_version": dependencies.safetensors.__version__,
-            "bittensor_version": importlib.metadata.version("bittensor"),
-            "docker_engine_version": _docker_version(docker),
-            "extractor_image_id": extractor_record["image_id"],
-            "mediapipe_task_model_sha256": task_model_sha256,
-        },
+        "runtime": runtime_evidence,
         "timeouts_seconds": {
             "inner_model_hard_deadline": _BACKEND_HARD_DEADLINE_SECONDS,
             "outer_inference_timeout": _UMI_INFERENCE_TIMEOUT_SECONDS,
@@ -585,6 +623,8 @@ async def _run_real_reference_model_umi_flow(
     }
     if release_profile is not None:
         capture["release_profile"] = release_profile
+    if deployment_profile is not None:
+        capture["deployment_profile"] = deployment_profile
     return dependencies.seal_private_release_e2e(capture)
 
 

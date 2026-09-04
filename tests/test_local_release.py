@@ -41,6 +41,18 @@ def _dependencies() -> dict[str, Any]:
     }
 
 
+def test_local_host_platform_accepts_apple_silicon_and_rejects_rosetta(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(extractor_module.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(extractor_module.platform, "machine", lambda: "arm64")
+    assert extractor_module.local_host_platform() == "darwin/arm64"
+
+    monkeypatch.setattr(extractor_module.platform, "machine", lambda: "x86_64")
+    with pytest.raises(LocalExtractorReleaseError, match="host is unsupported"):
+        extractor_module.local_host_platform()
+
+
 def test_local_build_record_binds_source_image_and_packages(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -65,7 +77,10 @@ def test_local_build_record_binds_source_image_and_packages(
         builder=builder,
     )
     assert record["image_id"] == image.image_id
+    assert record["schema"] == "umi-local-extractor-build/2"
     assert record["status"] == "component_test_no_weight"
+    assert record["host_platform"] == extractor_module.local_host_platform()
+    assert record["container_platform"] == "linux/amd64"
     assert record["sources"] == extractor_module._source_record()
     assert (
         extractor_module.validate_local_extractor_record(
@@ -82,6 +97,65 @@ def test_local_build_record_binds_source_image_and_packages(
             changed,
             docker_executable=docker,
         )
+
+
+def test_local_build_record_rejects_transfer_to_another_host_platform(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    docker = _executable(tmp_path / "docker")
+    image = _local_image()
+    monkeypatch.setattr(
+        extractor_module,
+        "validate_local_extractor",
+        lambda *_args, **_kwargs: (image, _dependencies()),
+    )
+    record = extractor_module.build_local_extractor(
+        docker_executable=docker,
+        image_tag="local:test",
+        timeout_seconds=900,
+        builder=lambda **_kwargs: image,
+    )
+    other_host = "linux/amd64" if record["host_platform"] != "linux/amd64" else "darwin/arm64"
+    monkeypatch.setattr(extractor_module, "local_host_platform", lambda: other_host)
+    with pytest.raises(LocalExtractorReleaseError, match="identity differs"):
+        extractor_module.validate_local_extractor_record(
+            record,
+            docker_executable=docker,
+        )
+
+
+def test_legacy_local_build_record_remains_valid(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    docker = _executable(tmp_path / "docker")
+    image = _local_image()
+    monkeypatch.setattr(
+        extractor_module,
+        "validate_local_extractor",
+        lambda *_args, **_kwargs: (image, _dependencies()),
+    )
+    legacy = {
+        "schema": extractor_module.LEGACY_LOCAL_EXTRACTOR_SCHEMA,
+        "status": extractor_module.LOCAL_EXTRACTOR_STATUS,
+        "platform": extractor_module.LOCAL_EXTRACTOR_PLATFORM,
+        "image_id": image.image_id,
+        "dependencies": _dependencies(),
+        "sources": extractor_module._source_record(),
+        "claim_boundary": extractor_module._LEGACY_CLAIM_BOUNDARY,
+    }
+    legacy["content_sha256"] = extractor_module.canonical_json_sha256(
+        legacy,
+        domain=extractor_module._LEGACY_CONTENT_DOMAIN,
+    )
+    assert (
+        extractor_module.validate_local_extractor_record(
+            legacy,
+            docker_executable=docker,
+        )
+        == legacy
+    )
 
 
 def test_rebinder_extracts_only_the_deterministic_published_bundle(tmp_path: Path) -> None:
@@ -121,6 +195,8 @@ def test_rebinder_preserves_every_identity_field_except_local_amd64_image(
     local_image = "sha256:" + "78" * 32
     build_record = {
         "image_id": local_image,
+        "host_platform": "darwin/arm64",
+        "container_platform": "linux/amd64",
         "sources": {
             "amd64_container_host_source_sha256": source_hash,
             "requirements_sha256": source_hash,
@@ -179,6 +255,8 @@ def test_rebinder_preserves_every_identity_field_except_local_amd64_image(
     )
     assert result["inference_revision"] == derived_revision
     assert result["local_extractor_image_id"] == local_image
+    assert result["host_platform"] == "darwin/arm64"
+    assert result["container_platform"] == "linux/amd64"
 
 
 def test_identity_comparison_rejects_unrelated_derived_change() -> None:
@@ -252,6 +330,8 @@ def test_rebinder_accepts_an_explicit_nonlegacy_base_revision(
         "validate_local_extractor_record",
         lambda *_args, **_kwargs: {
             "image_id": local_image,
+            "host_platform": "darwin/arm64",
+            "container_platform": "linux/amd64",
             "sources": {
                 "amd64_container_host_source_sha256": source_hash,
                 "requirements_sha256": source_hash,

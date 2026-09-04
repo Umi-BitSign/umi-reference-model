@@ -10,6 +10,13 @@ The current superseding seal uses release ID `umi-s1-public-finetune-v1-r2` whil
 retaining the unchanged v1 artifact filenames. The `r2` suffix identifies updated
 UMI integration evidence and does not claim new model weights.
 
+The r2 release evidence remains a Linux/AMD64 record. Apple Silicon macOS support is
+an additive deployment profile in later source, not a change to the sealed release.
+Follow [the macOS miner runbook](RUN_MINER_MACOS.md) to build and bind the same
+Linux/AMD64 extractor through Docker Desktop, run PyTorch natively on MPS or CPU,
+and produce a separate `umi-s1-macos-miner-e2e/1` deployment record. Never add that
+record to `release/` or regenerate the r2 manifest and checksums.
+
 The release history has three commits:
 
 1. Commit A contains the tested source, intake archive, intake evidence, intake
