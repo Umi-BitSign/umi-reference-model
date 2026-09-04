@@ -485,7 +485,7 @@ def _public_release_arguments(
 ) -> argparse.Namespace:
     artifacts = release_tool.PUBLIC_ARTIFACTS
     return argparse.Namespace(
-        release_id="umi-s1-public-finetune-v1",
+        release_id=release_tool.PUBLIC_S1_FINETUNE_RELEASE_ID,
         inference_revision=revision,
         rights_decision_sha256=None,
         public_s1_policy=release / release_tool.PUBLIC_POLICY_FILENAME,
@@ -961,7 +961,7 @@ def test_miner_runbook_uses_locked_no_build_source_paths() -> None:
     assert ".venv/bin/python -m bitsign_motion.local_bundle_rebind" in runbook
     assert "-m bitsign_motion.umi_reference_backend probe" in runbook
     assert 'bin/python" -m umi.miner' in runbook
-    assert "umi-s1-public-finetune-v1" in runbook
+    assert release_evidence.PUBLIC_S1_FINETUNE_RELEASE_ID in runbook
     assert "40_LOWERCASE_HEX_CHARACTERS_FROM_TRUSTED_ANNOUNCEMENT" in runbook
     assert 'git verify-tag "$MODEL_RELEASE_TAG"' in runbook
     assert "cd31402c451f5da3af87fcd8c10f9ed0fbe43d27" not in runbook

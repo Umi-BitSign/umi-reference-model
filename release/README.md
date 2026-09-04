@@ -1,6 +1,8 @@
 # Release metadata and artifacts
 
-The sealed `umi-s1-public-finetune-v1` set has fifteen fixed artifacts:
+The sealed `umi-s1-public-finetune-v1-r2` set has fifteen fixed artifacts. The
+unchanged model artifacts retain their v1 filenames; `r2` identifies the superseding
+release seal and its updated UMI integration evidence, not new model weights.
 
 | Label | File |
 |---|---|

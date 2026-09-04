@@ -41,10 +41,12 @@ previously verified wheel. Then clone this repository and the public UMI reposit
 beside each other. Check out the model release tag and the UMI commit named by the
 signed inactive release.
 
-The values below identify the reviewed public-finetune v1 model release. Confirm
+The values below identify the reviewed public-finetune v1-r2 release seal. Confirm
 both through the trusted release announcement before executing code from the
-checkout. The signed `umi-s1-public-finetune-v1` tag must resolve to the exact
-reviewed release commit; a newer development `main` is not a substitute.
+checkout. The signed `umi-s1-public-finetune-v1-r2` tag must resolve to the exact
+reviewed release commit; a newer development `main` is not a substitute. The
+unchanged model artifacts retain their v1 filenames; `r2` binds updated UMI
+integration evidence and does not claim new model weights.
 
 Run Sections 1 through 5 in the same Bash session. The first command enables
 fail-fast handling so a failed digest, revision, import, or cleanup check stops
@@ -58,7 +60,7 @@ export UMI_INACTIVE_RELEASE=/absolute/path/to/public-inactive-release
 export UMI_RELEASE_MANIFEST_SHA256=64_LOWERCASE_HEX_CHARACTERS
 export UMI_RELEASE_AUTHORITY=EXPECTED_RELEASE_AUTHORITY_SS58
 export TRUSTED_UMI_RELEASE_VERIFY=/absolute/path/to/trusted/umi-shadow-release-verify
-export MODEL_RELEASE_TAG=umi-s1-public-finetune-v1
+export MODEL_RELEASE_TAG=umi-s1-public-finetune-v1-r2
 export EXPECTED_MODEL_RELEASE_GIT_REVISION=40_LOWERCASE_HEX_CHARACTERS_FROM_TRUSTED_ANNOUNCEMENT
 test -x "$TRUSTED_UMI_RELEASE_VERIFY"
 test "$(sha256sum "$UMI_INACTIVE_RELEASE/release-manifest.json" | cut -d ' ' -f 1)" = \

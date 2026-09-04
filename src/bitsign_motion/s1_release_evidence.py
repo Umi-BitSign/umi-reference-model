@@ -26,7 +26,7 @@ RELEASE_E2E_FILENAME: Final = "umi-s1-baseline-v0-release-e2e-evidence.json"
 RELEASE_E2E_RUN_SCHEMA: Final = "umi-s1-release-e2e-run/1"
 PUBLIC_S1_FINETUNE_RELEASE_E2E_SCHEMA: Final = "umi-s1-public-finetune-release-e2e/1"
 PUBLIC_S1_FINETUNE_RELEASE_E2E_RUN_SCHEMA: Final = "umi-s1-public-finetune-release-e2e-run/1"
-PUBLIC_S1_FINETUNE_RELEASE_ID: Final = "umi-s1-public-finetune-v1"
+PUBLIC_S1_FINETUNE_RELEASE_ID: Final = "umi-s1-public-finetune-v1-r2"
 PUBLIC_S1_FINETUNE_RELEASE_PROFILE: Final = "public-s1-finetune/1"
 
 EVIDENCE_FILES: Final = {

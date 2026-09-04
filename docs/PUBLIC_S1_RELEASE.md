@@ -6,6 +6,10 @@ release contains aggregate evidence and a deterministic six-file model archive. 
 must not contain source rows, videos, annotations, references, predictions, or
 training checkpoints.
 
+The current superseding seal uses release ID `umi-s1-public-finetune-v1-r2` while
+retaining the unchanged v1 artifact filenames. The `r2` suffix identifies updated
+UMI integration evidence and does not claim new model weights.
+
 The release history has three commits:
 
 1. Commit A contains the tested source, intake archive, intake evidence, intake
@@ -278,7 +282,7 @@ test "$(git -C ../umi rev-parse HEAD)" = "$UMI_GIT_REVISION"
 test -z "$(git -C ../umi status --porcelain=v1 --untracked-files=all)"
 
 uv run --frozen --extra dev python tools/release_artifacts.py \
-  --release-id umi-s1-public-finetune-v1 \
+  --release-id umi-s1-public-finetune-v1-r2 \
   --inference-revision "$BASE_INFERENCE_REVISION" \
   --public-s1-policy release/umi-s1-public-finetune-v1-intake-policy.json \
   --source-git-revision "$B" \

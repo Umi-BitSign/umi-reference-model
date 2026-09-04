@@ -1,6 +1,6 @@
 # UMI S1 Reference Model
 
-Status: public no-weight bootstrap candidate (`umi-s1-public-finetune-v1`)
+Status: public no-weight bootstrap candidate (`umi-s1-public-finetune-v1-r2`)
 
 This repository packages a compact ASL-to-English reference model and backend for
 UMI miners. It gives miners a working baseline to inspect, operate, and improve.
@@ -24,7 +24,9 @@ handle wallet keys or submit chain calls.
 
 ## Release contents
 
-The sealed `umi-s1-public-finetune-v1` release contains:
+The sealed `umi-s1-public-finetune-v1-r2` release contains the unchanged v1-named
+model artifacts below. The `r2` suffix identifies the superseding release seal and
+its updated UMI integration evidence; it does not claim new model weights.
 
 - `umi-s1-public-finetune-v1-portable.zip` (`model`);
 - `umi-s1-public-finetune-v1-evidence.json` (`intake-evidence`);
