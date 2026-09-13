@@ -2,6 +2,10 @@
 
 Status: public no-weight bootstrap candidate (`umi-s1-public-finetune-v1-r2`)
 
+The separate [community SHuBERT/ByT5 integration](community/README.md) is being
+rehearsed for open competition. It has its own weights, dependency environment,
+manifest and license notices; it does not replace the S1 release described here.
+
 This repository packages a compact ASL-to-English reference model and backend for
 UMI miners. It gives miners a working baseline to inspect, operate, and improve.
 UMI translation weights remain inactive.
