@@ -9,6 +9,13 @@ Its provenance says no model tensor was trained, pruned or quantized in this
 assembly. Its supplied qualification is an Apple Silicon functional smoke check,
 not a measured accuracy result or improvement claim.
 
+The same assembly's inspectable source is in
+[`candidates/community-baseline-v0.2/`](../candidates/community-baseline-v0.2/README.md).
+Its `MODEL_ARTIFACT.json` records the separately delivered model assets. The
+standalone candidate and this CPU adapter use the same original ZIP; neither
+directory introduces newly trained weights or changes S1. Continue to use the
+pinned ZIP importer below for an evaluator bundle.
+
 ## Verify and stage
 
 Keep the ZIP and extracted weights outside Git. The importer uses only Python's
