@@ -97,3 +97,9 @@ Runtime dependency and local-image distribution notes are documented in
 
 No source videos, annotations, derived source records, MediaPipe task binary,
 secrets, or wallet material belong in this repository or its release artifacts.
+
+## Additional standalone candidate
+
+[UMI Community Baseline v0.2](candidates/community-baseline-v0.2/README.md)
+provides a separately supplied SHuBERT inference candidate. It leaves S1 unchanged
+and requires model assets delivered outside Git; see its manifest and provenance.

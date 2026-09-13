@@ -1,0 +1,11 @@
+{
+  "name": "UMI Community Baseline v0.2",
+  "model_id": "umi-community-baseline-v0.2",
+  "inference_sha256": "e8522dcb87d6e7562351bfa6673886d78fc96c99a3541ff38d44e4838678593e",
+  "format": "safetensors",
+  "generation": {
+    "num_beams": 5,
+    "max_length": 2048
+  },
+  "qualification": "Functional smoke only; no benchmark claim"
+}
