@@ -25,6 +25,13 @@ scratch budget between private shared memory and `/tmp`. Separate native tests
 confirmed lock/shared-buffer access, the combined storage limit, unchanged v1
 behavior and read-only model/input mounts.
 
+Two additional failure probes used the same preserved real model and runtime v2.
+A three-second deadline returned `reason=deadline` after 3,015 ms and removed its
+case container. Cancelling an evaluation after its case container had started
+also removed that container. Neither probe executed a second copy or touched any
+validator process. These checks cover the evaluator's deadline and cooperative
+host cancellation paths; abrupt host power loss was not tested.
+
 This is one operator's local execution evidence. It grants no rights approval,
 independent-evaluation quorum, contributor attribution or chain-write authority.
 The image name is local and is not a published registry download.
