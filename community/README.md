@@ -102,5 +102,7 @@ a qualifying promotion under the approved policy, including independent
 evaluation, preservation and rights review. The importer and smoke command never
 create that attribution or submit chain transactions.
 
-An immutable object-store copy and restore verification are still required before
-publishing a baseline download. No public artifact URL is assigned by this tool.
+The original ZIP has a private R2 backup with full download, reconstruction and
+SHA-256 verification. See [qualification evidence](QUALIFICATION.md). Public
+distribution and a reviewed baseline download remain pending; the importer does
+not assign a public artifact URL.

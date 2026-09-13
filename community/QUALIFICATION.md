@@ -29,6 +29,12 @@ This is one operator's local execution evidence. It grants no rights approval,
 independent-evaluation quorum, contributor attribution or chain-write authority.
 The image name is local and is not a published registry download.
 
+The original ZIP is retained in UMI's private `umi-model-candidates` R2 bucket
+as eleven checksum-addressed chunks and a reconstruction manifest. Each chunk
+was downloaded, and the reconstructed 2,934,700,086-byte ZIP matched the original
+SHA-256 above. Public bucket access is disabled and no custom domain is attached.
+This backup does not publish a baseline download or approve its rights.
+
 Before a production baseline or promotion, complete protected ASL evaluation,
 base-model/data provenance review, workload and concurrency measurements,
 independently administered evaluation and approved signed policy inputs.
