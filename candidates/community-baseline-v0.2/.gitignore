@@ -1,0 +1,9 @@
+run/
+.runtime/
+__pycache__/
+*.pyc
+*.zip
+*.safetensors
+*.pt
+*.pth
+*.task

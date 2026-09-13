@@ -1,0 +1,51 @@
+{
+  "model_id": "umi-community-baseline-v0.2",
+  "archive": {
+    "filename": "umi-community-baseline-v0.2.zip",
+    "bytes": 2934700086,
+    "sha256": "f78979599486456e06e7886b126169f8d45e5e1e7d16d7a2b617648615eef3d4",
+    "availability": "Supplied separately to maintainers; no public download URL in this candidate"
+  },
+  "model_files": [
+    {
+      "path": "models/byt5_base/special_tokens_map.json",
+      "bytes": 3090,
+      "sha256": "3c2572df5f4ec60a476e5d90a1f52a989f9eefbbf381d358924a44a648bf0edb"
+    },
+    {
+      "path": "models/byt5_base/tokenizer_config.json",
+      "bytes": 3327,
+      "sha256": "6a09add0f72f24764a4f918e6cd235ef3db1be1a9b394b4286051e43dc231521"
+    },
+    {
+      "path": "models/checkpoint-11625/config.json",
+      "bytes": 1028,
+      "sha256": "2d0e87ee07e83e681888e20ab0e69c3b51b031aaac6e783de77945a36b4725c5"
+    },
+    {
+      "path": "models/checkpoint-11625/model.safetensors",
+      "bytes": 2686227696,
+      "sha256": "92c6c77ed7f2343f346c2a0cc7c025d733d47fcb1adc55150939f934d5f3b3b9"
+    },
+    {
+      "path": "models/dinov2face.safetensors",
+      "bytes": 112789352,
+      "sha256": "61e96b40c9b3b841520fb2fcf89b2a2fdda706d13723669d11304fc2064d295e"
+    },
+    {
+      "path": "models/dinov2hand.safetensors",
+      "bytes": 112789352,
+      "sha256": "630a11c0aef6bca4f27bcb2f68dbf35ad33d365af877c1fca7c42e1e748064ac"
+    },
+    {
+      "path": "models/face_landmarker_v2_with_blendshapes.task",
+      "bytes": 11577701,
+      "sha256": "8e0044e474913045fff3ace464ab14db1646f5f49b42f7c38cacc5f85a5bb8e9"
+    },
+    {
+      "path": "models/hand_landmarker.task",
+      "bytes": 7819105,
+      "sha256": "fbc2a30080c3c557093b5ddfc334698132eb341044ccee322ccf8bcf3607cde1"
+    }
+  ]
+}
