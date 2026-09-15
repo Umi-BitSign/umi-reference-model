@@ -53,6 +53,8 @@ class CommunityModelSidecar:
         self.inference_seconds = self.workers[0].inference_seconds
         self._available = asyncio.Queue(maxsize=len(self.workers))
         self._operations: set[asyncio.Task] = set()
+        self._recoveries: set[asyncio.Task] = set()
+        self._recovery_lock = asyncio.Lock()
         self._startup: asyncio.Task | None = None
         self._server = None
         self._close_task: asyncio.Task | None = None
@@ -94,15 +96,38 @@ class CommunityModelSidecar:
         try:
             if self._closed:
                 raise RuntimeError("sidecar is closed")
-            return await worker.translate(video)
+            result = await worker.translate(video)
         except BaseException:
             if worker.closed:
                 # Schedule cleanup without awaiting ourselves through the set
                 # of active operations. serve_forever/close drains the result.
                 self._begin_close()
+            elif not self._closed:
+                # Reload outside any caller's inference deadline. A request
+                # waiting for this slot may expire without canceling recovery.
+                recovery = asyncio.create_task(self._rewarm(worker))
+                self._recoveries.add(recovery)
+                recovery.add_done_callback(self._recoveries.discard)
             raise
-        finally:
+        else:
             self._available.put_nowait(worker)
+            return result
+
+    async def _rewarm(self, worker) -> None:
+        try:
+            # As at initial startup, avoid simultaneous model-loading bursts.
+            async with self._recovery_lock:
+                if self._closed:
+                    return
+                await worker.startup()
+                if not self._closed:
+                    self._available.put_nowait(worker)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            # Failed verification/reload must not leave advertised slots with
+            # no usable workers. The service manager can observe this shutdown.
+            self._begin_close()
 
     async def translate(self, video: bytes, request) -> str:
         if self._closed or self._server is None:
@@ -121,7 +146,8 @@ class CommunityModelSidecar:
         operation = asyncio.create_task(self._translate(video))
         self._operations.add(operation)
         try:
-            # This deadline includes queueing and replacement-worker startup.
+            # This deadline includes queueing. Replacement workers reload in a
+            # separate bounded task and rejoin the queue only after readiness.
             # The UMI socket helper separately enforces the same outer limit.
             return await asyncio.wait_for(operation, timeout=self.inference_seconds)
         finally:
@@ -186,6 +212,10 @@ class CommunityModelSidecar:
         for operation in pending:
             operation.cancel()
         await asyncio.gather(*pending, return_exceptions=True)
+        recoveries = tuple(self._recoveries)
+        for recovery in recoveries:
+            recovery.cancel()
+        await asyncio.gather(*recoveries, return_exceptions=True)
         results = await asyncio.gather(
             *(worker.close() for worker in self.workers), return_exceptions=True
         )
