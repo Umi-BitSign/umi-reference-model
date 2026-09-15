@@ -38,10 +38,12 @@ jobs:
       - name: Lint service source and tests
         run: |
           uv run --locked ruff check \
+            community/reboot_recovery.py tests/test_community_reboot_recovery.py \
             community/native_runtime.py community/service.py community/sidecar.py \
             community/worker_transport.py tests/test_community_service.py \
             tests/test_community_sidecar.py tests/test_community_worker_transport.py
           uv run --locked ruff format --check \
+            community/reboot_recovery.py tests/test_community_reboot_recovery.py \
             community/native_runtime.py community/service.py community/sidecar.py \
             community/worker_transport.py tests/test_community_service.py \
             tests/test_community_sidecar.py tests/test_community_worker_transport.py

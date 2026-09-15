@@ -70,10 +70,30 @@ remains after normal shutdown and is reused; do not delete it while a service
 may still hold it. Normal shutdown reaps the workers and removes the owned
 socket and capacity descriptor, allowing the same configuration to restart.
 
-After SIGKILL or power loss, an existing socket, capacity descriptor or nonempty
-scratch stops startup. The service does not guess whether an old worker is still
-alive or delete those paths automatically. Verify process ownership and retained
-state before recovery. Automatic crash recovery remains deployment work.
+To recover after a host reboot, add `--recover-after-reboot` to the service
+command. Enable it during a normal stop/start with empty worker scratch and no
+retained socket or capacity descriptor. It requires Linux's machine ID and boot
+ID, or macOS's platform UUID and boot-session UUID. An unavailable identity stops
+startup. Keep the configuration, socket directory and worker scratch on local
+storage. Shared filesystems and copied VM identities are unsupported.
+
+Before launching a worker, the controller durably records the host, boot,
+configuration hash and scratch-directory identities in `SOCKET.reboot.json`.
+Normal shutdown marks that journal clean only after worker cleanup succeeds.
+After a reboot, an unfinished journal with the same host and configuration lets
+the controller move the old socket, capacity descriptor and scratch into private
+`.umi-reboot-*` sibling paths. It creates empty replacement scratch and starts
+the configured workers. An interrupted quarantine resumes its saved plan.
+Quarantined data is retained for review; it is never followed or recursively
+deleted by recovery. It may include input clips, so retain its private permissions
+and review disk use after an outage.
+
+An unfinished service from the current boot still requires operator review,
+even if no socket exists. This covers a controller killed while a worker was
+starting. The controller does not infer worker death from a missing PID or socket.
+Unknown files, changed identities and changed unfinished configurations also stop
+startup. Never remove the journal or lock to bypass that check. Once recovery is
+enabled, omitting the flag does not bypass its journal.
 
 The HTTP miner's finality, assignment and nonce databases are separate retained
 state. Neither this service nor model scratch cleanup may remove them. Starting
@@ -87,7 +107,7 @@ Run these tests with Python 3.12 and the reviewed UMI source on `PYTHONPATH`:
 ```sh
 PYTHONPATH=/ABSOLUTE/PATH/TO/umi/src python -m pytest \
   tests/test_community_service.py tests/test_community_sidecar.py \
-  tests/test_community_worker_transport.py -W error
+  tests/test_community_worker_transport.py tests/test_community_reboot_recovery.py -W error
 ```
 
 The service and socket tests require UMI's `model_sidecar` helper; they skip if
@@ -98,8 +118,9 @@ tests do not install or load them.
 The service tests use inert workers and the actual UMI socket protocol. They
 cover hash/schema/file checks, separate scratch, exclusive startup, duplicate
 rejection, one request, graceful shutdown and restart with the same configuration.
-They do not qualify native-model throughput, accuracy, power-loss recovery or
-the host's launchd installation.
+The recovery tests simulate changed boot identities and interrupted filesystem
+operations. They also check real OS identity reads and graceful service restarts.
+They do not power-cycle a host or qualify native-model throughput or accuracy.
 
 On Studio, the 32 service tests and 63 existing transport/socket tests passed
 together with warnings treated as errors (95 total). The full reference suite
@@ -113,3 +134,10 @@ a normal service stop/start. Those are local functional checks on one shared
 machine. The public miner remained unavailable, and a supported longer clip
 had already exceeded the ordinary 120-second limit. No full-workload or accuracy
 qualification is claimed.
+
+The reboot-recovery extension passed all 122 service, recovery, socket and worker
+transport cases on Studio, with no skips and warnings treated as errors. The full
+committed-source suite passed 297 tests, with four opt-in model/container/capacity
+integrations skipped. This includes a real controller process exiting before
+socket creation, followed by rejection of its same-boot restart. Reboot identities
+in quarantine tests are simulated; an actual host power cycle is not covered.

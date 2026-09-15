@@ -260,10 +260,29 @@ def test_startup_failure_identifies_stage_without_input_values(
     assert str(failure.value) == failure.value.reason_code
 
 
+def test_abrupt_exit_before_socket_creation_blocks_same_boot_restart(service, configuration):
+    _root, path, document, checksum = configuration
+    script = (
+        "import os, sys\n"
+        f"sys.path.insert(0, {str(ROOT / 'community')!r})\n"
+        "import service\n"
+        "service.run_sidecar_service = lambda *a, **k: os._exit(17)\n"
+        f"service.run_configuration(service.Path({str(path)!r}), "
+        f"{checksum!r}, recover_after_reboot=True)\n"
+    )
+    process = subprocess.run([sys.executable, "-B", "-c", script], capture_output=True, timeout=10)
+    assert process.returncode == 17, process.stderr
+    assert not Path(document["socket_path"]).exists()
+    with pytest.raises(service.ModelServiceError) as failure:
+        service.run_configuration(path, checksum, recover_after_reboot=True)
+    assert failure.value.reason_code == "model_service_reboot_recovery_failed"
+
+
 @pytest.mark.parametrize("shutdown_signal", [signal.SIGTERM, signal.SIGINT])
 @pytest.mark.parametrize("standby", [False, True])
+@pytest.mark.parametrize("reboot_recovery", [False, True])
 def test_real_service_request_duplicate_rejection_and_restart(
-    service, configuration, shutdown_signal, standby
+    service, configuration, shutdown_signal, standby, reboot_recovery
 ):
     api = pytest.importorskip("umi.model_sidecar", reason="requires reviewed UMI socket helper")
     root, path, document, _checksum = configuration
@@ -290,6 +309,8 @@ def test_real_service_request_duplicate_rejection_and_restart(
         "--expected-config-sha256",
         checksum,
     ]
+    if reboot_recovery:
+        command.append("--recover-after-reboot")
     environment = {
         "PYTHONDONTWRITEBYTECODE": "1",
         "PYTHONNOUSERSITE": "1",
@@ -372,6 +393,9 @@ def test_real_service_request_duplicate_rejection_and_restart(
                 os.kill(worker_pid, 0)
             assert not socket.exists() and not Path(f"{socket}.capacity.json").exists()
             assert not list((root / "scratch").iterdir())
+            if reboot_recovery:
+                journal = json.loads(Path(f"{socket}.reboot.json").read_bytes())
+                assert journal["phase"] == "clean"
         finally:
             if process.poll() is None:
                 process.kill()
