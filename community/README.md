@@ -13,6 +13,12 @@ Its provenance says no model tensor was trained, pruned or quantized in this
 assembly. Its supplied qualification is an Apple Silicon functional smoke check,
 not a measured accuracy result or improvement claim.
 
+The later [public sentence diagnostic](PUBLIC_DIAGNOSTIC.md) did not qualify
+this candidate for launch: one of three preselected sentences returned text
+with word error rate 1.0, and two returned no complete response at the installed
+120-second limit. Successful loading and process recovery do not establish
+translation quality or capacity for the full workload.
+
 The same assembly's inspectable source is in
 [`candidates/community-baseline-v0.2/`](../candidates/community-baseline-v0.2/README.md).
 Its `MODEL_ARTIFACT.json` records the separately delivered model assets. The
