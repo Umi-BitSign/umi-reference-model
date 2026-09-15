@@ -1,0 +1,54 @@
+name: Model service
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: model-service-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  reference-and-service:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Install locked reference environment
+        run: |
+          python -m pip install uv==0.12.9
+          uv sync --locked --extra dev
+      - name: Fetch reviewed dependency-light UMI socket helper
+        run: |
+          git init "$RUNNER_TEMP/umi-service-helper"
+          git -C "$RUNNER_TEMP/umi-service-helper" fetch --depth 1 \
+            https://github.com/Umi-BitSign/umi.git aa8ee655be3227a8e9dc080d8e0e1c6b2df65579
+          git -C "$RUNNER_TEMP/umi-service-helper" checkout --detach FETCH_HEAD
+          test "$(git -C "$RUNNER_TEMP/umi-service-helper" rev-parse HEAD)" = \
+            aa8ee655be3227a8e9dc080d8e0e1c6b2df65579
+      - name: Lint service source and tests
+        run: |
+          uv run --locked ruff check \
+            community/native_runtime.py community/service.py community/sidecar.py \
+            community/worker_transport.py tests/test_community_service.py \
+            tests/test_community_sidecar.py tests/test_community_worker_transport.py
+          uv run --locked ruff format --check \
+            community/native_runtime.py community/service.py community/sidecar.py \
+            community/worker_transport.py tests/test_community_service.py \
+            tests/test_community_sidecar.py tests/test_community_worker_transport.py
+      - name: Require socket helper and run full reference suite
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          export PYTHONPATH="$GITHUB_WORKSPACE/src:$RUNNER_TEMP/umi-service-helper/src"
+          uv run --locked python -c 'import os; from pathlib import Path; import umi.model_sidecar as helper; assert Path(helper.__file__).resolve() == Path(os.environ["RUNNER_TEMP"]) / "umi-service-helper/src/umi/model_sidecar.py"'
+          uv run --locked pytest --junitxml="$RUNNER_TEMP/reference-service.xml"
