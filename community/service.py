@@ -19,6 +19,7 @@ import sys
 from pathlib import Path
 
 from native_runtime import canonical, digest
+from reboot_recovery import RebootRecovery
 from sidecar import CommunityModelSidecar, run_sidecar_service
 from worker_transport import WarmModelProcess
 
@@ -105,7 +106,7 @@ def read_configuration(path: Path, expected_sha256: str) -> dict:
 
 
 @contextlib.contextmanager
-def service_lock(socket_path: Path):
+def service_lock(socket_path: Path, *, recover_after_reboot: bool = False):
     parent = socket_path.parent
     if not socket_path.is_absolute() or parent.resolve(strict=True) != parent:
         raise ValueError("socket parent must be an absolute directory without aliases")
@@ -131,9 +132,14 @@ def service_lock(socket_path: Path):
         linked = path.lstat()
         if (linked.st_dev, linked.st_ino) != (info.st_dev, info.st_ino):
             raise ValueError("model service lock changed while acquiring")
-        for artifact in (socket_path, Path(f"{socket_path}.capacity.json")):
-            if artifact.exists() or artifact.is_symlink():
-                raise FileExistsError("existing model socket or capacity requires recovery")
+        if not recover_after_reboot:
+            for artifact in (
+                socket_path,
+                Path(f"{socket_path}.capacity.json"),
+                Path(f"{socket_path}.reboot.json"),
+            ):
+                if artifact.exists() or artifact.is_symlink():
+                    raise FileExistsError("existing model artifacts require recovery mode")
         yield
     finally:
         # Leave the lock inode in place so another process cannot lock a new file
@@ -163,7 +169,9 @@ def build_sidecar(document: dict) -> CommunityModelSidecar:
     return CommunityModelSidecar(workers, validator_slot_count=document["validator_slot_count"])
 
 
-def run_configuration(path: Path, expected_sha256: str) -> None:
+def run_configuration(
+    path: Path, expected_sha256: str, *, recover_after_reboot: bool = False
+) -> None:
     stage = "model_service_configuration_invalid"
     try:
         document = read_configuration(path, expected_sha256)
@@ -171,13 +179,24 @@ def run_configuration(path: Path, expected_sha256: str) -> None:
             raise ValueError("socket path must be explicit")
         socket_path = Path(document["socket_path"])
         stage = "model_service_exclusive_startup_failed"
-        with service_lock(socket_path):
+        with service_lock(socket_path, recover_after_reboot=recover_after_reboot):
+            recovery = None
+            if recover_after_reboot:
+                stage = "model_service_reboot_recovery_failed"
+                recovery = RebootRecovery(socket_path, path, expected_sha256, document)
+                recovery.prepare()
             stage = "model_service_worker_configuration_invalid"
             sidecar = build_sidecar(document)
+            if recovery is not None:
+                stage = "model_service_reboot_recovery_failed"
+                recovery.begin()
             stage = "model_service_runtime_failed"
             run_sidecar_service(
                 sidecar, socket_path, scoring_policy_sha256=document["scoring_policy_sha256"]
             )
+            if recovery is not None:
+                stage = "model_service_reboot_recovery_failed"
+                recovery.finish()
     except Exception as error:
         raise ModelServiceError(stage) from error
 
@@ -186,10 +205,13 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--expected-config-sha256", required=True)
+    parser.add_argument("--recover-after-reboot", action="store_true")
     args = parser.parse_args()
     os.umask(0o077)
     try:
-        run_configuration(args.config, args.expected_config_sha256)
+        run_configuration(
+            args.config, args.expected_config_sha256, recover_after_reboot=args.recover_after_reboot
+        )
     except ModelServiceError as error:
         # No configuration, commands, environment values or local paths in logs.
         print(
