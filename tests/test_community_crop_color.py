@@ -58,8 +58,7 @@ def test_translation_sends_rgb_to_all_three_dino_streams(runtime, tmp_path):
     # No checkpoint or contributed model is loaded. Exercise the actual
     # translate_path wiring with different known BGR values for each crop.
     crops = [
-        np.full((2, 2, 3), pixel, dtype=np.uint8)
-        for pixel in ([1, 2, 3], [4, 5, 6], [7, 8, 9])
+        np.full((2, 2, 3), pixel, dtype=np.uint8) for pixel in ([1, 2, 3], [4, 5, 6], [7, 8, 9])
     ]
     source = np.full((1, 4, 4, 3), [200, 100, 50], dtype=np.uint8)
 
