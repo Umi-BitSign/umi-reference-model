@@ -1,4 +1,17 @@
-# Community candidate qualification, 2026-09-13
+# Community candidate qualification
+
+## Current status, 2026-09-15
+
+This candidate remains unqualified for open-competition launch. The
+[public sentence diagnostic](PUBLIC_DIAGNOSTIC.md) returned one incorrect
+translation and two incomplete responses at the installed deadline. Static
+source and checkpoint checks found no architecture/name/shape mismatch;
+they do not establish correct inference or useful ASL accuracy.
+
+The results below record earlier execution checks. They must not be used to
+override the later quality and capacity failures.
+
+## Linux ARM64 execution checks, 2026-09-13
 
 One Linux ARM64 functional case has passed through UMI's real
 `preserve_bundle` and `execute_offline_case` path. The input was a two-second,
