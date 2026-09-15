@@ -7,6 +7,13 @@ absent from Git. S1's backend is unchanged. For UMI's separate Linux CPU
 Its ARM64 synthetic-clip checks cover execution, deadline and cancellation only;
 accuracy and deployment capacity remain unqualified.
 
+The current source corrects a BGR/RGB mismatch between the hand/face crop
+helpers and DINO. The separate original ZIP and any already imported bundles
+retain their original bytes. A diagnostic of the color correction still failed
+the frozen sentence test; see the [public diagnostic](../../community/PUBLIC_DIAGNOSTIC.md).
+Do not treat this source change as a qualified replacement runtime or copy it
+over a hash-pinned running model.
+
 ## Install the separately supplied model assets
 
 Obtain `umi-community-baseline-v0.2.zip` from the maintainer handoff. Verify its

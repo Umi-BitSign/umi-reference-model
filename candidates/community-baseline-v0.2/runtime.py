@@ -12,6 +12,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import torch
 
 DEFAULT_GENERATION_NUM_BEAMS = 5
@@ -23,6 +24,27 @@ EXPECTED_ASSET_SHA256 = {
     "dinov2hand.safetensors": "630a11c0aef6bca4f27bcb2f68dbf35ad33d365af877c1fca7c42e1e748064ac",
     "dinov2face.safetensors": "61e96b40c9b3b841520fb2fcf89b2a2fdda706d13723669d11304fc2064d295e",
 }
+
+
+def _rgb_crop_frames(frames: list[np.ndarray]) -> list[np.ndarray]:
+    """Convert the crop helpers' OpenCV BGR output to DINO's RGB input."""
+    output = []
+    for frame in frames:
+        if (
+            not isinstance(frame, np.ndarray)
+            or frame.ndim != 3
+            or frame.shape[2] != 3
+            or not frame.shape[0]
+            or not frame.shape[1]
+            or frame.dtype != np.uint8
+        ):
+            raise ValueError("expected a nonempty uint8 BGR crop")
+        # The training pipeline wrote these BGR crops with OpenCV, then read
+        # the cropped videos back as RGB for DINO. Direct inference omits that
+        # video round trip, so it must restore channel order here explicitly.
+        output.append(frame[..., ::-1].copy())
+    return output
+
 
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
@@ -237,15 +259,21 @@ class SHuBERTInferenceRuntime:
             model_started_unix_ns = time.time_ns()
             left = timed(
                 "dino_left_hand",
-                lambda: self._hand_model.extract_embeddings_from_frames(left_frames),
+                lambda: self._hand_model.extract_embeddings_from_frames(
+                    _rgb_crop_frames(left_frames)
+                ),
             )
             right = timed(
                 "dino_right_hand",
-                lambda: self._hand_model.extract_embeddings_from_frames(right_frames),
+                lambda: self._hand_model.extract_embeddings_from_frames(
+                    _rgb_crop_frames(right_frames)
+                ),
             )
             face = timed(
                 "dino_face",
-                lambda: self._face_model.extract_embeddings_from_frames(face_frames),
+                lambda: self._face_model.extract_embeddings_from_frames(
+                    _rgb_crop_frames(face_frames)
+                ),
             )
 
             def construct_tensors():

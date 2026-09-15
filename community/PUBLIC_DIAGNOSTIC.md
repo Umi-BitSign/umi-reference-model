@@ -74,6 +74,36 @@ The two serialized aliases of the decoder embedding were also byte-identical.
 These checks cover structural compatibility, not actual loading behavior or
 correct predictions. Serving code and model bytes were unchanged.
 
+An additional isolated audit then loaded the complete model through the installed
+native loader and compared every inference tensor against its safetensors asset.
+All 482 translator tensors and all 176 tensors in each DINO encoder matched in
+name, shape, dtype and SHA-256 of their bytes. There were no missing, unexpected
+or unequal inference tensors. Each DINO asset's eight training-head tensors are
+intentionally excluded by the supplied inference architecture. No inference ran
+during this audit. This rules out a weight-loading discrepancy in the checked
+path, but does not establish translation quality.
+
+## Crop color-order defect
+
+The direct inference runtime passed BGR hand and face crops to DINO's RGB
+preprocessor. The upstream [training crop script](https://github.com/ShesterG/SHuBERT/blob/main/dataset/crop_hands.py)
+writes BGR arrays through OpenCV, and its [feature extraction script](https://github.com/ShesterG/SHuBERT/blob/main/features/dinov2_features.py)
+reads those cropped videos back through Decord as RGB. Direct inference omits
+that video round trip. The source candidate now restores RGB before all three
+DINO calls, without changing landmarks, crop geometry or model tensors.
+
+An isolated diagnostic applied that same conversion to the installed model on
+the original frozen 4.69-second clip. Its output remained incorrect. All 113
+frames had detected landmarks; neither hand stream nor the face stream contained
+an all-zero crop. Both hand streams had 99 distinct crops and the face stream
+had 113. The request completed within 120 seconds, but this shared-host run is
+not a controlled speed comparison or a passing accuracy result.
+
+The existing imported ZIP, installed native bundle and their identities remain
+unchanged. This candidate source correction requires a newly inventoried bundle
+and qualification before deployment. It does not retroactively change any
+earlier diagnostic or make the baseline eligible for rewards.
+
 ## Remaining qualification
 
 Investigate translation quality and demonstrate completion across supported
