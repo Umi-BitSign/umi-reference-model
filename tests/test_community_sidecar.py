@@ -186,7 +186,10 @@ def test_blocked_worker_does_not_block_other_slot_and_disconnect_reaps_it(setup)
             assert await request(api, path, b"available") == f"{second_pid}:available"
             pending.cancel()
             await asyncio.gather(pending, return_exceptions=True)
-            await until(lambda: sidecar.workers[0]._process is None)
+            await until(
+                lambda: sidecar.workers[0]._process is None
+                or sidecar.workers[0]._process.pid != first_pid
+            )
             absent(first_pid)
             assert sidecar.workers[1]._process.pid == second_pid
         finally:
@@ -205,7 +208,10 @@ def test_socket_deadline_reaps_hung_process(setup):
         try:
             with pytest.raises(asyncio.IncompleteReadError):
                 await asyncio.wait_for(request(api, path, b"hang"), timeout=5)
-            await until(lambda: sidecar.workers[0]._process is None)
+            await until(
+                lambda: sidecar.workers[0]._process is None
+                or sidecar.workers[0]._process.pid != pid
+            )
             absent(pid)
         finally:
             await sidecar.close()

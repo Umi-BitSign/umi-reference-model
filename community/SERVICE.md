@@ -60,6 +60,18 @@ model meets the competition's full workload. Never report it as such.
 
 ## Supervision and recovery
 
+After an inference failure or cancellation, a safely reaped worker reloads
+under its existing startup deadline before its slot becomes available again.
+Reloading runs separately from incoming requests: a queued request timing out
+does not cancel the reload. Reloads are serialized to limit startup resource
+bursts. Inference deadlines still include time spent waiting for a ready slot.
+The capacity descriptor records configured capacity, not an instantaneous count
+of ready workers or proof of measured throughput.
+
+A reload verification failure closes the service; it does not return a broken
+worker to the queue. Shutdown cancels reloads and drains worker cleanup before
+exiting. This recovery does not change model weights or inference deadlines.
+
 Run the service with the dedicated miner operator's identity and retain its
 configuration outside model-writable paths. Configure a restart delay so an
 invalid deployment cannot repeatedly load the model in a tight loop. Never run
