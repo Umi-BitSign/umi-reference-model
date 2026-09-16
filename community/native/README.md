@@ -5,7 +5,8 @@ rehearsal. `manifest.json` identifies the complete preserved bundle as
 `ce459641c180c680aae32009052985165fa8bbffd165b0dca05d2dade0e619ed`.
 No tensors or private evaluation data are stored here.
 
-To reconstruct that bundle from the original supplied ZIP:
+First [download and verify the original ZIP](../DOWNLOAD.md), then reconstruct
+the bundle:
 
 ```sh
 mkdir -m 700 -p /ABSOLUTE/PRIVATE/native-models
@@ -19,7 +20,8 @@ reviewed adapters, then verifies every output file against the preserved bundle.
 It refuses an existing destination. It performs no inference, dependency install,
 wallet operation, endpoint registration, baseline promotion or weight submission.
 The separate runtime installation, sandbox and 120-second limit still apply.
-Public model-asset distribution remains pending.
+The public ZIP is the unchanged supplied archive. The staging command adds the
+versioned native adapters; the resulting bundle has the distinct identity above.
 
 `runtime.py` comes from `candidates/community-baseline-v0.2/runtime.py`, including
 the RGB crop correction. The native entrypoint selects MPS with five beams,
