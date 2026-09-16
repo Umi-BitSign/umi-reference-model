@@ -13,6 +13,11 @@ Its provenance says no model tensor was trained, pruned or quantized in this
 assembly. Its supplied qualification is an Apple Silicon functional smoke check,
 not a measured accuracy result or improvement claim.
 
+For the exact corrected MPS bundle used in the September 16 rehearsal, use the
+[native baseline staging instructions](native/README.md). That path includes
+the RGB correction and native compatibility adapters. The CPU importer below
+retains its original bundle identity and does not include those later changes.
+
 The later [public sentence diagnostic](PUBLIC_DIAGNOSTIC.md) did not qualify
 this candidate for launch: one of three preselected sentences returned text
 with word error rate 1.0, and two returned no complete response at the installed
