@@ -1,6 +1,40 @@
 # Community candidate qualification
 
-## Current status, 2026-09-15
+## Current status, 2026-09-16
+
+The native evaluator completed six previously exposed rehearsal clips using
+preserved bundle
+`ce459641c180c680aae32009052985165fa8bbffd165b0dca05d2dade0e619ed` and runtime
+`888c6a3d2c95b3539dacf24f10dea52cfa1e909bae608922b6ac4a744b843a54`.
+All six returned `ok` in 16.016, 19.922, 21.553, 29.052, 32.025 and 44.532
+seconds, within the unchanged 120-second inference limit.
+
+Replay of the signed paired result verified the evaluator's retained evidence.
+The baseline scored 0.246914 for fingerspelling, 0.215873 for continuous signing,
+and 0.223036 aggregate under that rehearsal policy. These are normalized
+CER/WER-derived scores on six exposed examples, not accuracy percentages or
+evidence of performance on unseen data.
+
+The endpoint side returned six signed miner errors. Its retained resource
+journal showed `video_fetch_failed` for every clip: the rehearsal video
+delivery had expired before dispatch. Inference was not reached. The failed
+responses and original signed round remain unchanged. Its zero endpoint score
+prevents a settlement with a qualifying endpoint recipient.
+
+A subsequent serving preflight used fresh capability URLs for the same clips.
+The production downloader verified their bytes over HTTPS, and the running
+miner's policy-bound Unix-socket translator returned nonempty bounded text for
+all six. Inference took 32.542, 6.001, 14.079, 3.373, 9.686 and 12.139 seconds
+in that test's order. This preflight did not sign evaluator evidence or submit
+weights. A fresh signed round is still required to establish the complete
+endpoint-to-settlement path. No unused private holdout cases were exercised.
+
+The deployed service and sidecar source files match the reboot-recovery and
+slot-rewarming changes on main. The serving preflight does not establish broad
+translation accuracy, full-load capacity, or completion of the launch gates.
+The earlier failures below remain part of the qualification record.
+
+## Earlier status, 2026-09-15
 
 This candidate remains unqualified for open-competition launch. The
 [public sentence diagnostic](PUBLIC_DIAGNOSTIC.md) returned one incorrect
@@ -8,8 +42,8 @@ translation and two incomplete responses at the installed deadline. Static
 source and checkpoint checks found no architecture/name/shape mismatch;
 they do not establish correct inference or useful ASL accuracy.
 
-The results below record earlier execution checks. They must not be used to
-override the later quality and capacity failures.
+The Linux results below record earlier execution checks. They do not override
+these quality and capacity failures.
 
 ## Linux ARM64 execution checks, 2026-09-13
 

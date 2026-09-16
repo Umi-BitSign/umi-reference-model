@@ -114,6 +114,11 @@ policy or establish that the miner is earning rewards.
 
 ## Test coverage
 
+The September 16 [qualification record](QUALIFICATION.md) includes six real
+requests through the installed policy-bound service, after production HTTPS
+video retrieval. All completed within 120 seconds. This covers that six-clip
+serving path, not signed settlement, general accuracy or full-load capacity.
+
 Run these tests with Python 3.12 and the reviewed UMI source on `PYTHONPATH`:
 
 ```sh
