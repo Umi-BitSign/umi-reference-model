@@ -42,13 +42,15 @@ jobs:
             community/native_runtime.py community/service.py community/sidecar.py \
             community/worker_transport.py tests/test_community_service.py \
             tests/test_community_sidecar.py tests/test_community_worker_transport.py \
-            tests/test_community_slot_rewarm.py
+            tests/test_community_slot_rewarm.py \
+            tools/stage_native_baseline.py tests/test_native_baseline_staging.py
           uv run --locked ruff format --check \
             community/reboot_recovery.py tests/test_community_reboot_recovery.py \
             community/native_runtime.py community/service.py community/sidecar.py \
             community/worker_transport.py tests/test_community_service.py \
             tests/test_community_sidecar.py tests/test_community_worker_transport.py \
-            tests/test_community_slot_rewarm.py
+            tests/test_community_slot_rewarm.py \
+            tools/stage_native_baseline.py tests/test_native_baseline_staging.py
       - name: Require socket helper and run full reference suite
         env:
           PYTHONDONTWRITEBYTECODE: "1"
