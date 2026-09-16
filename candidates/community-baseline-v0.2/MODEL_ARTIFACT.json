@@ -4,7 +4,7 @@
     "filename": "umi-community-baseline-v0.2.zip",
     "bytes": 2934700086,
     "sha256": "f78979599486456e06e7886b126169f8d45e5e1e7d16d7a2b617648615eef3d4",
-    "availability": "Supplied separately to maintainers; no public download URL in this candidate"
+    "availability": "Public split archive with checksums: https://github.com/Umi-BitSign/umi-reference-model/releases/tag/community-baseline-v0.2"
   },
   "model_files": [
     {

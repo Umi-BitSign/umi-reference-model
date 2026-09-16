@@ -26,7 +26,8 @@ translation quality or capacity for the full workload.
 
 The same assembly's inspectable source is in
 [`candidates/community-baseline-v0.2/`](../candidates/community-baseline-v0.2/README.md).
-Its `MODEL_ARTIFACT.json` records the separately delivered model assets. The
+Its `MODEL_ARTIFACT.json` records the model assets, now available through the
+[verified public download](DOWNLOAD.md). The
 standalone candidate and this CPU adapter use the same original ZIP; neither
 directory introduces newly trained weights or changes S1. Continue to use the
 pinned ZIP importer below for an evaluator bundle.

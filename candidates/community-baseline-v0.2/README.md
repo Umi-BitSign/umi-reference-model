@@ -16,7 +16,8 @@ over a hash-pinned running model.
 
 ## Install the separately supplied model assets
 
-Obtain `umi-community-baseline-v0.2.zip` from the maintainer handoff. Verify its
+Obtain `umi-community-baseline-v0.2.zip` through the
+[public download instructions](../../community/DOWNLOAD.md). Verify its
 SHA-256 against `MODEL_ARTIFACT.json` before extracting it into a separate directory.
 Copy the extracted `models/` directory into this directory, preserving its layout.
 No private access URL or credential is required by the code or committed here.
@@ -24,8 +25,8 @@ No private access URL or credential is required by the code or committed here.
 Run `python3 verify_model_assets.py` from this directory to verify every model file
 before following the standalone instructions below. The manifest contains hashes
 of inference assets only, not training data. The existing repository S1 command
-and release are unchanged. Automated installation cannot retrieve the private
-archive; maintainers must supply it or publish an appropriately licensed artifact.
+and release are unchanged. The public archive is unchanged from the supplied
+baseline; verify it before using these model assets.
 
 # UMI Community Baseline v0.2
 
