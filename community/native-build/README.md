@@ -38,7 +38,7 @@ not enforce this against their owner; the Studio diagnostic also denies writes
 to the exact overlay path in the macOS sandbox. The verifier does not create a
 sandbox or certify the rest of the Python environment or model bundle.
 
-Real-input results and limitations are in
-[the headless Studio record](../HEADLESS_STUDIO_CHECK.md). This packaging step
+Real-input results and limitations are in the current
+[qualification record](../QUALIFICATION.md). This packaging step
 does not change model weights, approve contribution rights, or establish ASL
 accuracy. The Linux evaluator bundle retains its separate runtime and tests.
