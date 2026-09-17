@@ -43,6 +43,13 @@ jobs:
             community/worker_transport.py tests/test_community_service.py \
             tests/test_community_sidecar.py tests/test_community_worker_transport.py \
             tests/test_community_slot_rewarm.py \
+            community/bundle_verification.py community/native_worker.py \
+            community/native-worker-bundle/umi_inference.py \
+            community/native-build/stage_macos_overlay.py \
+            community/native-build/verify_macos_overlay.py \
+            tests/test_community_bundle_verification.py \
+            tests/test_community_native_overlay.py tests/test_community_native_worker.py \
+            tools/import_community_baseline.py \
             tools/stage_native_baseline.py tests/test_native_baseline_staging.py
           uv run --locked ruff format --check \
             community/reboot_recovery.py tests/test_community_reboot_recovery.py \
@@ -50,6 +57,13 @@ jobs:
             community/worker_transport.py tests/test_community_service.py \
             tests/test_community_sidecar.py tests/test_community_worker_transport.py \
             tests/test_community_slot_rewarm.py \
+            community/bundle_verification.py community/native_worker.py \
+            community/native-worker-bundle/umi_inference.py \
+            community/native-build/stage_macos_overlay.py \
+            community/native-build/verify_macos_overlay.py \
+            tests/test_community_bundle_verification.py \
+            tests/test_community_native_overlay.py tests/test_community_native_worker.py \
+            tools/import_community_baseline.py \
             tools/stage_native_baseline.py tests/test_native_baseline_staging.py
       - name: Require socket helper and run full reference suite
         env:

@@ -7,13 +7,16 @@ approval. The launcher must deny worker writes to all inventoried roots.
 
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import json
 import os
+import platform
 import stat
 from pathlib import Path
 
 DOMAIN = b"umi-community-native-runtime-v1\0"
+F_GETPATH = 50
 MAXIMUM_ENTRIES = 40_000
 MAXIMUM_BYTES = 4 * 1024**3
 MAXIMUM_MANIFEST_BYTES = 12 * 1024**2
@@ -77,17 +80,47 @@ def file_hash(path: Path, *, maximum_bytes: int) -> tuple[str, int]:
     return result.hexdigest(), total
 
 
+def opened_directory(path: Path) -> tuple[Path, tuple[int, int]]:
+    if not path.is_absolute():
+        raise ValueError("runtime roots must be absolute directories without aliases")
+    try:
+        descriptor = os.open(path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    except OSError as error:
+        raise ValueError("runtime roots must be absolute directories without aliases") from error
+    try:
+        metadata = os.fstat(descriptor)
+        if platform.system() == "Darwin":
+            raw = fcntl.fcntl(descriptor, F_GETPATH, b"\0" * 1024)
+            actual = raw.split(b"\0", 1)[0]
+            canonical = actual == os.fsencode(path)
+        else:
+            canonical = os.fsencode(path.resolve(strict=True)) == os.fsencode(path)
+        linked = path.stat(follow_symlinks=False)
+        if (
+            not canonical
+            or not stat.S_ISDIR(metadata.st_mode)
+            or (
+                metadata.st_dev,
+                metadata.st_ino,
+            )
+            != (linked.st_dev, linked.st_ino)
+        ):
+            raise ValueError("runtime roots must be absolute directories without aliases")
+        return path, (metadata.st_dev, metadata.st_ino)
+    finally:
+        os.close(descriptor)
+
+
 def checked_roots(roots: dict[str, Path]) -> dict[str, Path]:
     if set(roots) != {"code", "environment", "python"}:
         raise ValueError("runtime needs exactly code, environment and python roots")
     resolved = {}
+    identities = {}
     for name, path in roots.items():
-        if not path.is_absolute() or path.resolve(strict=True) != path or not path.is_dir():
-            raise ValueError("runtime roots must be absolute directories without aliases")
-        resolved[name] = path
+        resolved[name], identities[name] = opened_directory(path)
     for name, path in resolved.items():
         if any(
-            path == other or path.is_relative_to(other)
+            identities[name] == identities[key] or path.is_relative_to(other)
             for key, other in resolved.items()
             if key != name
         ):

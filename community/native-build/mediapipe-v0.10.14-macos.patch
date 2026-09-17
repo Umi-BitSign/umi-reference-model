@@ -1,0 +1,86 @@
+diff --git a/mediapipe/third_party/BUILD b/mediapipe/third_party/BUILD
+--- a/mediapipe/third_party/BUILD
++++ b/mediapipe/third_party/BUILD
+@@ -153,10 +153,14 @@ OPENCV_SO_VERSION = "3.4"
+ 
+ cmake(
+     name = "opencv_cmake",
++    build_args = ["--parallel", "2"],
+     # Values to be passed as -Dkey=value on the CMake command line;
+     # here are serving to provide some CMake script configuration options
+     cache_entries = {
+         "CMAKE_BUILD_TYPE": "Release",
++        # CMake 4 dropped compatibility with OpenCV's older policy minimum.
++        # This override applies only to this third-party configure invocation.
++        "CMAKE_POLICY_VERSION_MINIMUM": "3.5",
+         # The module list is always sorted alphabetically so that we do not
+         # cause a rebuild when changing the link order.
+         "BUILD_LIST": ",".join(sorted(OPENCV_MODULES)),
+@@ -174,6 +178,8 @@ cmake(
+         # Optimization flags
+         "CV_ENABLE_INTRINSICS": "ON",
+         "WITH_EIGEN": "ON",
++        # This headless video pipeline does not decode OpenEXR images.
++        "WITH_OPENEXR": "OFF",
+         "WITH_PTHREADS": "ON",
+         "WITH_PTHREADS_PF": "ON",
+         # When building tests, by default Bazel builds them in dynamic mode.
+diff --git a/external/zlib/zutil.h b/external/zlib/zutil.h
+--- a/external/zlib/zutil.h
++++ b/external/zlib/zutil.h
+@@ -140,7 +140,7 @@
+-#if defined(MACOS) || defined(TARGET_OS_MAC)
++#if defined(MACOS)
+ #  define OS_CODE  7
+ #  ifndef Z_SOLO
+ #    if defined(__MWERKS__) && __dest_os != __be_os && __dest_os != __win32_os
+ #      include <unix.h> /* for fdopen */
+ #    else
+ #      ifndef fdopen
+diff --git a/external/opencv/3rdparty/zlib/zutil.h b/external/opencv/3rdparty/zlib/zutil.h
+--- a/external/opencv/3rdparty/zlib/zutil.h
++++ b/external/opencv/3rdparty/zlib/zutil.h
+@@ -130,7 +130,7 @@
+ #  endif
+ #endif
+ 
+-#if defined(MACOS) || defined(TARGET_OS_MAC)
++#if defined(MACOS)
+ #  define OS_CODE  7
+ #  ifndef Z_SOLO
+ #    if defined(__MWERKS__) && __dest_os != __be_os && __dest_os != __win32_os
+diff --git a/external/opencv/3rdparty/libpng/pngpriv.h b/external/opencv/3rdparty/libpng/pngpriv.h
+--- a/external/opencv/3rdparty/libpng/pngpriv.h
++++ b/external/opencv/3rdparty/libpng/pngpriv.h
+@@ -518,7 +518,7 @@
+ #  include <float.h>
+ 
+ #  if (defined(__MWERKS__) && defined(macintosh)) || defined(applec) || \
+-    defined(THINK_C) || defined(__SC__) || defined(TARGET_OS_MAC)
++    defined(THINK_C) || defined(__SC__) || (defined(TARGET_OS_MAC) && !defined(__MACH__))
+    /* We need to check that <math.h> hasn't already been included earlier
+     * as it seems it doesn't agree with <fp.h>, yet we should really use
+     * <fp.h> if possible.
+diff --git a/external/org_tensorflow/tensorflow/lite/kernels/elementwise.cc b/external/org_tensorflow/tensorflow/lite/kernels/elementwise.cc
+--- a/external/org_tensorflow/tensorflow/lite/kernels/elementwise.cc
++++ b/external/org_tensorflow/tensorflow/lite/kernels/elementwise.cc
+@@ -293,7 +293,8 @@
+   const TfLiteType type = input->type;
+   switch (type) {
+     case kTfLiteFloat32:
+-      return EvalImpl<float>(context, node, std::abs<float>, type);
++      return EvalImpl<float>(context, node,
++                             [](float value) { return std::abs(value); }, type);
+     case kTfLiteInt8:
+       return AbsEvalQuantized<int8_t>(context, node, type);
+     case kTfLiteInt16:
+@@ -301,7 +302,8 @@
+                  ? AbsInt16EvalImpl(context, node, type)
+                  : AbsEvalQuantized<int16_t>(context, node, type);
+     case kTfLiteInt32:
+-      return EvalImpl<int32_t>(context, node, std::abs<int32_t>, type);
++      return EvalImpl<int32_t>(context, node,
++                               [](int32_t value) { return std::abs(value); }, type);
+     default:
+       TF_LITE_KERNEL_LOG(context, "Current data type %s is not supported.",
+                          TfLiteTypeGetName(type));
