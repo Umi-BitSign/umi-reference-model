@@ -9,6 +9,9 @@ preserved bundle
 All six returned `ok` in 16.016, 19.922, 21.553, 29.052, 32.025 and 44.532
 seconds, within the unchanged 120-second inference limit.
 
+These six inputs had already been exposed for rehearsal. They were not drawn
+from the private holdout and do not provide private-holdout evidence.
+
 Replay of the signed paired result verified the evaluator's retained evidence.
 The baseline scored 0.246914 for fingerspelling, 0.215873 for continuous signing,
 and 0.223036 aggregate under that rehearsal policy. These are normalized
@@ -87,7 +90,9 @@ The original ZIP is retained in UMI's private `umi-model-candidates` R2 bucket
 as eleven checksum-addressed chunks and a reconstruction manifest. Each chunk
 was downloaded, and the reconstructed 2,934,700,086-byte ZIP matched the original
 SHA-256 above. Public bucket access is disabled and no custom domain is attached.
-This backup does not publish a baseline download or approve its rights.
+This backup does not publish a baseline download or approve its rights. The same
+verified ZIP is available separately through the
+[public GitHub download](DOWNLOAD.md).
 
 Before a production baseline or promotion, complete protected ASL evaluation,
 base-model/data provenance review, workload and concurrency measurements,
