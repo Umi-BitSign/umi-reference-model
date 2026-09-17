@@ -118,7 +118,7 @@ S1 model's CC BY-SA label.
 The supplied provenance identifies public upstream revisions but expressly does
 not provide a detailed training-data rights audit. Model integration does not
 resolve that review. See UMI's
-[contributor preparation checklist](https://github.com/Umi-BitSign/umi/blob/main/docs/MODEL_CONTRIBUTION_REVIEW.md).
+[contributor preparation checklist](https://github.com/Umi-BitSign/umi/blob/main/docs/contributors/models.md).
 
 An imported baseline has no contributor reward recipient. The 30% track requires
 a qualifying promotion under the approved policy, including independent
@@ -126,6 +126,8 @@ evaluation, preservation and rights review. The importer and smoke command never
 create that attribution or submit chain transactions.
 
 The original ZIP has a private R2 backup with full download, reconstruction and
-SHA-256 verification. See [qualification evidence](QUALIFICATION.md). Public
-distribution and a reviewed baseline download remain pending; the importer does
-not assign a public artifact URL.
+SHA-256 verification. See [qualification evidence](QUALIFICATION.md). The same
+verified ZIP is published in the
+[community baseline v0.2 prerelease](https://github.com/Umi-BitSign/umi-reference-model/releases/tag/community-baseline-v0.2);
+follow the [public download instructions](DOWNLOAD.md) to reconstruct it. The
+importer does not assign a public artifact URL or approve the package's rights.
