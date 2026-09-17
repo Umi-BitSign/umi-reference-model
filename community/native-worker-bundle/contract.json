@@ -1,0 +1,19 @@
+{
+  "schema": "umi-native-worker-bundle-contract/1",
+  "derivation": "replace_historical_manifest_entry_only",
+  "historical_bundle": {
+    "model_bundle_sha256": "ce459641c180c680aae32009052985165fa8bbffd165b0dca05d2dade0e619ed",
+    "manifest_file_sha256": "2b208c811fe4e07ce558421ef3bee4971a7e2a5f063a1fee46a628d09ba4366d",
+    "entrypoint_sha256": "ec6d1e71b0aff42f7d2c0f84e4df93808e6d25724fe52e8632a3b10dba7a2604",
+    "entrypoint_size_bytes": 1451
+  },
+  "live_worker_bundle": {
+    "model_bundle_sha256": "2fd4c30f5455e29630ffa06ad2c3cbd674b5bd4fa47aaaf1ea9b78fc40d95c58",
+    "manifest_file_sha256": "94c01623d83a114549b22e7dd407afba77f97ad9865fbe9d9ddcfc10dd5a9dce",
+    "entrypoint_path": "umi_inference.py",
+    "entrypoint_sha256": "78948d6c601373b73d0fb7966793d947d833d5fdf627fcb1bbf69c31896460f1",
+    "entrypoint_size_bytes": 2862
+  },
+  "worker_entrypoint": "community/native_worker.py",
+  "bundle_entrypoint_executed_by_worker": false
+}

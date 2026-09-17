@@ -179,7 +179,13 @@ def stage_baseline(source: Path, destination: Path) -> dict:
                 records = []
                 for name, info in sorted(members.items()):
                     target = model / name
-                    target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+                    # pathlib's parents=True applies mode only to the leaf.
+                    # Create each level explicitly so a permissive process umask
+                    # cannot leave group-writable intermediate directories.
+                    parent_directory = model
+                    for part in PurePosixPath(name).parts[:-1]:
+                        parent_directory = parent_directory / part
+                        parent_directory.mkdir(exist_ok=True, mode=0o700)
                     checksum = hashlib.sha256()
                     total = 0
                     with archive.open(info) as incoming, target.open("xb") as outgoing:

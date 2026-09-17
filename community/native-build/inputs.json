@@ -1,0 +1,71 @@
+{
+  "schema": "umi-community-native-build-inputs/1",
+  "status": "build_completed_native_overlay_staged_not_qualified",
+  "installed_mediapipe_inventory": {
+    "algorithm": "sha256-canonical-json-v1",
+    "schema": "umi-mediapipe-installed-package-inventory/1",
+    "sha256": "2e573f32f4c12d3ceb1c7dfe779d9604cc89609c7d2c669d979c89ab05698476",
+    "file_count": 581,
+    "content_bytes": 120539339,
+    "original_binding": {
+      "path": "python/_framework_bindings.cpython-310-darwin.so",
+      "sha256": "8b9917e1d96f67c05bdebebeb1eecd88f04f43506cd19c60d3325e4d30229e03",
+      "size_bytes": 86193587
+    }
+  },
+  "unrelocated_binding_sha256": "c97bef49278b1ea83905b7d966b5e7d0a551f62481644b03e8284bf969dadef6",
+  "unrelocated_native_sha256": {
+    "mediapipe/python/_framework_bindings.cpython-310-darwin.so": "c97bef49278b1ea83905b7d966b5e7d0a551f62481644b03e8284bf969dadef6",
+    "mediapipe/python/libopencv_calib3d.3.4.dylib": "f7d27326d0645298a12f0beead0e6a2aed2ece168f297a2a35e2d6d3dfbbe209",
+    "mediapipe/python/libopencv_core.3.4.dylib": "1d988b19ca7918d299ad2d48dfb36dfee37c8138d96dd753e018d1849dfbc180",
+    "mediapipe/python/libopencv_features2d.3.4.dylib": "28062bccc22ffffe08129e773c02d420705c7289b3f2dd1dafc888d13239d864",
+    "mediapipe/python/libopencv_highgui.3.4.dylib": "7b240638443a8a6af593ecbd8026f388499c6542ff8e5b6b982842238777b610",
+    "mediapipe/python/libopencv_imgcodecs.3.4.dylib": "19411d6cde6e431daafa7f30a8e6eef1844004b8b83d9ee2327b14fcdfdf92a7",
+    "mediapipe/python/libopencv_imgproc.3.4.dylib": "bce04dc6f94584726cdda516dc0f24ed53e4808d2cb19c1c1531ea75ac73c67c",
+    "mediapipe/python/libopencv_video.3.4.dylib": "f205e15b120b84065deb50e14da621b4e567e53f337ad5fddfc1e3becf42025c",
+    "mediapipe/python/libopencv_videoio.3.4.dylib": "a0c75f819b0343cfc3df24570d1a423f5e53f07fb45b5d4666bb7cae508e107f"
+  },
+  "relocated_binding_sha256": "c658315e1c034baf8d4643072981e98af2fec31191ad657e754263db70c0da91",
+  "overlay_manifest_sha256": "a9aaeb93f0b28f7823448212ecefb1c4f6375da0e74d62b494ed50e39677a312",
+  "overlay_file_count": 589,
+  "overlay_content_bytes": 69850552,
+  "mediapipe_commit": "4cf89a70942ca3252e46ace7e4552f53be9bef2e",
+  "mediapipe_tag": "v0.10.14",
+  "tensorflow_commit": "8038e44ea38bb889095afaaf6ad05e94adaed8d2",
+  "opencv_version": "3.4.10",
+  "bazel_version": "6.6.0",
+  "bazel_darwin_arm64_sha256": "e7983caca13ada740ac3714cee07ca4f8add34392c022434ceb94e30844e36d6",
+  "cmake_version": "3.31.12",
+  "cmake_macos_universal_archive_sha256": "799af7fd545db9bf1b9cfe72f8095880e727a2d4e0df0e3dffc3bc7b95c2d3b0",
+  "observed_sdk_version": "26.5",
+  "observed_clang_version": "Apple clang version 21.0.0 (clang-2100.1.1.101)",
+  "patch": "mediapipe-v0.10.14-macos.patch",
+  "patch_sha256": "8c32b627d19ff9196bcdda40234a82b014999dddb88c7566ea43e2d630a9a3e8",
+  "files": [
+    {
+      "path": "external/opencv/3rdparty/libpng/pngpriv.h",
+      "before_sha256": "cfd75ff2fad5095512437787dfbe178fe746c31c2f84d247796455fbee42de2f",
+      "after_sha256": "f8d1f46852fb4f8d100a9a40f0092a252b803d8240bffb2d61894886e14ce78f"
+    },
+    {
+      "path": "external/opencv/3rdparty/zlib/zutil.h",
+      "before_sha256": "671d58c5447b0ee6123bfd0997f4627e35992c396b147ac4bda9a27e497600f6",
+      "after_sha256": "643eb6215d4034b78eec53e5fce0280b1d21cd0e2ae43ffb439bdaafafa9c2ef"
+    },
+    {
+      "path": "external/org_tensorflow/tensorflow/lite/kernels/elementwise.cc",
+      "before_sha256": "ef19d34b3bc35c5f8ac8bcc0a186b30eeddc57b3da9f1988571a6109c4000fd3",
+      "after_sha256": "fbb3bbfb5fdd7de86ecb84c60c84143b77deccd6c24471c43ac65f6f58d26085"
+    },
+    {
+      "path": "external/zlib/zutil.h",
+      "before_sha256": "cf94d865e3a9162c0571cba7f74c8f01efbdca26b981d6cc9c545d4c3991e3c2",
+      "after_sha256": "aef452a3b9e19599aab96400f356ddae78505685044ad2f0291d19c0b7f19125"
+    },
+    {
+      "path": "mediapipe/third_party/BUILD",
+      "before_sha256": "87a8cc7a917bd45f1d700841cfcde1eef78a01ce2bcb18f59009fbdc6fd49679",
+      "after_sha256": "d015285fe05cb54bb5514bff854718a47542cbc5eccf44836ec580fc138469f0"
+    }
+  ]
+}
