@@ -91,6 +91,13 @@ storage. Shared filesystems and copied VM identities are unsupported.
 
 Before launching a worker, the controller durably records the host, boot,
 configuration hash and scratch-directory identities in `SOCKET.reboot.json`.
+On macOS, version 2 journals bind each artifact to its persistent volume UUID
+and inode, so APFS device-number changes during reboot do not prevent recovery.
+The UUID is read from the OS; a different volume or inode still stops recovery.
+Linux retains its device-and-inode checks. Existing version 1 journals keep
+their original checks and upgrade when the next worker session begins. Stop
+the old service gracefully before upgrading; a legacy journal cannot recover
+a changed device number by guessing its previous volume identity.
 Normal shutdown marks that journal clean only after worker cleanup succeeds.
 After a reboot, an unfinished journal with the same host and configuration lets
 the controller move the old socket, capacity descriptor and scratch into private
