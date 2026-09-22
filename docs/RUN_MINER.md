@@ -462,3 +462,25 @@ an explicit encrypted error response and scores zero. Do not add a text fallback
 a timeout or cancellation, stop the miner if any generated job directory or
 `bitsign-holistic-*` container remains, preserve bounded logs, and report the incident
 with the derived model revision.
+
+### FFmpeg thread exhaustion
+
+`Resource temporarily unavailable` or `ff_frame_thread_encoder_init failed` in
+extractor stderr can indicate exhaustion of the container's 128-task PID limit.
+FFmpeg may size its thread pools from the host CPU count even when Docker limits
+the container to four CPUs. The worker bounds decoder, filter and rawvideo encoder
+threads separately. An input-side `-threads 1` alone does not bound the output
+encoder.
+
+Keep the failing stderr and model revision when reporting this error. The generic
+`inference_failed` response alone does not identify its cause. Increasing the PID
+limit can help diagnose thread exhaustion, but changing the worker requires a new
+local image build and derived bundle identity using section 4. Keep existing pinned
+images and bundles intact, and use the new revision only where the applicable
+submission policy admits it.
+
+The miner's inference admission and optional window-video coalescing provide bounded
+queueing. `--max-backend-workers` limits coalesced backend work; lowering it may help
+with concurrent resource pressure. Preserve the required per-validator admission
+slots and request deadlines. Queueing cannot fix a single extractor that already
+exhausts its own PID budget.

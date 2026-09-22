@@ -836,6 +836,8 @@ def _decode_command(
         "-loglevel",
         "error",
         "-nostdin",
+        "-filter_threads",
+        "1",
         "-threads",
         "1",
         "-hwaccel",
@@ -858,6 +860,10 @@ def _decode_command(
         "passthrough",
         "-pix_fmt",
         "rgb24",
+        # The input -threads above limits the decoder only. Bound the rawvideo
+        # encoder separately: CPU quota does not constrain its auto thread count.
+        "-threads:v",
+        "1",
         "-f",
         "rawvideo",
         "pipe:1",
