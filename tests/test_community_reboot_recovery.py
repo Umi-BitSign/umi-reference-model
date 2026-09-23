@@ -6,8 +6,10 @@ import importlib
 import json
 import os
 import socket
+import sys
 import tempfile
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -38,6 +40,7 @@ def deployment(private_root, monkeypatch):
     config.write_bytes(b"retained configuration")
     config.chmod(0o600)
     monkeypatch.setattr(recovery, "kernel_identity", lambda: dict(FIRST))
+    monkeypatch.setattr(recovery, "darwin_volume_uuid", lambda _path: "55" * 16)
 
     def instance(sha=SHA):
         return recovery.RebootRecovery(endpoint, config, sha, document)
@@ -203,3 +206,218 @@ def test_recovery_journal_cannot_be_bypassed_by_default_startup(deployment):
     service = importlib.import_module("service")
     with pytest.raises(FileExistsError), service.service_lock(endpoint):
         raise AssertionError("recovery journal bypassed")
+
+
+def change_device_number(monkeypatch, scratch):
+    original = Path.lstat
+
+    def changed(path, *args, **kwargs):
+        info = original(path, *args, **kwargs)
+        if path == scratch:
+            values = {name: getattr(info, name) for name in dir(info) if name.startswith("st_")}
+            return SimpleNamespace(**{**values, "st_dev": info.st_dev + 1})
+        return info
+
+    monkeypatch.setattr(Path, "lstat", changed)
+
+
+def test_new_boot_accepts_renumbered_device_on_same_volume(deployment, monkeypatch):
+    module, root, endpoint, scratch, instance = deployment
+    leave_artifacts(endpoint, scratch)
+    change_device_number(monkeypatch, scratch)
+    monkeypatch.setattr(module, "kernel_identity", lambda: dict(SECOND))
+    current = instance()
+    current.prepare()
+    assert not list(scratch.iterdir())
+    assert (
+        next(p for p in root.glob(".umi-reboot-*") if p.is_dir()).joinpath("clip.bin").read_bytes()
+        == b"retained video"
+    )
+    current.begin()
+    current.finish()
+    assert current.state["schema"] == module.SCHEMA
+
+
+@pytest.mark.parametrize("phase", ["active", "clean"])
+def test_different_volume_does_not_claim_same_inode(deployment, monkeypatch, phase):
+    module, root, endpoint, scratch, instance = deployment
+    if phase == "clean":
+        instance().finish()
+    else:
+        leave_artifacts(endpoint, scratch)
+    monkeypatch.setattr(module, "kernel_identity", lambda: dict(SECOND))
+    monkeypatch.setattr(module, "darwin_volume_uuid", lambda _path: "66" * 16)
+    before = sorted(p.name for p in root.iterdir())
+    with pytest.raises(ValueError):
+        instance().prepare()
+    assert sorted(p.name for p in root.iterdir()) == before
+
+
+@pytest.mark.parametrize("phase", ["active", "clean"])
+def test_legacy_journal_keeps_device_checks_and_migrates_on_begin(deployment, monkeypatch, phase):
+    module, _root, endpoint, scratch, instance = deployment
+    legacy = instance()
+    legacy._write(
+        {
+            **legacy.state,
+            "schema": module.LEGACY_SCHEMA,
+            "phase": phase,
+            "scratches": [
+                {"path": str(scratch), "metadata": module.metadata(scratch, "directory")}
+            ],
+        }
+    )
+    if phase == "active":
+        leave_artifacts(endpoint, scratch)
+    monkeypatch.setattr(module, "kernel_identity", lambda: dict(SECOND))
+    current = instance()
+    current.prepare()
+    current.begin()
+    assert current.state["schema"] == module.SCHEMA
+    assert current.state["scratches"][0]["metadata"][0] == "55" * 16
+
+
+def test_legacy_journal_cannot_invent_old_volume_identity(deployment, monkeypatch):
+    module, root, endpoint, scratch, instance = deployment
+    legacy = instance()
+    legacy._write(
+        {
+            **legacy.state,
+            "schema": module.LEGACY_SCHEMA,
+            "scratches": [
+                {"path": str(scratch), "metadata": module.metadata(scratch, "directory")}
+            ],
+        }
+    )
+    leave_artifacts(endpoint, scratch)
+    change_device_number(monkeypatch, scratch)
+    monkeypatch.setattr(module, "kernel_identity", lambda: dict(SECOND))
+    with pytest.raises(ValueError, match="identity changed"):
+        instance().prepare()
+    assert not list(root.glob(".umi-reboot-*"))
+    assert (scratch / "clip.bin").read_bytes() == b"retained video"
+
+
+def test_second_reboot_resumes_partly_quarantined_plan(deployment, monkeypatch):
+    module, root, endpoint, scratch, instance = deployment
+    leave_artifacts(endpoint, scratch)
+    monkeypatch.setattr(module, "kernel_identity", lambda: dict(SECOND))
+    pending = instance()
+    pending._write({**pending.state, "plan": pending._entries()})
+    pending._apply(pending.state["plan"][0], execute=True)
+    change_device_number(monkeypatch, scratch)
+    monkeypatch.setattr(module, "kernel_identity", lambda: {**SECOND, "boot": "77" * 16})
+    resumed = instance()
+    resumed.prepare()
+    resumed.begin()
+    assert len(list(root.glob(".umi-reboot-*"))) == 3
+    assert not list(scratch.iterdir())
+
+
+@pytest.mark.parametrize("identity", [None, "", "00" * 16, "55" * 15, 1, True])
+def test_invalid_volume_identity_never_moves_artifacts(deployment, monkeypatch, identity):
+    module, root, endpoint, scratch, instance = deployment
+    leave_artifacts(endpoint, scratch)
+    monkeypatch.setattr(module, "kernel_identity", lambda: dict(SECOND))
+    monkeypatch.setattr(module, "darwin_volume_uuid", lambda _path: identity)
+    with pytest.raises(ValueError):
+        instance().prepare()
+    assert not list(root.glob(".umi-reboot-*"))
+    assert (scratch / "clip.bin").read_bytes() == b"retained video"
+
+
+@pytest.mark.skipif(sys.platform != "darwin", reason="Darwin kernel API")
+def test_native_volume_uuid_survives_directory_rename(private_root, monkeypatch):
+    monkeypatch.syspath_prepend(str(ROOT / "community"))
+    module = importlib.import_module("reboot_recovery")
+    old = private_root / "before"
+    old.mkdir(mode=0o700)
+    identity = module.metadata(old, "directory", volume=True)
+    assert identity[0] == module.darwin_volume_uuid(private_root)
+    new = private_root / "after"
+    old.rename(new)
+    assert module.metadata(new, "directory", volume=True) == identity
+
+
+def test_linux_journal_does_not_require_darwin_api(deployment, monkeypatch):
+    module, _root, endpoint, scratch, _instance = deployment
+    Path(f"{endpoint}.reboot.json").unlink()
+    monkeypatch.setattr(module, "kernel_identity", lambda: {**FIRST, "platform": "linux"})
+
+    def no_darwin(_path):
+        raise AssertionError("Linux must not query Darwin")
+
+    monkeypatch.setattr(module, "darwin_volume_uuid", no_darwin)
+    current = module.RebootRecovery(
+        endpoint,
+        scratch.parent / "config.json",
+        SHA,
+        {"workers": [{"scratch_directory": str(scratch)}]},
+    )
+    current.prepare()
+    current.begin()
+    current.finish()
+    assert current.state["scratches"][0]["metadata"] == [
+        scratch.stat().st_dev,
+        scratch.stat().st_ino,
+    ]
+
+
+@pytest.mark.parametrize("boundary", ["capacity_after_rename", "scratch_after_mkdir"])
+def test_retry_repeats_failed_parent_durability_barrier(private_root, monkeypatch, boundary):
+    monkeypatch.syspath_prepend(str(ROOT / "community"))
+    module = importlib.import_module("reboot_recovery")
+    monkeypatch.setattr(module, "kernel_identity", lambda: dict(FIRST))
+    monkeypatch.setattr(module, "darwin_volume_uuid", lambda _path: "55" * 16)
+    sockets, models = private_root / "sockets", private_root / "models"
+    sockets.mkdir(mode=0o700)
+    models.mkdir(mode=0o700)
+    scratch = models / "scratch"
+    scratch.mkdir(mode=0o700)
+    endpoint = sockets / "model.sock"
+    config = private_root / "config.json"
+    config.write_bytes(b"retained configuration")
+    config.chmod(0o600)
+    document = {"workers": [{"scratch_directory": str(scratch)}]}
+
+    def instance():
+        return module.RebootRecovery(endpoint, config, SHA, document)
+
+    instance().begin()
+    leave_artifacts(endpoint, scratch)
+    old_scratch_inode = scratch.stat().st_ino
+    monkeypatch.setattr(module, "kernel_identity", lambda: dict(SECOND))
+    expected_parent = sockets if boundary == "capacity_after_rename" else models
+    original = module.sync_directory
+    failed = False
+
+    def fail_once(path):
+        nonlocal failed
+        at_boundary = (
+            not Path(f"{endpoint}.capacity.json").exists()
+            if boundary == "capacity_after_rename"
+            else scratch.exists() and scratch.stat().st_ino != old_scratch_inode
+        )
+        if path == expected_parent and at_boundary and not failed:
+            failed = True
+            raise OSError("parent sync interrupted")
+        return original(path)
+
+    monkeypatch.setattr(module, "sync_directory", fail_once)
+    with pytest.raises(OSError, match="parent sync interrupted"):
+        instance().prepare()
+    assert failed
+    synced = []
+
+    def recording(path):
+        original(path)
+        synced.append(path)
+
+    monkeypatch.setattr(module, "sync_directory", recording)
+    recovered = instance()
+    recovered.prepare()
+    assert expected_parent in synced
+    assert not list(scratch.iterdir())
+    assert next(models.glob(".umi-reboot-*")).joinpath("clip.bin").read_bytes() == b"retained video"
+    recovered.begin()
+    recovered.finish()

@@ -7,6 +7,7 @@ This journal must remain outside model-writable paths on host-local storage.
 
 from __future__ import annotations
 
+import ctypes
 import hashlib
 import json
 import os
@@ -21,7 +22,8 @@ from pathlib import Path
 from native_runtime import canonical, digest
 
 LIMIT = 256 * 1024
-SCHEMA = "umi-model-reboot-journal/1"
+LEGACY_SCHEMA = "umi-model-reboot-journal/1"
+SCHEMA = "umi-model-reboot-journal/2"
 
 
 def kernel_identity() -> dict[str, str]:
@@ -78,7 +80,62 @@ def private_directory(path: Path) -> None:
         raise ValueError("recovery directories must be owner-private")
 
 
-def metadata(path: Path, kind: str) -> list[int] | None:
+def darwin_volume_uuid(path: Path) -> str:
+    """Read the persistent volume ID from Darwin, without resolving symlinks.
+
+    ATTR_VOL_UUID and the required ATTR_VOL_INFO come from Apple's sys/attr.h.
+    Device numbers alone are not persistent across an APFS reboot.
+    """
+
+    class Attributes(ctypes.Structure):
+        _fields_ = (
+            ("bitmapcount", ctypes.c_uint16),
+            ("reserved", ctypes.c_uint16),
+            ("commonattr", ctypes.c_uint32),
+            ("volattr", ctypes.c_uint32),
+            ("dirattr", ctypes.c_uint32),
+            ("fileattr", ctypes.c_uint32),
+            ("forkattr", ctypes.c_uint32),
+        )
+
+    library = ctypes.CDLL("/usr/lib/libSystem.B.dylib", use_errno=True)
+    getter = library.getattrlist
+    getter.argtypes = [
+        ctypes.c_char_p,
+        ctypes.POINTER(Attributes),
+        ctypes.c_void_p,
+        ctypes.c_size_t,
+        ctypes.c_ulong,
+    ]
+    getter.restype = ctypes.c_int
+    attributes = Attributes(5, 0, 0, 0x80040000, 0, 0, 0)
+    # Four-byte returned length followed by the sixteen-byte volume UUID.
+    result = ctypes.create_string_buffer(20)
+    if getter(os.fsencode(path), ctypes.byref(attributes), result, len(result), 1) != 0:
+        raise OSError(ctypes.get_errno(), "persistent volume identity unavailable")
+    if int.from_bytes(result.raw[:4], sys.byteorder) != len(result):
+        raise ValueError("invalid volume identity response")
+    identity = uuid.UUID(bytes=result.raw[4:20])
+    if identity.int == 0:
+        raise ValueError("persistent volume identity unavailable")
+    return identity.hex
+
+
+def validate_metadata(value: object, *, volume: bool) -> None:
+    if not isinstance(value, list) or len(value) != 2 or type(value[1]) is not int or value[1] <= 0:
+        raise ValueError("invalid retained artifact identity")
+    if volume:
+        if (
+            not isinstance(value[0], str)
+            or uuid.UUID(value[0]).hex != value[0]
+            or uuid.UUID(value[0]).int == 0
+        ):
+            raise ValueError("invalid retained volume identity")
+    elif type(value[0]) is not int or value[0] <= 0:
+        raise ValueError("invalid retained device identity")
+
+
+def metadata(path: Path, kind: str, *, volume: bool = False) -> list[int | str] | None:
     try:
         info = path.lstat()
     except FileNotFoundError:
@@ -94,7 +151,18 @@ def metadata(path: Path, kind: str) -> list[int] | None:
         or (kind != "directory" and info.st_nlink != 1)
     ):
         raise ValueError("retained model artifact is unsafe")
-    return [info.st_dev, info.st_ino]
+    if not volume:
+        return [info.st_dev, info.st_ino]
+    identity = darwin_volume_uuid(path)
+    after = path.lstat()
+    if any(
+        getattr(info, field) != getattr(after, field)
+        for field in ("st_dev", "st_ino", "st_mode", "st_uid", "st_nlink")
+    ):
+        raise ValueError("retained model artifact changed during volume lookup")
+    result = [identity, info.st_ino]
+    validate_metadata(result, volume=True)
+    return result
 
 
 def sync_directory(path: Path) -> None:
@@ -165,7 +233,7 @@ class RebootRecovery:
             canonical(state) != raw
             or not isinstance(state, dict)
             or set(state) != {"schema", "config_sha256", "identity", "phase", "scratches", "plan"}
-            or state["schema"] != SCHEMA
+            or state["schema"] not in {LEGACY_SCHEMA, SCHEMA}
             or state["phase"] not in {"active", "clean"}
             or not isinstance(state["scratches"], list)
             or not 1 <= len(state["scratches"]) <= 256
@@ -179,12 +247,22 @@ class RebootRecovery:
                 or set(scratch) != {"path", "metadata"}
                 or not isinstance(scratch["path"], str)
                 or not Path(scratch["path"]).is_absolute()
-                or not isinstance(scratch["metadata"], list)
-                or len(scratch["metadata"]) != 2
-                or any(type(value) is not int or value <= 0 for value in scratch["metadata"])
             ):
                 raise ValueError("invalid retained scratch identity")
+            validate_metadata(
+                scratch["metadata"],
+                volume=state["schema"] == SCHEMA and state["identity"]["platform"] == "darwin",
+            )
         return state
+
+    def _metadata(self, path: Path, kind: str) -> list[int | str] | None:
+        # Old journals keep their exact device check. Never invent a missing
+        # historical volume identity; a clean restart can write the new schema.
+        return metadata(
+            path,
+            kind,
+            volume=self.state["schema"] == SCHEMA and self.identity["platform"] == "darwin",
+        )
 
     def _write(self, state: dict) -> None:
         raw = canonical(state)
@@ -212,7 +290,7 @@ class RebootRecovery:
         for scratch in self.state["scratches"]:
             path = Path(scratch["path"])
             private_directory(path)
-            if metadata(path, "directory") != scratch["metadata"] or any(path.iterdir()):
+            if self._metadata(path, "directory") != scratch["metadata"] or any(path.iterdir()):
                 raise ValueError("retained scratch is not clean")
 
     def _entries(self) -> list[dict]:
@@ -223,7 +301,7 @@ class RebootRecovery:
         entries += [(Path(s["path"]), "directory", s["metadata"]) for s in self.state["scratches"]]
         plan = []
         for source, kind, retained in entries:
-            current = metadata(source, kind)
+            current = self._metadata(source, kind)
             if kind == "directory" and current != retained:
                 raise ValueError("retained scratch identity changed")
             token = hashlib.sha256(
@@ -240,7 +318,7 @@ class RebootRecovery:
     def _apply(self, entry: dict, *, execute: bool) -> None:
         source, target, kind = Path(entry["source"]), Path(entry["target"]), entry["kind"]
         old = entry["metadata"]
-        present, quarantined = metadata(source, kind), metadata(target, kind)
+        present, quarantined = self._metadata(source, kind), self._metadata(target, kind)
         if old is None:
             if present is not None or quarantined is not None:
                 raise ValueError("unexpected model artifact during recovery")
@@ -249,15 +327,21 @@ class RebootRecovery:
             if not execute:
                 return
             os.rename(source, target)
-            sync_directory(source.parent)
             present, quarantined = None, old
         if quarantined != old:
             raise ValueError("recovery artifact identity differs")
+        if execute:
+            # A previous attempt may have renamed the artifact but failed to
+            # sync its parent. Reopening the plan must finish that barrier.
+            sync_directory(source.parent)
         if kind == "directory":
             if present is not None and (present == old or any(source.iterdir())):
                 raise ValueError("replacement scratch is occupied")
             if present is None and execute:
                 source.mkdir(mode=0o700)
+            if execute:
+                # This also covers a mkdir that succeeded before interruption.
+                sync_directory(source)
                 sync_directory(source.parent)
         elif present is not None:
             raise ValueError("model socket reappeared during recovery")
@@ -300,12 +384,11 @@ class RebootRecovery:
                 or entry["target"] != target
             ):
                 raise ValueError("recovery plan binding differs")
-            if entry["metadata"] is not None and (
-                not isinstance(entry["metadata"], list)
-                or len(entry["metadata"]) != 2
-                or any(type(v) is not int or v <= 0 for v in entry["metadata"])
-            ):
-                raise ValueError("invalid recovery artifact identity")
+            if entry["metadata"] is not None:
+                validate_metadata(
+                    entry["metadata"],
+                    volume=state["schema"] == SCHEMA and self.identity["platform"] == "darwin",
+                )
             if (
                 kind == "directory"
                 and entry["metadata"] != state["scratches"][index - 2]["metadata"]
@@ -322,7 +405,14 @@ class RebootRecovery:
             private_directory(path)
             if any(path.iterdir()):
                 raise ValueError("worker scratch must start empty")
-            scratches.append({"path": str(path), "metadata": metadata(path, "directory")})
+            scratches.append(
+                {
+                    "path": str(path),
+                    "metadata": metadata(
+                        path, "directory", volume=self.identity["platform"] == "darwin"
+                    ),
+                }
+            )
         self._write(
             {
                 "schema": SCHEMA,
