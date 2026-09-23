@@ -79,6 +79,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     strategy:
+      fail-fast: false
       matrix:
         python: ["3.10", "3.12"]
     steps:
@@ -92,8 +93,13 @@ jobs:
         run: |
           python -m pip install pytest==8.4.2
           sudo apt-get update
-          sudo apt-get install -y bubblewrap
+          sudo apt-get install -y apparmor bubblewrap
           command -v bwrap
+          # Activate Ubuntu's packaged, executable-specific userns policy.
+          # Keep global AppArmor restrictions enabled.
+          profile=/etc/apparmor.d/bwrap-userns-restrict
+          test -f "$profile"
+          sudo apparmor_parser -r "$profile"
       - name: Verify CPU worker, sandbox and bounded transport
         env:
           PYTHONDONTWRITEBYTECODE: "1"

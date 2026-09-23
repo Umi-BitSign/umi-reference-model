@@ -119,6 +119,12 @@ sandbox. The worker checks read-only mounts, the hidden marker and blocked
 outbound access before loading model code. These probes do not replace reviewing
 the launcher and its mount list. See [Bubblewrap's sandbox documentation](https://github.com/containers/bubblewrap#sandboxing).
 
+On Ubuntu 24.04, the operator must also have the distribution's Bubblewrap
+AppArmor user-namespace profile installed and active. An error such as
+`loopback: Failed RTM_NEWADDR: Operation not permitted` occurs before the worker
+starts. Follow [Ubuntu's AppArmor guidance](https://discourse.ubuntu.com/t/understanding-apparmor-user-namespace-restriction/58007)
+for the host; do not remove network isolation to work around it.
+
 Enforce memory, CPU, task and scratch limits in the service manager/container as
 well. Start with a measured slot budget; the existing cold CPU rehearsal used
 four CPUs and 12 GiB, but it did not qualify warm serving capacity. Each worker
