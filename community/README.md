@@ -1,7 +1,7 @@
 # Community baseline integration
 
 For the warm, isolated model-process interface and persistent local standby,
-see [model service operation](SERVICE.md). That entry point does not install an
+see [model service operation](SERVICE.md), including the [Linux CPU worker](SERVICE.md#linux-cpu-worker). That entry point does not install an
 HTTP miner, publish an endpoint or activate competition rewards.
 
 This directory integrates the supplied `umi-community-baseline-v0.2.zip` as a
