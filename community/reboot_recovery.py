@@ -88,7 +88,7 @@ def darwin_volume_uuid(path: Path) -> str:
     """
 
     class Attributes(ctypes.Structure):
-        _fields_ = [
+        _fields_ = (
             ("bitmapcount", ctypes.c_uint16),
             ("reserved", ctypes.c_uint16),
             ("commonattr", ctypes.c_uint32),
@@ -96,7 +96,7 @@ def darwin_volume_uuid(path: Path) -> str:
             ("dirattr", ctypes.c_uint32),
             ("fileattr", ctypes.c_uint32),
             ("forkattr", ctypes.c_uint32),
-        ]
+        )
 
     library = ctypes.CDLL("/usr/lib/libSystem.B.dylib", use_errno=True)
     getter = library.getattrlist
