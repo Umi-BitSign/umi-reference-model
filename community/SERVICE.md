@@ -45,6 +45,113 @@ The local configuration hash does not replace policy signatures, model rights
 approval, measured capacity, or the worker's artifact verification. It prevents
 the service manager from silently starting different local inputs.
 
+## Linux CPU worker
+
+On Linux x86_64, use `cpu_worker.py` behind this supervisor. It keeps one
+`SHuBERTInferenceRuntime(device="cpu")` loaded per worker and speaks the same
+bounded `worker_transport` protocol as the Metal worker. The supervisor stays
+in the UMI Python 3.12 environment; the model runs in a separate Python 3.10
+environment with the community baseline's dependencies. Linux miners do not
+need to write their own worker entrypoint.
+
+Use the [verified CPU bundle importer](README.md#verify-and-stage). This selects
+the original CPU bundle, including its original preprocessing; it does not
+silently substitute the later Mac adapters. Install its `model/requirements.txt`
+in a dedicated Python 3.10 environment, using pip 24.0 for the supplied OmegaConf
+metadata as in [the existing CPU image recipe](Dockerfile). Use the CPU builds of
+the pinned Torch packages. Preserve the package licenses and provenance.
+
+The deployment needs separate canonical absolute directories for worker code,
+the Python 3.10 installation, its environment, the imported bundle, and scratch.
+They must belong to the dedicated model-service user and must not overlap.
+Use an operator-owned standalone Python installation: a system `/usr` tree is
+not a worker-owned Python root. Copy these five files into the code directory:
+`cpu_worker.py`, `cpu_runtime.py`, `native_runtime.py`, `bundle_verification.py`
+and `worker_transport.py`. `native_runtime.py` supplies inventory helpers only;
+this path imports no Metal worker or macOS overlay. Copy files rather than
+hardlinking them, and keep group/other write permissions disabled.
+
+Seal the installed runtime after dependency installation, before starting it.
+Replace the paths and the imported bundle identity below with the verified
+local values. The output manifest must be outside the inventoried directories:
+
+```sh
+/ABSOLUTE/ENVIRONMENT/bin/python -B -s /ABSOLUTE/CODE/cpu_runtime.py \
+  --code /ABSOLUTE/CODE \
+  --environment /ABSOLUTE/ENVIRONMENT \
+  --python /ABSOLUTE/PYTHON310 \
+  --bundle /ABSOLUTE/BUNDLE \
+  --expected-bundle-sha256 IMPORTED_MODEL_BUNDLE_SHA256 \
+  --output /ABSOLUTE/PRIVATE/cpu-runtime.json
+```
+
+The printed `model_revision` binds the bundle, code, Python installation,
+installed packages and CPU execution settings. Use it in both the service
+configuration and miner configuration. Keep the manifest owner-private and
+read-only. A changed file, execution setting or bundle requires a new reviewed
+manifest and revision. This is a local deployment identity, not a signed UMI
+release or a claim of reproducible packages. The inventory has a 4 GiB ceiling
+for code, environment and Python combined, excluding the separate model bundle.
+
+The worker invocation is:
+
+```sh
+/ABSOLUTE/ENVIRONMENT/bin/python -B -s /ABSOLUTE/CODE/cpu_worker.py \
+  --environment-root /ABSOLUTE/ENVIRONMENT \
+  --python-root /ABSOLUTE/PYTHON310 \
+  --bundle /ABSOLUTE/BUNDLE \
+  --runtime-manifest /ABSOLUTE/PRIVATE/cpu-runtime.json \
+  --model-revision PRINTED_MODEL_REVISION \
+  --scratch /ABSOLUTE/SLOT_SCRATCH \
+  --deny-read-marker /ABSOLUTE/OUTSIDE/harmless-marker
+```
+
+Run that invocation inside a reviewed Linux sandbox in each worker's `command`,
+not directly on the host. For example, a Bubblewrap launcher should use
+`--unshare-all --die-with-parent --new-session --cap-drop ALL`, expose only the
+interpreter, required system libraries, worker code, bundle and manifest as
+read-only, and mount only that slot's scratch as writable. Preserve the absolute
+paths above inside the sandbox. Provide private `/proc`, `/dev` and `/dev/shm`;
+Fairseq needs POSIX semaphores. Hide home directories, wallets, credentials and
+host service sockets. Create the harmless marker outside those mounts before
+launching; it must be unreadable inside. Do not bind the host root into the
+sandbox. The worker checks read-only mounts, the hidden marker and blocked
+outbound access before loading model code. These probes do not replace reviewing
+the launcher and its mount list. See [Bubblewrap's sandbox documentation](https://github.com/containers/bubblewrap#sandboxing).
+
+On Ubuntu 24.04, the operator must also have the distribution's Bubblewrap
+AppArmor user-namespace profile installed and active. Ubuntu 24.04 provides it
+in `apparmor-profiles` as
+`/usr/share/apparmor/extra-profiles/bwrap-userns-restrict`; it is not enabled
+merely by installing Bubblewrap. An error such as
+`loopback: Failed RTM_NEWADDR: Operation not permitted` occurs before the worker
+starts. Follow [Ubuntu's AppArmor guidance](https://discourse.ubuntu.com/t/understanding-apparmor-user-namespace-restriction/58007)
+for the host; do not remove network isolation to work around it.
+
+Enforce memory, CPU, task and scratch limits in the service manager/container as
+well. Start with a measured slot budget; the existing cold CPU rehearsal used
+four CPUs and 12 GiB, but it did not qualify warm serving capacity. Each worker
+uses four CPU threads and one inference at a time. Give every configured slot
+its own empty, mode-0700 scratch directory and enough aggregate resources.
+`startup_seconds` and `inference_seconds` use the existing transport's `(0, 600]`
+range; choose them from measurements within the miner's signed request budget.
+A queued request's deadline includes its wait. More queued work cannot extend
+that signed request budget.
+
+Put the sandbox launcher plus the invocation above in `command`, an explicit
+credential-free environment in `environment`, the code directory in `cwd`, and
+the sealed identity in `model_revision`. The remaining fields are the same as
+in [Configuration](#configuration). Use standby first for a real clip and a
+restart check, then the actual policy and required validator slot count. Verify
+capacity with representative clip lengths before registering this deployment
+as ready. CPU workers propagate inference failures; they never invent text.
+
+The tests cover the worker protocol, CPU selection, artifact drift, private
+scratch cleanup, loading failure, deadline cancellation and replacement.
+Linux CI also checks the sandbox probes using Bubblewrap on Python 3.10 and
+3.12. Model loading is stubbed in these tests: they do not establish real-model
+latency, translation quality or competition eligibility.
+
 ## Local baseline standby
 
 For local baseline comparisons, use `umi-community-model-standby/1` with

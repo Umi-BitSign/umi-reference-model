@@ -40,6 +40,7 @@ jobs:
           uv run --locked ruff check \
             community/reboot_recovery.py tests/test_community_reboot_recovery.py \
             community/native_runtime.py community/service.py community/sidecar.py \
+            community/cpu_runtime.py community/cpu_worker.py tests/test_community_cpu_worker.py \
             community/worker_transport.py tests/test_community_service.py \
             tests/test_community_sidecar.py tests/test_community_worker_transport.py \
             tests/test_community_slot_rewarm.py \
@@ -54,6 +55,7 @@ jobs:
           uv run --locked ruff format --check \
             community/reboot_recovery.py tests/test_community_reboot_recovery.py \
             community/native_runtime.py community/service.py community/sidecar.py \
+            community/cpu_runtime.py community/cpu_worker.py tests/test_community_cpu_worker.py \
             community/worker_transport.py tests/test_community_service.py \
             tests/test_community_sidecar.py tests/test_community_worker_transport.py \
             tests/test_community_slot_rewarm.py \
@@ -72,3 +74,40 @@ jobs:
           export PYTHONPATH="$GITHUB_WORKSPACE/src:$RUNNER_TEMP/umi-service-helper/src"
           uv run --locked python -c 'import os; from pathlib import Path; import umi.model_sidecar as helper; assert Path(helper.__file__).resolve() == Path(os.environ["RUNNER_TEMP"]) / "umi-service-helper/src/umi/model_sidecar.py"'
           uv run --locked pytest --junitxml="$RUNNER_TEMP/reference-service.xml"
+
+  linux-cpu-worker:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        id: worker-python
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Install worker test tools
+        run: |
+          python -m pip install pytest==8.4.2
+          sudo apt-get update
+          sudo apt-get install -y apparmor apparmor-profiles bubblewrap
+          command -v bwrap
+          # Activate Ubuntu's packaged, executable-specific userns policy.
+          # Keep global AppArmor restrictions enabled.
+          profile=/usr/share/apparmor/extra-profiles/bwrap-userns-restrict
+          test -f "$profile"
+          sudo apparmor_parser -r "$profile"
+      - name: Verify CPU worker, sandbox and bounded transport
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+          UMI_TEST_WORKER_PYTHON: ${{ steps.worker-python.outputs.python-path }}
+        run: |
+          python -m pytest -W error tests/test_community_cpu_worker.py \
+            tests/test_community_worker_transport.py tests/test_community_bundle_verification.py
