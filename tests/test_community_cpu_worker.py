@@ -6,6 +6,7 @@ import hashlib
 import importlib
 import json
 import os
+import subprocess
 import sys
 import time
 import types
@@ -14,6 +15,12 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+@pytest.fixture
+def worker_python():
+    # The supervisor stays on 3.12; CI also launches workers with real 3.10.
+    return os.environ.get("UMI_TEST_WORKER_PYTHON", sys.executable)
 
 
 @pytest.fixture
@@ -252,7 +259,7 @@ def test_worker_refuses_writable_runtime_and_visible_marker(modules, tmp_path, m
         worker.sandbox_probes([tmp_path], marker)
 
 
-def test_actual_cpu_worker_loop_reuses_model_and_reaps_on_timeout(modules, tmp_path):
+def test_actual_cpu_worker_loop_reuses_model_and_reaps_on_timeout(modules, tmp_path, worker_python):
     _, worker = modules
     transport = importlib.import_module("worker_transport")
     script = tmp_path / "inert_cpu_loader.py"
@@ -277,7 +284,7 @@ def test_actual_cpu_worker_loop_reuses_model_and_reaps_on_timeout(modules, tmp_p
 
     async def run():
         backend = transport.WarmModelProcess(
-            [sys.executable, "-B", "-s", str(script)],
+            [worker_python, "-B", "-s", str(script)],
             environment={},
             cwd=tmp_path,
             model_revision="ab" * 32,
@@ -306,9 +313,7 @@ def test_actual_cpu_worker_loop_reuses_model_and_reaps_on_timeout(modules, tmp_p
     asyncio.run(run())
 
 
-def test_loading_failure_emits_no_readiness_or_diagnostic_on_protocol(tmp_path):
-    import subprocess
-
+def test_loading_failure_emits_no_readiness_or_diagnostic_on_protocol(tmp_path, worker_python):
     script = tmp_path / "failed_loader.py"
     script.write_text(
         "import os, sys\nfrom pathlib import Path\n"
@@ -320,7 +325,7 @@ def test_loading_failure_emits_no_readiness_or_diagnostic_on_protocol(tmp_path):
         f"cpu_worker.run_worker(Path('.'), Path('.'), {'ab' * 32!r})\n"
     )
     result = subprocess.run(
-        [sys.executable, "-B", "-s", str(script)], capture_output=True, check=False, timeout=5
+        [worker_python, "-B", "-s", str(script)], capture_output=True, check=False, timeout=5
     )
     assert result.returncode != 0
     assert result.stdout == b""
@@ -328,9 +333,8 @@ def test_loading_failure_emits_no_readiness_or_diagnostic_on_protocol(tmp_path):
 
 
 @pytest.mark.skipif(sys.platform != "linux", reason="Linux mount/network namespaces")
-def test_linux_bubblewrap_sandbox_probes(modules, tmp_path):
+def test_linux_bubblewrap_sandbox_probes(modules, tmp_path, worker_python):
     import shutil
-    import subprocess
 
     bwrap = shutil.which("bwrap")
     if bwrap is None:
@@ -343,6 +347,18 @@ def test_linux_bubblewrap_sandbox_probes(modules, tmp_path):
         "from cpu_worker import sandbox_probes; "
         f"sandbox_probes([Path({str(ROOT / 'community')!r})], Path({str(marker)!r}))"
     )
+    python_roots = json.loads(
+        subprocess.check_output(
+            [
+                worker_python,
+                "-B",
+                "-s",
+                "-c",
+                "import json, sys; print(json.dumps([sys.base_prefix, sys.prefix]))",
+            ],
+            timeout=5,
+        )
+    )
     command = [bwrap, "--unshare-all", "--die-with-parent", "--new-session", "--cap-drop", "ALL"]
     # Only the reviewed interpreter, standard shared libraries and code are visible.
     for path in dict.fromkeys(
@@ -350,8 +366,7 @@ def test_linux_bubblewrap_sandbox_probes(modules, tmp_path):
             Path("/usr"),
             Path("/lib"),
             Path("/lib64"),
-            Path(sys.base_prefix),
-            Path(sys.prefix),
+            *(Path(path) for path in python_roots),
             ROOT / "community",
         ]
     ):
@@ -367,7 +382,7 @@ def test_linux_bubblewrap_sandbox_probes(modules, tmp_path):
         "--chdir",
         "/",
         "--",
-        sys.executable,
+        worker_python,
         "-B",
         "-s",
         "-c",
@@ -388,3 +403,39 @@ def test_manifest_cannot_be_written_inside_an_inventoried_tree(modules, sealed):
                 roots, bundle=bundle, bundle_sha256=bundle_sha, output=directory / "runtime.json"
             )
         assert not (directory / "runtime.json").exists()
+
+
+def test_runtime_sealing_cli_in_worker_interpreter(modules, sealed, tmp_path, worker_python):
+    runtime, _ = modules
+    roots, bundle, bundle_sha, _, expected_revision = sealed
+    manifest = tmp_path / "cli-runtime.json"
+    result = subprocess.run(
+        [
+            worker_python,
+            "-B",
+            "-s",
+            str(ROOT / "community/cpu_runtime.py"),
+            "--code",
+            str(roots["code"]),
+            "--environment",
+            str(roots["environment"]),
+            "--python",
+            str(roots["python"]),
+            "--bundle",
+            str(bundle),
+            "--expected-bundle-sha256",
+            bundle_sha,
+            "--output",
+            str(manifest),
+        ],
+        capture_output=True,
+        timeout=5,
+        check=True,
+    )
+    assert json.loads(result.stdout)["model_revision"] == expected_revision
+    assert (
+        runtime.verify_runtime(roots, manifest=manifest, expected_revision=expected_revision)[
+            "model_bundle_sha256"
+        ]
+        == bundle_sha
+    )
