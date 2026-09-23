@@ -120,7 +120,10 @@ outbound access before loading model code. These probes do not replace reviewing
 the launcher and its mount list. See [Bubblewrap's sandbox documentation](https://github.com/containers/bubblewrap#sandboxing).
 
 On Ubuntu 24.04, the operator must also have the distribution's Bubblewrap
-AppArmor user-namespace profile installed and active. An error such as
+AppArmor user-namespace profile installed and active. Ubuntu 24.04 provides it
+in `apparmor-profiles` as
+`/usr/share/apparmor/extra-profiles/bwrap-userns-restrict`; it is not enabled
+merely by installing Bubblewrap. An error such as
 `loopback: Failed RTM_NEWADDR: Operation not permitted` occurs before the worker
 starts. Follow [Ubuntu's AppArmor guidance](https://discourse.ubuntu.com/t/understanding-apparmor-user-namespace-restriction/58007)
 for the host; do not remove network isolation to work around it.

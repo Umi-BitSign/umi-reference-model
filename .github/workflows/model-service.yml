@@ -93,11 +93,11 @@ jobs:
         run: |
           python -m pip install pytest==8.4.2
           sudo apt-get update
-          sudo apt-get install -y apparmor bubblewrap
+          sudo apt-get install -y apparmor apparmor-profiles bubblewrap
           command -v bwrap
           # Activate Ubuntu's packaged, executable-specific userns policy.
           # Keep global AppArmor restrictions enabled.
-          profile=/etc/apparmor.d/bwrap-userns-restrict
+          profile=/usr/share/apparmor/extra-profiles/bwrap-userns-restrict
           test -f "$profile"
           sudo apparmor_parser -r "$profile"
       - name: Verify CPU worker, sandbox and bounded transport
