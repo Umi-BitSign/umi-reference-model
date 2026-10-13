@@ -419,6 +419,18 @@
       "focused_tests_passed": 72,
       "stage_completion_observed": false,
       "held_out_quality_verified": false
+    },
+    {
+      "timestamp": "2026-10-13T20:30:15Z",
+      "description": "Full RGB run stopped at memory guard; masked-shape fresh restart launched",
+      "result": "First executable run exited1 after18updates/72exposures at unchanged6GiB MPS limit. Both resolution preflights passed126finitegradient tensors andpixelconditioning. Batchedguard preservedcoverage and reducedguard-component time93.17percent/92.78percent; not end-to-end speed. Post-update tensors below1GiB butdriver6421381120bytes, nextbackwardOOM. No trained checkpoint evaluation; incomplete infrastructurefailure, notqualityrejection. Partialoutputs/sourcearchives retained. Newfresh serial128/192 plan adds masked temporal/target buckets and clearsunusedMetal allocations; spatialaspect/dimensions,allrealframes,alltargets,corpus,schedule,rates,trainedchecks andqualitygates unchanged. CPUvalidlogit/loss/allparametergradient paritytested withdropoutdisabled; paddingchangestrainingRNGconsumption, notbitidenticaltrajectories. Metalvalid-outputparity requiredpreflight. Removed costlyuntrained generationonly.74focusedtests pass. Newowned session54899 observedlive atlaunch; memoryrecovery/preflight/progress/quality unobserved. GenericT5/freshvisual initialization unchanged; original/currentbaselineidentities,miner,protecteddata andconfirmations unchanged. CPU2,MPS6GiB,80GiBfloor,4GiBownedcache andautomatic50percentdutyafter2026-10-14T00:48:21Z retained.",
+      "failed_run": "runs/tiny-rgb-full-v2-bound/memory-failure.json",
+      "artifact": "runs/tiny-rgb-full-v3-buckets/plan.json",
+      "artifact_sha256": "df76a4dee3a125ee4de47903ea2158715995b79a6dc12e3bad78b8a3c098d5d9",
+      "focused_tests_passed": 74,
+      "stage_completion_observed": false,
+      "held_out_quality_verified": false,
+      "selected_model_changed": false
     }
   ],
   "failed_attempts": [

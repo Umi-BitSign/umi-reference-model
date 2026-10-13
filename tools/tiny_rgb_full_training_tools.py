@@ -114,3 +114,34 @@ def batched_gradient_receipt(model, torch) -> dict:
         }
         for group, numbers in grouped.items()
     }
+
+
+def masked_length_buckets(video, label, torch):
+    """Bound temporal/target shapes without changing real pixels or dropping tokens."""
+    frames = video.shape[1]
+    frame_size = next(
+        (
+            size
+            for size in (16, 32, 48, 64, 96, 128, 160, 192, 208, 256, 384, 512)
+            if size >= frames
+        ),
+        None,
+    )
+    if frames < 1 or frame_size is None:
+        raise ValueError("full RGB temporal bucket cannot truncate a clip")
+    padded = video.new_zeros(video.shape[0], frame_size, *video.shape[2:])
+    padded[:, :frames] = video
+    mask = torch.zeros(video.shape[0], frame_size, dtype=torch.bool, device=video.device)
+    mask[:, :frames] = True
+    target = None
+    if label is not None:
+        length = label.shape[1]
+        target_size = next(
+            (size for size in (8, 16, 24, 32, 48, 64, 80, 96, 128, 192, 256) if size >= length),
+            None,
+        )
+        if length < 1 or target_size is None:
+            raise ValueError("full RGB target bucket cannot truncate a reference")
+        target = label.new_full((label.shape[0], target_size), -100)
+        target[:, :length] = label
+    return padded, mask, target

@@ -15,6 +15,7 @@ from tiny_rgb_full_training_tools import (
     batched_gradient_receipt,
     decode_pixel_delta,
     encode_pixel_delta,
+    masked_length_buckets,
 )
 
 
@@ -86,3 +87,63 @@ def test_temporal_pixel_delta_is_lossless_for_every_byte_and_preserves_shape(kin
     restored = decode_pixel_delta(encode_pixel_delta(pixels))
     assert restored.dtype == np.uint8 and restored.shape == pixels.shape
     assert np.array_equal(restored, pixels)
+
+
+def test_masked_buckets_preserve_all_real_pixels_aspect_and_targets():
+    video = torch.randn(1, 17, 3, 32, 56)
+    label = torch.tensor([[4, 5, 6, 7, 1]])
+    padded, mask, target = masked_length_buckets(video, label, torch)
+    assert padded.shape == (1, 32, 3, 32, 56)
+    assert torch.equal(padded[:, :17], video)
+    assert torch.count_nonzero(padded[:, 17:]) == 0
+    assert mask[:, :17].all() and not mask[:, 17:].any()
+    assert target.shape == (1, 8)
+    assert torch.equal(target[:, :5], label) and (target[:, 5:] == -100).all()
+    assert masked_length_buckets(video, None, torch)[2] is None
+
+
+def test_masked_buckets_do_not_change_valid_logits_or_loss():
+    from tiny_rgb_language_model import TinyRgbLanguageTranslator
+    from tiny_rgb_model import TinyRgbConfig
+    from tiny_rgb_mps_safe import replace_native_gelu
+    from transformers import T5Config, T5ForConditionalGeneration
+
+    torch.manual_seed(317)
+    text = T5ForConditionalGeneration(
+        T5Config(
+            vocab_size=32,
+            d_model=32,
+            d_ff=64,
+            num_layers=1,
+            num_decoder_layers=1,
+            num_heads=4,
+            d_kv=8,
+            dropout_rate=0.0,
+            pad_token_id=0,
+            eos_token_id=1,
+            decoder_start_token_id=0,
+        )
+    )
+    candidate = TinyRgbLanguageTranslator(
+        text, TinyRgbConfig(width=32, heads=4, encoder_layers=1, decoder_layers=1, dropout=0.0)
+    ).eval()
+    replace_native_gelu(candidate)
+    video = torch.randn(1, 3, 3, 32, 56)
+    label = torch.tensor([[4, 5, 1]])
+    padded, mask, target = masked_length_buckets(video, label, torch)
+    plain = candidate(video, torch.ones(1, 3, dtype=torch.bool), label)
+    bucketed = candidate(padded, mask, target)
+    assert torch.allclose(plain.logits, bucketed.logits[:, :3], atol=2e-5, rtol=2e-5)
+    assert torch.allclose(plain.loss, bucketed.loss, atol=2e-5, rtol=2e-5)
+    plain.loss.backward()
+    before = {name: parameter.grad.clone() for name, parameter in candidate.named_parameters()}
+    candidate.zero_grad(set_to_none=True)
+    bucketed.loss.backward()
+    for name, parameter in candidate.named_parameters():
+        assert torch.allclose(before[name], parameter.grad, atol=2e-5, rtol=2e-5), name
+
+
+@pytest.mark.parametrize("frames,targets", ((0, 3), (513, 3), (3, 0), (3, 257)))
+def test_masked_buckets_refuse_truncation_or_empty_inputs(frames, targets):
+    with pytest.raises(ValueError, match="cannot truncate"):
+        masked_length_buckets(torch.zeros(1, frames, 3, 32, 56), torch.ones(1, targets), torch)

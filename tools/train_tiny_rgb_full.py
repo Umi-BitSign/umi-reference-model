@@ -16,7 +16,7 @@ from c5_full_coverage_mps import comparison
 from tiny_rgb_fit import ROOT, SIDES, RgbDutyCycle, gradient_receipt, metal_working_set_bytes
 from tiny_rgb_full_corpus import FULL_RECIPE, read_rows
 from tiny_rgb_full_run import checked_full_plan, lr_factor, training_inventory
-from tiny_rgb_full_training_tools import batched_gradient_receipt
+from tiny_rgb_full_training_tools import batched_gradient_receipt, masked_length_buckets
 from tiny_rgb_pixel_cache import PixelCache
 
 
@@ -77,21 +77,31 @@ class Arm:
         )
         from tiny_rgb_data import pixel_tensor
 
-        return pixel_tensor(pixels)[None], self.labels.get((row["source"], row["example_id"])), hit
+        video, mask, label = masked_length_buckets(
+            pixel_tensor(pixels)[None],
+            self.labels.get((row["source"], row["example_id"])),
+            self.torch,
+        )
+        return video, label, hit, mask
 
     def tensors(self, sample):
-        video, label, _ = sample
+        video, label, _, mask = sample
         video = video.to("mps")
-        mask = self.torch.ones(1, video.shape[1], dtype=self.torch.bool, device="mps")
-        return video, mask, label.to("mps") if label is not None else None
+        return video, mask.to("mps"), label.to("mps") if label is not None else None
 
     def backward(self, sample, divisor=1):
+        self.torch.mps.synchronize()
+        self.torch.mps.empty_cache()
         video, mask, label = self.tensors(sample)
         result = self.model(video, mask, label)
         if not self.torch.isfinite(result.loss):
             raise RuntimeError("full RGB loss is nonfinite")
         (result.loss / divisor).backward()
-        return float(result.loss)
+        loss = float(result.loss)
+        del result, video, mask, label
+        self.torch.mps.synchronize()
+        self.torch.mps.empty_cache()
+        return loss
 
     def preflight(self, rows, output):
         self.model.eval()
@@ -111,7 +121,8 @@ class Arm:
                     "short_side": self.side,
                     "example_id": row["example_id"],
                     "loss": loss,
-                    "frames": sample[0].shape[1],
+                    "real_frames": int(sample[3].sum()),
+                    "padded_frames": sample[0].shape[1],
                     "pixel_shape": list(sample[0].shape[-2:]),
                     "optimizer_updates": 0,
                     "gradient_coverage": batched,
@@ -141,14 +152,33 @@ class Arm:
         def condition():
             video, mask, label = self.tensors(sample)
             with self.torch.no_grad():
-                normal = self.model(video, mask, label).logits
+                normal_result = self.model(video, mask, label)
+                normal = normal_result.logits
+                frames = int(mask.sum())
+                tokens = int((label != -100).sum())
+                plain = self.model(video[:, :frames], mask[:, :frames], label[:, :tokens])
+                padding_difference = float((plain.logits - normal[:, :tokens]).abs().max())
+                padding_loss_difference = float((plain.loss - normal_result.loss).abs())
                 altered = self.model(-video, mask, label).logits
                 difference = float((normal - altered).abs().max())
+            if (
+                not math.isfinite(padding_difference)
+                or not math.isfinite(padding_loss_difference)
+                or padding_difference > 1e-3
+                or padding_loss_difference > 5e-4
+            ):
+                raise RuntimeError("full RGB masked padding changed valid Metal outputs")
             if not math.isfinite(difference) or difference <= 1e-6:
                 raise RuntimeError("full RGB pixels do not condition the language decoder")
-            return difference
+            return {
+                "negated_pixel_maximum_logit_change": difference,
+                "masked_padding_maximum_logit_difference": padding_difference,
+                "masked_padding_loss_difference": padding_loss_difference,
+                "padding_probe_real_frames": frames,
+                "padding_probe_real_tokens": tokens,
+            }
 
-        receipt["negated_pixel_maximum_logit_change"] = self.duty.run(condition)
+        receipt.update(self.duty.run(condition))
         append(
             output / "preflight.jsonl", {**receipt, "optimizer_updates": 0, **self.duty.receipt()}
         )
@@ -187,6 +217,8 @@ class Arm:
                 return self.tokenizer.decode(tokens[0].cpu(), skip_special_tokens=True)
 
             hypothesis = self.duty.run(predict)
+            self.torch.mps.synchronize()
+            self.torch.mps.empty_cache()
             reference = normalize(row["reference"])
             edits = distance(reference, normalize(hypothesis))
             result = {
@@ -281,15 +313,8 @@ def main() -> None:
         arm = Arm(torch, plan, side, tokenizer, labels, cache, duty)
         if preflights[side]["use_batched_guard"]:
             arm.guard = batched_gradient_receipt
-        initial = arm.evaluate(0, output)
-        append(
-            output / "initial-model.jsonl",
-            {
-                "short_side": side,
-                "initial_vs_selected": comparison(controls["selected_parent"], initial),
-                **duty.receipt(),
-            },
-        )
+        # Zero-update numerical and conditioning proofs are supplied by preflight.
+        # Keep all five trained checkpoint evaluations and fixed controls unchanged.
         seen = set()
         for start in range(0, len(schedule), FULL_RECIPE["gradient_accumulation"]):
             arm.model.train()

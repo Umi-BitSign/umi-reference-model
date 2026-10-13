@@ -17,6 +17,14 @@ from c5_full_coverage_mps import GATES, load_training
 from tiny_rgb_fit import ROOT, SIDES
 from tiny_rgb_full_corpus import FULL_RECIPE, full_schedule, read_rows, validate_split
 
+MEMORY_POLICY = {
+    "temporal_and_target_buckets": True,
+    "preserve_spatial_aspect_and_dimensions": True,
+    "clear_unused_mps_allocations": "before_and_after_each_backward_and_after_each_evaluation_clip",
+    "initial_untrained_generation": False,
+    "real_frames_or_targets_dropped": False,
+}
+
 
 def sources() -> dict[str, str]:
     names = (
@@ -124,6 +132,7 @@ def checked_full_plan(path: Path) -> dict:
         or plan["learned_feature_inputs"]
         or plan["c5_teacher_targets"]
         or plan["runtime_binding"] != runtime_binding()
+        or plan.get("memory_policy") != MEMORY_POLICY
     ):
         raise ValueError("full RGB immutable implementation or scientific plan changed")
     snapshot = json.loads(path.with_name("source-snapshot").joinpath("manifest.json").read_text())
@@ -179,6 +188,7 @@ def freeze(proposal_path: Path, audit_dir: Path, budget_path: Path, output: Path
             "gpu_budget_policy": str(budget_path.resolve().relative_to(ROOT)),
             "miner_mode": "user_authorized_maintenance",
             "miner_health_claim": False,
+            "memory_policy": dict(MEMORY_POLICY),
             "cache_policy": {
                 "codec": "uint8_modulo_temporal_delta",
                 "training_minimum_repeats": 12,
