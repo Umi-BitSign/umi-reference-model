@@ -375,6 +375,17 @@
       "repaired_gradient_comparisons_sha256": "14599cf8f4a85a7405091f15e9f65e631d0327ac4917b064250a439922605421",
       "focused_tests_passed": 41,
       "asl_quality_verified": false
+    },
+    {
+      "timestamp": "2026-10-13T17:27:46Z",
+      "description": "Numerically corrected32-pass RGB fit completed without a passing gate; horizon-only256-pass replay launched",
+      "result": "Correctedbotharmscompleted768updates each,576fit/wrong-video predictions and126finiteparametergradients. FinaltrainWER128=5.49051 with0exact,192=2.97804 with1exact; allgatesfailed. Finalteacherforcedloss2.25294/2.05622 improves butfreegenerationstillrepeats; notbaseline-comparable orheldout quality. Wrong-videoWERdelta+1.47166/-0.30886, noresolutionwinner. MPSactive899.69s,idle0,maxdriver5089492992bytes within6GiB. Newlyfrozen256epochperarm follow-up reuses exact24cases,pixelledger,frameindices,configuration, freshvisual/bridge initialization, pinnedT5weights,rates,dropout,numericalandfitgates. No diagnosticweightoroptimizerwarmstart. Onlyhorizonandcheckcadencechange, adding64/128/256whilepreservingoldchecks;6144updatesperarm. Exactpixelcachesreused,0newpixelbytes. Forty-sixfocusedtests pass,includingguardagainstchangedrates,qualitythresholds,dropoutormissingoldchecks. Launcherconfirmedliveatlaunch; completion/fitqualityunobserved. Selected/current/original baselines,miner,protecteddataandconfirmations unchanged; automatic50percentGPUdutyafter2026-10-14T00:48:21Z retained.",
+      "evaluation": "checkpoints/tiny-rgb-fit-v2-portable/decision.json",
+      "evaluation_sha256": "8cdad0b790d169de0817396eab9349f5750a78913129e5edc434666c2a29334d",
+      "artifact": "runs/tiny-rgb-fit-v3-long/plan.json",
+      "artifact_sha256": "9cc19560ed9adaaeb3abe3bb6a633f1ff0341ff9eb61657a21343570645683a9",
+      "focused_tests_passed": 46,
+      "asl_quality_verified": false
     }
   ],
   "failed_attempts": [

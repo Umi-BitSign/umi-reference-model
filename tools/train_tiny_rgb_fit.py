@@ -330,7 +330,7 @@ def main() -> None:
                 json.dumps(summaries, indent=2, sort_keys=True) + "\n"
             )
             print(json.dumps(summary), flush=True)
-            if epoch in (16, 32):
+            if epoch in RECIPE["checkpoints_at_epochs"]:
                 storage(data_dir, counts["total"] * 4 + 1024**2)
                 checkpoint = output / f"rgb-cap{side}-epoch{epoch:02d}.safetensors"
                 duty.run(

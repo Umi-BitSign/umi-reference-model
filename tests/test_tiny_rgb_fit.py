@@ -12,6 +12,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 import tiny_rgb_fit
 from benchmark_fleurs_dev import sha256
+from freeze_tiny_rgb_long_fit import validate_horizon_change
 from tiny_rgb_fit import load_pixels, select_fit_cases, verify_backend_comparisons
 from train_tiny_rgb_fit import fit_summary
 
@@ -197,3 +198,27 @@ def test_backend_gate_requires_actual_full_parameter_cpu_metal_parity(bad):
     else:
         with pytest.raises(ValueError, match="RGB backend"):
             verify_backend_comparisons([record], expected)
+
+
+@pytest.mark.parametrize("bad", (None, "learning_rate", "fit_gate", "missing_old_check", "dropout"))
+def test_long_fit_changes_horizon_only_and_preserves_original_gates(bad):
+    import copy
+
+    current = copy.deepcopy(tiny_rgb_fit.RECIPE)
+    previous = copy.deepcopy(current)
+    previous["epochs"] = 32
+    previous["checks_at_epochs"] = [0, 1, 4, 8, 16, 32]
+    del previous["checkpoints_at_epochs"]
+    if bad == "learning_rate":
+        current["language_learning_rate"] *= 2
+    elif bad == "fit_gate":
+        current["fit_gate_mean_wer"] = 1.0
+    elif bad == "missing_old_check":
+        current["checks_at_epochs"].remove(16)
+    elif bad == "dropout":
+        current["dropout"] = 0.0
+    if bad is None:
+        validate_horizon_change(previous, current)
+    else:
+        with pytest.raises(ValueError, match="change only training horizon"):
+            validate_horizon_change(previous, current)

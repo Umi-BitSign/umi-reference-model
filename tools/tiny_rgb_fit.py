@@ -18,8 +18,9 @@ SIDES = (128, 192)
 SEED = 317
 RECIPE = {
     "activation_implementation": "portable_exact_gelu",
-    "epochs": 32,
-    "checks_at_epochs": [0, 1, 4, 8, 16, 32],
+    "epochs": 256,
+    "checks_at_epochs": [0, 1, 4, 8, 16, 32, 64, 128, 256],
+    "checkpoints_at_epochs": [32, 128, 256],
     "visual_learning_rate": 3e-4,
     "language_learning_rate": 5e-5,
     "weight_decay": 0.01,
@@ -115,6 +116,7 @@ def sources() -> dict[str, str]:
         "tiny_rgb_mps_safe.py",
         "probe_tiny_rgb_numerics.py",
         "probe_tiny_rgb_operations.py",
+        "freeze_tiny_rgb_long_fit.py",
     )
     return {f"tools/{name}": sha256(ROOT / "tools" / name) for name in names}
 
