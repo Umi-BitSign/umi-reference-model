@@ -466,6 +466,20 @@
       "stage_completion_observed": false,
       "held_out_quality_verified": false,
       "selected_model_changed": false
+    },
+    {
+      "timestamp": "2026-10-13T23:04:47Z",
+      "description": "User-designated C5 winner becomes working training baseline; full-translator qualification launched",
+      "result": "Supplied00a74422 bundle identity,all466archive/stagedfiles andcomponentchecksums verified. CPU482tensor auditfindsmatchingparent topology andfinitevalues,withdecoder andencodertrained. Ownerreports43percentC5 aggregategain; notlocalWERorcomponentgain. ActiveC5_BASELINE_REFERENCE.json nowtargets winner whilehistoricoriginal/currentbestfieldsandservingcandidate remainunchanged. New48hour resourcewindow through2026-10-15T22:47:28Z permitsunthrottledcompute andframeworkdefaultallocator,noold6GiBcap; then50percentGPUduty. Privatecertification/servingchangesnotauthorized. OldcustomRGBownedPID86400 verifiedcwd/argvthenSIGINTstoppedafter16384saved/evaluatedcheckpoint:terminal1KeyboardInterrupt,18596exposures/4649updates/5264unique,192armunstarted. Allthreeobservedhistoricalqualitychecksfailed; latestHow2.397270/F1.354937,maxdriver3.26GiB. Incompletepriorityhandoff,notcompletedarchitectureverdict; allrecords preserved. WinnerdecoderCPUpreflightpassed167539584trainable/670950728total withzeroupdates,originalsourcearchived.355generatedpycfilesrecoverablyquarantined,noassetsmoved;futurebytecodedisabled. FullfunctionaltranslatorCPU/Metalgradientparity andAdamWmomentmemoryprobe session86887 launched;13provenunusedauxiliaryparametersfrozen,FSweights/routerunchanged. Completion/parityunobserved; nooptimizerupdatesornewqualitywin. Sourcepinnedwhilelive,nextcheck30minuteslater. Seventeenreference/resource/scope tests pass.",
+      "working_reference": "C5_BASELINE_REFERENCE.json",
+      "model_bundle_sha256": "00a74422d9c17a4add1c562bcf54abe4111f26288a33c5168ed458b13b233b91",
+      "translator_sha256": "6a2926c77f0912305e16701287340612512015c007f89c050114a575bcd02050",
+      "custom_stop_receipt": "runs/tiny-rgb-full-v3-buckets/stop-receipt.json",
+      "winner_probe_output": "runs/c5-winner-full-preflight-v1/mps.json",
+      "optimizer_updates_on_winner": 0,
+      "new_quality_win_verified": false,
+      "selected_serving_model_changed": false,
+      "miner_modified": false
     }
   ],
   "failed_attempts": [
