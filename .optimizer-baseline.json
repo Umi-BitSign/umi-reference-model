@@ -431,6 +431,16 @@
       "stage_completion_observed": false,
       "held_out_quality_verified": false,
       "selected_model_changed": false
+    },
+    {
+      "timestamp": "2026-10-13T21:00:20Z",
+      "description": "Masked full RGB restart exceeds former memory failure point",
+      "result": "Owned session54899 remainslive at128-cap476updates/1904exposures/1519unique. Both resolutionpreflights passed validMetalpaddingloss/logitparity,126gradientcoverage andpixelconditioning. Maxobserveddriver3147104256bytes=2.93GiB belowunchanged6GiB; active430.72seconds,noartificialidle withinapprovedwindow. Batchedguard componentmeets5percentthreshold withsamecoverage. This is observedinfrastructure recovery sofar,not full-run stabilityproof,generalization orbaselinewin. First2048-exposurequalityevaluationpending. Immutableplan/source/runtime bindings retained; no edits topinnedcode whilelive. Original/current selectedbaseline,miner andconfirmations unchanged. Nextscheduledobservation30minuteslater; automatic50percentGPUdutyafter2026-10-14T00:48:21Z retained.",
+      "artifact": "runs/tiny-rgb-full-v3-buckets/plan.json",
+      "artifact_sha256": "df76a4dee3a125ee4de47903ea2158715995b79a6dc12e3bad78b8a3c098d5d9",
+      "stage_completion_observed": false,
+      "held_out_quality_verified": false,
+      "selected_model_changed": false
     }
   ],
   "failed_attempts": [
