@@ -321,6 +321,15 @@
       "proposed_schedule_sha256": "61fa933848e3c6164843c18cec047dbdaaa0d015c3bad49e0ca6eecbbc76b888",
       "focused_tests_passed": 31,
       "quality_gain_verified": false
+    },
+    {
+      "timestamp": "2026-10-13T05:06:26Z",
+      "description": "Stationary replay compatible runner verified and frozen-plan pipeline launched",
+      "result": "New runner supports48800 unit-weight exposures,12200 accumulated updates,all7529 unique training identities andeight checkpoint evaluations on142 already-open diagnostic clips. It binds one training-only teacher per unique source/id and rejects changed reference/cache/role/weight/position. Both fixed controls must reproduce284 prior MPS hypotheses and seven FLEURS CPU hypotheses before updates. The prior run did not persist historical teacher hashes, so newly bound teacher bytes must all reproduce current fixed-parent prefix logits before training. New source files preserve the prior frozen implementations and data; all46 focused tests,lint andcompilation pass. The pipeline was verified live at launch and must pass freeze,Metal preflight,controls andallteacher checks beforeupdates. No newly observed quality result or promotion. This longer schedule changes repetition,ordering,loss normalization andlearning-rate horizon; notanequalupdate causal comparison. Minority overfitrisk,original/selected model gates andindependentconfirmation requirements remain. CPU2,MPS6GiB,nominerchanges andautomaticGPU50percent duty at2026-10-14T00:48:21Z are retained.",
+      "artifact": "runs/c5-stationary-mps-v1/plan.json",
+      "focused_tests_passed": 46,
+      "stage_completion_observed": false,
+      "quality_gain_verified": false
     }
   ],
   "failed_attempts": [
