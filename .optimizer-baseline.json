@@ -330,6 +330,18 @@
       "focused_tests_passed": 46,
       "stage_completion_observed": false,
       "quality_gain_verified": false
+    },
+    {
+      "timestamp": "2026-10-13T06:07:31Z",
+      "description": "User-directed fully custom low-input-surface RGB prototype implemented",
+      "result": "Built a2.588624million parameter directRGB CNN/spatial-query/temporal/UTF8-byte-decoder model withallweights randomlyinitialized andtrainable,no pretrained image/language models,learnedfeature inputs orteacher distillation. Aspectpreserving CPUresize precedes firstconvolution; matched shortside128/192 keeps identicalparametercount while128has55.6percent fewerpixels. Streamingdecoder retains complete12.5fps clips andfails ratherthantruncatingoversized signing. Fifteen custommodel/reader tests pass. CPUonly syntheticconditioning check completed200updates,loss5.50079to0.00289,exactred/blue words andswappedvisualinputsswappedoutputs. NoASLexamples,GPU use,savedweights orqualityclaim. This is implementation evidence only; realtrainingonlyASL fitting andsourceheldoutgeneralization remain required. A rawclip-byte audit is launched fromall7529 protectedeligible identities withoutloadingC5features. Newstrictscratch track supersedes oldergenericpretrain fit prerequisite and128deferral peruserrequest. Priorstationary pipeline remains separate: itsfirst30minutecheck provedfrozenplan,Metalpreflight and284controlparities,with5120/7529teacherprefixes validated beforeupdates; no learnedqualityresult observedatthatcheck. Selected/original baselines andminer remain unchanged.",
+      "artifact": "runs/tiny-rgb-cpu-smoke-v1.json",
+      "artifact_sha256": "83213d2595378b0d937c80a93deb04a01945a490f21890203672e00bdd7e0484",
+      "model_parameters": 2588624,
+      "custom_model_and_reader_tests_passed": 15,
+      "focused_tests_passed": 61,
+      "asl_quality_verified": false,
+      "stationary_plan_sha256": "c1c2a758a941e93bba4779c480628fe1e8571b1ed75833a033602eb02c6eeb9d"
     }
   ],
   "failed_attempts": [
