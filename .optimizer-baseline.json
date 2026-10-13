@@ -300,6 +300,15 @@
       "evaluation": "runs/c5-all-source-corpus-v2/audit.json",
       "evaluation_sha256": "f6cae0496685b28642e8cee0d946738f3b604cc65f6c1615e6498d3f48f54b86",
       "training_manifest_sha256": "6c2724e89e4aeb50b748651f5ce914bc89ac5874fe889dbbc198e14411b825e9"
+    },
+    {
+      "timestamp": "2026-10-13T03:01:22Z",
+      "description": "Frozen protected full-corpus Metal retention pipeline launched",
+      "result": "A new plan covers 7529 eligible training clips and 142 already-open diagnostic cases. First512 coverage includes all four domains and 38-39 clips per each of eight How2Sign signers. Selected merged-parent zero-output adapters use native224 legacy stride2 training inputs, crop168 calibrated legacy stride2 evaluation, fixed direct projections, visual/decoder rates 1e-5/3e-5 and frozen-parent training-prefix KL. Original and selected controls share the evaluation inputs; this is not untouched original full-rate inference or an isolated order-only comparison with the old CPU experiment. The pipeline was confirmed live at launch; preparation, finite-gradient preflight and exact FLEURS CPU/MPS parent-hypothesis parity must pass before optimizer updates. No quality result or promotion yet. CPU2 and 6GiB MPS limits remain; the approved GPU window automatically returns to50percent duty at2026-10-14T00:48:21Z. User-authorized miner maintenance is recorded without a serving-health claim. Source SHA pins remain frozen while the job is live.",
+      "artifact": "runs/c5-full-coverage-mps-v1/plan.json",
+      "artifact_sha256": "a9c220e3bbdeecbb674c78cae1933b5ae2826f9a980397a3eee1fcd7767a2b05",
+      "focused_tests_passed": 25,
+      "quality_verified": false
     }
   ],
   "failed_attempts": [
