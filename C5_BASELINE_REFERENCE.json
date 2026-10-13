@@ -1,0 +1,40 @@
+{
+  "schema": "umi-studio-working-baseline-reference/1",
+  "status": "active_training_reference",
+  "authority": "User designated the released C5 winner as the baseline to beat and requested further training.",
+  "model_bundle_sha256": "00a74422d9c17a4add1c562bcf54abe4111f26288a33c5168ed458b13b233b91",
+  "bundle_root": "artifacts/c5-winner-00a74422-intake/bundle",
+  "archive_sha256": "76b837d8285e21d3eae505fd6a7b438ca413a57eddc608317a4ca149c287a078",
+  "manifest_file_sha256": "405ef315c2897321869e2815df6f358fd2f13ba8892c586cf2e837a52775b5e7",
+  "translator_checkpoint": "models/checkpoint-11625/model.safetensors",
+  "translator_checkpoint_sha256": "6a2926c77f0912305e16701287340612512015c007f89c050114a575bcd02050",
+  "fingerspelling_checkpoint": "models/fs/fs-fsboard.pt",
+  "fingerspelling_checkpoint_sha256": "e717af9496c07c4f0d252f087b33362d37e39c99b14aa2ab2d64869aa554d60e",
+  "router_sha256": "336b8ef35541fd54df50813906453ab917d5cded9a799f27adcd255ff2fbbf1b",
+  "router_config_sha256": "4b69ffc8f3453279993975040133e54ad7e306e40897609d2133d020f17e0462",
+  "declared_bundle_license": "CC-BY-SA-4.0",
+  "generation": {
+    "num_beams": 5,
+    "max_length": 2048,
+    "length_penalty": 0.6,
+    "no_repeat_ngram_size": 16
+  },
+  "reported_C5_gain": {
+    "percent": 43,
+    "source": "user report",
+    "metric_definition": "not yet independently verified; do not convert into local WER or component-level gains"
+  },
+  "verified_local_intake": {
+    "archive_bytes": 2969876480,
+    "files": 466,
+    "all_manifest_sizes_and_checksums_verified": true,
+    "intake_receipt": "runs/c5-winner-intake-v1/receipt.json",
+    "intake_receipt_sha256": "68ce2908dc8f385ff675046ff1998d1d9fc4746b038e9c5c54ba24bb145b0a63",
+    "staging_receipt": "runs/c5-winner-intake-v1/staging.json",
+    "staging_receipt_sha256": "15707b741281ffef23055d959bed8482ed1e760c02e134921b5cd1220f142e92"
+  },
+  "historical_original_and_selected_comparisons_preserved": true,
+  "installed_into_miner": false,
+  "local_quality_and_runtime_verified": false,
+  "initial_training_scope": "Fine-tune the translator from the winner weights, with the fingerspelling weights and routing policy frozen. Evaluate the complete composite before any serving promotion. Use only the protected-eligible training corpus, never local evaluation references."
+}

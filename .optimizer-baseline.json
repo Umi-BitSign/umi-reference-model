@@ -3,6 +3,19 @@
   "created_at": "2026-10-09T13:48:10Z",
   "benchmark_command": "artifacts/baseline-6fe8df59/.runtime/bin/python tools/evaluate_fresh_lowres_tuning.py --inventory runs/fresh-lowres-v1/tuning-inventory-v2.jsonl --training-inventory runs/fresh-lowres-v1/training-inventory.jsonl --checkpoint checkpoints/fresh-lowres-v2-decoder-step1024-v2/trainable.safetensors --run checkpoints/fresh-lowres-v2-decoder-step1024-v2/run.json --output <new-run-ledger-path> --miner-maintenance-mode --device mps",
   "improvement_threshold_percent": 5.0,
+  "working_training_reference": {
+    "registry": "C5_BASELINE_REFERENCE.json",
+    "model_bundle_sha256": "00a74422d9c17a4add1c562bcf54abe4111f26288a33c5168ed458b13b233b91",
+    "authority": "User designated the released C5 winner as the new baseline to beat and requested further training.",
+    "reported_C5_gain_percent": 43,
+    "reported_gain_is_independently_reproduced": false,
+    "local_quality_and_runtime_verified": false,
+    "new_resource_policy": "runs/c5-resource-policy-v2-certification48/gpu-budget.json",
+    "unthrottled_compute_expires_at": "2026-10-15T22:47:28Z",
+    "next_training_scope": "full functional translator, preserving separate fingerspelling component and router; qualifying numerics before updates",
+    "historical_original_and_current_baseline_fields_preserved": true,
+    "miner_modified": false
+  },
   "original_baseline_commit": "4bf69e3e4e381e578557f3f5069ba645b3889250",
   "original_worktree_fingerprint": {
     "tracked_diff_sha256": "c2f986f400fd36c162effdb3ab0ae8d3a6bd048702e012239be1e2d71f17ff6c",
