@@ -409,6 +409,16 @@
       "delta_pixel_cache_bytes": 174214543,
       "focused_tests_passed": 65,
       "held_out_quality_verified": false
+    },
+    {
+      "timestamp": "2026-10-13T19:46:18Z",
+      "description": "All-source RGB executable plan, owned cache and serial Metal pipeline launched",
+      "result": "CPU2 auditpassedall7529training and142open-evaluation clipbytes,headers andcomplete targets;sampledframes1-197,targettokens<=80,no truncation. Actualplanbinds24sourcefiles,criticalruntime/packageversions,language/controlassetbytes andexpiringGPUpolicy. Serial128/192arms useidenticalfreshvision/bridge andgenericT5,48800balancedexposures/12200accumulatedupdates perarm. Bothresolutionzero-updategradient,pixelconditioning andmemorypreflightswithfutureAdamWmomentreserve required beforeupdates. Batchedgradguard mustmatchreferencecoverageandimprove>=5percent orreferenceguardremains. Owned4GiB losslesspixelcache checksvideo,payload,header androle;checksumverifiedown-file evictions preserveoriginalclips. Cacheonlyhighrepeattraining/eval inputs; noeligibleclipdropped. All72focusedtests pass. Launcherconfirmedliveatlaunch,preflightcompletion/updates/qualitynotyetobserved. Firstunusedexecutionfreeze preserved andnottrained becausefullruntimebindingwasmissing. Selected/current/originalbaselines,miner,protectedmaterial andconfirmations unchanged. CPU2,MPS6GiB,80GiBphysicaldiskfloor andautomatic50percent dutyafter2026-10-14T00:48:21Z retained. Sourcespinned whilelive; no promotionorcompletionclaim.",
+      "artifact": "runs/tiny-rgb-full-v2-bound/plan.json",
+      "artifact_sha256": "2e7d15861796f8eb1ff1055cae5dad79217c362fc40c2c6054d3a50045d6d12e",
+      "focused_tests_passed": 72,
+      "stage_completion_observed": false,
+      "held_out_quality_verified": false
     }
   ],
   "failed_attempts": [
