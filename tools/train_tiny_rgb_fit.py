@@ -82,6 +82,7 @@ def main() -> None:
     from tiny_rgb_data import pixel_tensor
     from tiny_rgb_language_model import TinyRgbLanguageTranslator
     from tiny_rgb_model import TinyRgbConfig
+    from tiny_rgb_mps_safe import replace_native_gelu
     from transformers import AutoTokenizer, T5ForConditionalGeneration
 
     torch.set_num_threads(2)
@@ -147,7 +148,11 @@ def main() -> None:
         # Reset after loading language weights to isolate the visual initialization seed.
         torch.manual_seed(SEED)
         model = TinyRgbLanguageTranslator(text_model, TinyRgbConfig(**plan["visual_config"]))
+        if replace_native_gelu(model) != 6:
+            raise RuntimeError("RGB repaired replay activation count differs")
         digest = initialization_digest(model)
+        if digest != plan["backend"]["visual_initialization_sha256"]:
+            raise RuntimeError("RGB replay initialization differs from CPU/Metal parity probe")
         if initial_digest is not None and digest != initial_digest:
             raise RuntimeError("RGB resolution arms differ in initial visual/bridge weights")
         initial_digest = digest

@@ -364,6 +364,17 @@
       "pixel_cache_bytes": 284120302,
       "focused_tests_passed": 33,
       "asl_quality_verified": false
+    },
+    {
+      "timestamp": "2026-10-13T16:50:47Z",
+      "description": "Completed custom RGB fit diagnosed as numerically invalid; equivalent Metal activation repair verified and replay launched",
+      "result": "Original128/192 fit completed768updates perarm and576training/wrong-video predictions; allgatesfailed,finalWER5.63320/2.84746 withone/zeroexacttranslations. These are notheldout orarchitecture conclusions: matchedCPU/Metal auditfound twelveCNN gradients corrupted despiteforwardparity. CPUtotalgradientnorm114-140 versusMetal576494-5196695. Isolatedpinned nativeGELU backwardmishandlesstridedupstreamgradient; contiguousGELU andchannelRMScontrolsagree. Equivalentexplicit erf GELU keeps everyparameter/weight unchanged andrepairs fourfullmodelpairedcases: maxrelativegradienterror0.0018421, maxlogiterror0.00058175, matching113-140 totalnorms. Mandatorybackendgatebinds all126parametergradients, exactapprovedcases, losses/logits andunchangedinitialization, with0.5percentmaxgradienterror. Forty-onefocusedtests pass. Newlyfrozenpairedreplayconfirmedliveatlaunch, same24trainingcases,configuration,languagebytes,rates,dropout,32epochs,samplingandfitgates; onlyactivationimplementationchanges. Repairedfit completion andqualitynotyetobserved. Oldrecords,snapshots,weights,original/currentbaselines,selectedmodel,minerandconfirmationspreserved. No unrelatedhistoricalexperimentinvalidated, noqualitypromotionornewdownscalingwin. GPUwindowexpiryandresourceguardsretained.",
+      "artifact": "runs/tiny-rgb-fit-v2-portable/plan.json",
+      "artifact_sha256": "db472e15538eb7c11ef6529f4208b3b08f8d93946a8ea3b2290581f4cf50eebf",
+      "invalid_fit_decision_sha256": "e5a75013916db2061b5c305dd216e3313ca4af5c5325d273b207d4879aaefae8",
+      "repaired_gradient_comparisons_sha256": "14599cf8f4a85a7405091f15e9f65e631d0327ac4917b064250a439922605421",
+      "focused_tests_passed": 41,
+      "asl_quality_verified": false
     }
   ],
   "failed_attempts": [

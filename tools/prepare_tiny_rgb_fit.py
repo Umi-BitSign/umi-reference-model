@@ -13,7 +13,17 @@ from benchmark_fleurs_dev import sha256
 from c5_experiment_sources import archive_sources
 from c5_full_coverage_mps import load_training
 from tiny_rgb_data import decode_rgb_video
-from tiny_rgb_fit import RECIPE, ROOT, SEED, SIDES, private_path, select_fit_cases, sources, storage
+from tiny_rgb_fit import (
+    RECIPE,
+    ROOT,
+    SEED,
+    SIDES,
+    checked_backend,
+    private_path,
+    select_fit_cases,
+    sources,
+    storage,
+)
 from tiny_rgb_model import TinyRgbConfig
 from train_fresh_lowres import language_artifact_receipt
 
@@ -94,6 +104,9 @@ def main() -> None:
         if p.is_file() and p.suffix in (".json", ".model", ".safetensors")
     }
     examples = select_fit_cases(rows)
+    backend = checked_backend(examples, ROOT / "runs/tiny-rgb-fit-v1/plan.json")
+    for label in ("original_plan", "receipt_path", "comparisons_path"):
+        dependency_hashes[backend[label]] = sha256(ROOT / backend[label])
     source_hashes = sources()
     output.mkdir(parents=True)
     data_dir.mkdir(parents=True)
@@ -140,6 +153,7 @@ def main() -> None:
         "short_sides": list(SIDES),
         "visual_config": asdict(TinyRgbConfig()),
         "examples": examples,
+        "backend": backend,
         "raw_inventory": str(inventory.relative_to(ROOT)),
         "data_dir": str(data_dir.relative_to(ROOT)),
         "source_sha256": source_hashes,

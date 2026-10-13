@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SIDES = (128, 192)
 SEED = 317
 RECIPE = {
+    "activation_implementation": "portable_exact_gelu",
     "epochs": 32,
     "checks_at_epochs": [0, 1, 4, 8, 16, 32],
     "visual_learning_rate": 3e-4,
@@ -111,6 +112,9 @@ def sources() -> dict[str, str]:
         "c5_coverage_schedule.py",
         "c5_face_learning_pilot.py",
         "c5_experiment_sources.py",
+        "tiny_rgb_mps_safe.py",
+        "probe_tiny_rgb_numerics.py",
+        "probe_tiny_rgb_operations.py",
     )
     return {f"tools/{name}": sha256(ROOT / "tools" / name) for name in names}
 
@@ -122,6 +126,87 @@ def storage(data_dir: Path, prospective_bytes: int = 0) -> None:
     used = sum(p.stat().st_size for p in data_dir.rglob("*") if p.is_file())
     if used + prospective_bytes > RECIPE["data_budget_bytes"] - headroom:
         raise RuntimeError("RGB experiment reached transformed-pixel budget")
+
+
+def verify_backend_comparisons(records: list[dict], expected: set[tuple[int, str]]) -> dict:
+    identities = {(r["short_side"], r["example_id"]) for r in records}
+    if len(records) != len(expected) or identities != expected:
+        raise ValueError("RGB backend parity cases differ from matched eligible fit cases")
+    worst = 0.0
+    for record in records:
+        differences = record["gradient_differences"]
+        if (
+            record["optimizer_updates"] != 0
+            or record["dropout_enabled"]
+            or record["portable_gelu_replacements"] != 6
+            or len(differences) != 126
+            or len({r["parameter"] for r in differences}) != 126
+            or abs(record["cpu_loss"] - record["mps_loss"]) > 5e-4
+            or record["logit_max_abs_difference"] > 1e-3
+            or any(
+                not math.isfinite(record[k])
+                for k in (
+                    "cpu_loss",
+                    "mps_loss",
+                    "cpu_total_gradient_norm",
+                    "mps_total_gradient_norm",
+                    "logit_max_abs_difference",
+                )
+            )
+            or abs(record["mps_total_gradient_norm"] / record["cpu_total_gradient_norm"] - 1) > 5e-3
+        ):
+            raise ValueError("RGB backend loss or gradient coverage parity failed")
+        for gradient in differences:
+            error = gradient["relative_l2_error"]
+            if not gradient["finite"] or not math.isfinite(error) or not 0 <= error <= 5e-3:
+                raise ValueError("RGB backend per-parameter gradient parity failed")
+            worst = max(worst, error)
+    return {
+        "comparisons": len(records),
+        "maximum_relative_gradient_error": worst,
+        "maximum_allowed_relative_gradient_error": 5e-3,
+    }
+
+
+def checked_backend(examples: list[dict], original_plan: Path) -> dict:
+    """Bind the four actual repaired comparisons, without mutating the earlier plan."""
+    old = json.loads(original_plan.read_text())
+    if old["examples"] != examples or old["seed"] != SEED:
+        raise ValueError("RGB repaired replay differs from original matched cases")
+    directory = ROOT / "runs/tiny-rgb-numerics-portable-v1"
+    receipt_path, comparisons_path = directory / "receipt.json", directory / "comparisons.json"
+    receipt = json.loads(receipt_path.read_text())
+    if (
+        receipt["plan_sha256"] != sha256(original_plan)
+        or not receipt["portable_gelu_enabled"]
+        or receipt["portable_gelu_source_sha256"] != sha256(ROOT / "tools/tiny_rgb_mps_safe.py")
+        or receipt["comparisons_sha256"] != sha256(comparisons_path)
+        or receipt["optimizer_updates"] != 0
+        or receipt["weights_saved"]
+        or not receipt["training_only"]
+    ):
+        raise ValueError("RGB repaired backend receipt changed")
+    ledger = [
+        json.loads(s) for s in original_plan.with_name("pixels.jsonl").read_text().splitlines()
+    ]
+    sizes = [(r["views"]["128"]["shape"][0], r["example_id"]) for r in ledger]
+    extrema = {min(sizes)[1], max(sizes)[1]}
+    expected = {(side, identity) for side in SIDES for identity in extrema}
+    records = json.loads(comparisons_path.read_text())
+    summary = verify_backend_comparisons(records, expected)
+    digests = {r["visual_initialization_sha256"] for r in records}
+    if len(digests) != 1:
+        raise ValueError("RGB repaired backend did not use identical initial visual weights")
+    return {
+        **summary,
+        "visual_initialization_sha256": next(iter(digests)),
+        "original_plan": str(original_plan.relative_to(ROOT)),
+        "original_plan_sha256": sha256(original_plan),
+        "receipt_path": str(receipt_path.relative_to(ROOT)),
+        "receipt_sha256": sha256(receipt_path),
+        "comparisons_path": str(comparisons_path.relative_to(ROOT)),
+        "comparisons_sha256": sha256(comparisons_path),
+    }
 
 
 def checked_plan(path: Path) -> dict:
@@ -152,6 +237,11 @@ def checked_plan(path: Path) -> dict:
     inventory = [json.loads(s) for s in (ROOT / plan["raw_inventory"]).read_text().splitlines()]
     if select_fit_cases(inventory) != plan["examples"]:
         raise ValueError("RGB fit selection changed")
+    if (
+        checked_backend(plan["examples"], ROOT / plan["backend"]["original_plan"])
+        != plan["backend"]
+    ):
+        raise ValueError("RGB repaired backend validation changed")
     for row in plan["examples"]:
         original = allowed[(row["source"], row["example_id"])]
         if normalize(original["reference"]) != normalize(row["reference"]):

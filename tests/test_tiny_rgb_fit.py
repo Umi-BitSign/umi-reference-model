@@ -12,7 +12,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 import tiny_rgb_fit
 from benchmark_fleurs_dev import sha256
-from tiny_rgb_fit import load_pixels, select_fit_cases
+from tiny_rgb_fit import load_pixels, select_fit_cases, verify_backend_comparisons
 from train_tiny_rgb_fit import fit_summary
 
 
@@ -160,3 +160,40 @@ def test_rgb_gpu_guard_includes_driver_allocations(monkeypatch):
     duty = tiny_rgb_fit.RgbDutyCycle(torch, Path("unused"))
     with pytest.raises(RuntimeError, match="six-GiB"):
         duty.run(lambda: None)
+
+
+@pytest.mark.parametrize("bad", (None, "gradient", "coverage", "loss", "nonfinite", "case"))
+def test_backend_gate_requires_actual_full_parameter_cpu_metal_parity(bad):
+    gradients = [
+        {"parameter": f"parameter-{i}", "finite": True, "relative_l2_error": 1e-4}
+        for i in range(126)
+    ]
+    record = {
+        "short_side": 128,
+        "example_id": "training",
+        "optimizer_updates": 0,
+        "dropout_enabled": False,
+        "portable_gelu_replacements": 6,
+        "gradient_differences": gradients,
+        "cpu_loss": 10.0,
+        "mps_loss": 10.00001,
+        "logit_max_abs_difference": 1e-4,
+        "cpu_total_gradient_norm": 100.0,
+        "mps_total_gradient_norm": 100.001,
+    }
+    if bad == "gradient":
+        gradients[0]["relative_l2_error"] = 1e5
+    elif bad == "coverage":
+        gradients.pop()
+    elif bad == "loss":
+        record["mps_loss"] = 11.0
+    elif bad == "nonfinite":
+        gradients[0]["relative_l2_error"] = float("nan")
+    elif bad == "case":
+        record["example_id"] = "heldout"
+    expected = {(128, "training")}
+    if bad is None:
+        assert verify_backend_comparisons([record], expected)["comparisons"] == 1
+    else:
+        with pytest.raises(ValueError, match="RGB backend"):
+            verify_backend_comparisons([record], expected)
