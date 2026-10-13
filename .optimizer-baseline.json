@@ -309,6 +309,18 @@
       "artifact_sha256": "a9c220e3bbdeecbb674c78cae1933b5ae2826f9a980397a3eee1fcd7767a2b05",
       "focused_tests_passed": 25,
       "quality_verified": false
+    },
+    {
+      "timestamp": "2026-10-13T04:41:44Z",
+      "description": "Full protected corpus Metal training completed and rejected; stationary-mixture proposal prepared",
+      "result": "All7529 unique clips,1883 updates and994 evaluation predictions completed. Allfive checkpoints failed. Same-input original How/F meanWER0.83391/0.85737; selected parent0.80676/0.77560; best new How at512 exposures0.80625/0.76159, only0.063percent relative How gain with source-group95percent interval[-0.01149,+0.01299]. Final0.81824/0.81868. All losses, KL, norms and16 visual gradients remained finite. MPS active4916.36seconds,idle0 withinapprovedwindow,maxallocation2740765184bytes. No promotion, miner change or confirmation decode. The final3433 training exposures contained only2902 How signer8 clips and531 STEM clips. Global weights were correct, but the changing exposure mixture is a candidate mechanism, not a proven cause. A new tested planning-only stationary replay proposal uses48800 unit-weight exposures to cover all7529 unique clips while retaining allfour domains andeight How signers throughout; minority repeats reach88 and may overfit. It is not launched and needs a compatible trainer and newly frozen full scientific plan. Original/current baseline identities and selected model remain unchanged.",
+      "evaluation": "checkpoints/c5-full-coverage-mps-v1/decision.json",
+      "evaluation_sha256": "e9158cad671f76edc1a26be73e9013396cc9b29700b1c80bcad42c276b609d3f",
+      "proposal": "runs/c5-stationary-mixture-proposal-v1/report.json",
+      "proposal_sha256": "840534c11f1a2b3b6dc1d111560d2f5adb9482d4be0585e057c82158a67e23f9",
+      "proposed_schedule_sha256": "61fa933848e3c6164843c18cec047dbdaaa0d015c3bad49e0ca6eecbbc76b888",
+      "focused_tests_passed": 31,
+      "quality_gain_verified": false
     }
   ],
   "failed_attempts": [
