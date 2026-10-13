@@ -82,6 +82,7 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--scope", choices=("decoder", "full"), default="decoder")
     parser.add_argument("--resource-policy", type=Path)
+    parser.add_argument("--portable-fairseq-gelu", action="store_true")
     args = parser.parse_args()
     output = args.output.absolute()
     if output.exists() or not output.is_relative_to(ROOT / "runs"):
@@ -150,6 +151,22 @@ def main():
     model = SignLanguageByT5ForConditionalGeneration.from_pretrained(
         model_root / "models/checkpoint-11625", local_files_only=True
     )
+    replacements = 0
+    native_activations = []
+    if args.portable_fairseq_gelu:
+        from c5_winner_mps_safe import replace_fairseq_exact_gelu
+
+        native_activations = [
+            (module, module.activation_fn)
+            for module in model.modules()
+            if getattr(getattr(module, "activation_fn", None), "__module__", None)
+            == "fairseq.modules.gelu"
+            and getattr(module.activation_fn, "__name__", None) == "gelu"
+        ]
+
+        replacements = replace_fairseq_exact_gelu(model)
+        if replacements != 12:
+            raise RuntimeError("winner exact-GELU topology differs from the reviewed twelve layers")
     selected = trainable_full(model) if args.scope == "full" else trainable_decoder(model)
     if args.scope == "full" and not UNUSED_FEATURE_PARAMETERS.issubset(
         dict(model.named_parameters())
@@ -183,6 +200,20 @@ def main():
                 if parameter.requires_grad
             }
             inputs = {key: torch.from_numpy(value).unsqueeze(0) for key, value in arrays.items()}
+            native_result = None
+            if args.portable_fairseq_gelu:
+                from c5_winner_mps_safe import portable_fairseq_gelu
+
+                try:
+                    for module, function in native_activations:
+                        module.activation_fn = function
+                    with torch.no_grad():
+                        native_result = model(
+                            **inputs, labels=labels, use_cache=False, return_dict=True
+                        )
+                finally:
+                    for module, _ in native_activations:
+                        module.activation_fn = portable_fairseq_gelu
             result = model(**inputs, labels=labels, use_cache=False, return_dict=True)
             result.loss.backward()
             decoder_gradient_guard(model, selected, torch)
@@ -193,6 +224,14 @@ def main():
                     name: parameter.grad.detach().clone() for name, parameter in selected.items()
                 },
             }
+            if native_result is not None:
+                cpu_reference["native_portable_cpu_loss_difference"] = float(
+                    (native_result.loss - result.loss).abs()
+                )
+                cpu_reference["native_portable_cpu_logit_difference"] = float(
+                    (native_result.logits - result.logits).abs().max()
+                )
+                del native_result
             del inputs, result
             model.zero_grad(set_to_none=True)
             run(lambda: model.to("mps"))
@@ -225,24 +264,35 @@ def main():
                     expected = cpu_reference["gradients"][parameter_name]
                     actual = parameter.grad.detach().cpu()
                     relative = float((expected - actual).norm()) / max(float(expected.norm()), 1e-6)
-                    differences.append({"parameter": parameter_name, "relative_l2_error": relative})
+                    differences.append(
+                        {
+                            "parameter": parameter_name,
+                            "relative_l2_error": relative,
+                            "cpu_gradient_norm": float(expected.norm()),
+                            "mps_gradient_norm": float(actual.norm()),
+                        }
+                    )
                 worst = max(row["relative_l2_error"] for row in differences)
-                if (
+                passes = not (
                     loss_difference > 5e-4
                     or logit_difference > 1e-3
                     or not math.isfinite(worst)
                     or worst > 0.005
-                ):
-                    raise RuntimeError(
-                        f"full winner CPU/Metal parity failed: loss={loss_difference}, "
-                        f"logits={logit_difference}, gradients={worst}"
-                    )
+                    or cpu_reference.get("native_portable_cpu_loss_difference", 0) > 5e-6
+                    or cpu_reference.get("native_portable_cpu_logit_difference", 0) > 1e-4
+                )
                 parity = {
+                    "passes_cpu_mps_parity": passes,
                     "cpu_loss": cpu_reference["loss"],
                     "loss_absolute_difference": loss_difference,
                     "logit_maximum_absolute_difference": logit_difference,
                     "worst_gradient_relative_l2_error": worst,
                     "gradient_differences": differences,
+                    **{
+                        key: value
+                        for key, value in cpu_reference.items()
+                        if key.startswith("native_portable_cpu_")
+                    },
                 }
             del result, features, target
             if args.device == "mps":
@@ -272,6 +322,8 @@ def main():
         if args.scope == "full"
         else [],
         "resource_policy": budget.record if budget else None,
+        "portable_fairseq_gelu_replacements": replacements,
+        "numerics_passed": all(row.get("passes_cpu_mps_parity", True) for row in records),
         "model_bundle_sha256": reference["model_bundle_sha256"],
         "checkpoint_sha256": reference["translator_checkpoint_sha256"],
         "reference_registry_sha256": sha256(ROOT / "C5_BASELINE_REFERENCE.json"),
@@ -292,7 +344,7 @@ def main():
     print(
         json.dumps(
             {
-                "preflight_passed": True,
+                "preflight_passed": report["numerics_passed"],
                 "device": args.device,
                 "parameter_counts": counts,
                 "optimizer_updates": 0,
@@ -301,6 +353,10 @@ def main():
             sort_keys=True,
         )
     )
+    if not report["numerics_passed"]:
+        raise RuntimeError(
+            "winner CPU/Metal parity failed; complete per-parameter receipt preserved"
+        )
 
 
 if __name__ == "__main__":
