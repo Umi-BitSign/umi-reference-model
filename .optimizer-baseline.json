@@ -1,0 +1,319 @@
+{
+  "version": 3,
+  "created_at": "2026-10-09T13:48:10Z",
+  "benchmark_command": "artifacts/baseline-6fe8df59/.runtime/bin/python tools/evaluate_fresh_lowres_tuning.py --inventory runs/fresh-lowres-v1/tuning-inventory-v2.jsonl --training-inventory runs/fresh-lowres-v1/training-inventory.jsonl --checkpoint checkpoints/fresh-lowres-v2-decoder-step1024-v2/trainable.safetensors --run checkpoints/fresh-lowres-v2-decoder-step1024-v2/run.json --output <new-run-ledger-path> --miner-maintenance-mode --device mps",
+  "improvement_threshold_percent": 5.0,
+  "original_baseline_commit": "4bf69e3e4e381e578557f3f5069ba645b3889250",
+  "original_worktree_fingerprint": {
+    "tracked_diff_sha256": "c2f986f400fd36c162effdb3ab0ae8d3a6bd048702e012239be1e2d71f17ff6c",
+    "experimental_tools_tests_sha256": "6619d7e5f7c8cb47631baf13f571f7df808a0eaa29c3c8b3363312a951adf267"
+  },
+  "original_baseline": {
+    "compact_how2sign_mean_wer": 0.9168885801698302,
+    "compact_fleurs_mean_wer": 0.9508328450997624,
+    "compact_checkpoint_sha256": "8396778906169a70ecdaa502b4b78797d4082c074a42da7ed76268697e27f9d2",
+    "compact_tuning_sha256": "6b9238937096bbe71d49708ec9b18f971e69c9f89577355ba368970d4f28462f",
+    "confirmed_c5_how2sign_mean_wer": 0.8341465826,
+    "confirmed_c5_fleurs_mean_wer": 0.8806382840,
+    "confirmed_c5_how2sign_results_sha256": "b59733058c2b8403368ed266480f34132070fa840391defbbf7e2f494b9fa7f3",
+    "confirmed_c5_fleurs_results_sha256": "8c29db57dc28d77f1f19810c3a41687df6c23ee61ca904177fa23cfa676ea464"
+  },
+  "current_baseline": {
+    "compact_how2sign_mean_wer": 0.9168885801698302,
+    "compact_fleurs_mean_wer": 0.9508328450997624,
+    "compact_checkpoint_sha256": "8396778906169a70ecdaa502b4b78797d4082c074a42da7ed76268697e27f9d2",
+    "compact_tuning_sha256": "6b9238937096bbe71d49708ec9b18f971e69c9f89577355ba368970d4f28462f",
+    "crop168_open_how2sign_mean_wer": 0.8101281530969031,
+    "crop168_open_fleurs_mean_wer": 0.7756029684601113,
+    "crop168_openasl_confirmation_mean_wer": 0.614505538278371,
+    "crop168_openasl_confirmation_active_seconds": 129.3967981627211,
+    "crop168_confirmed_bundle_identity_sha256": "8c813666d4edadbf1e658b9edc747a2f6426950c90f44e712d48bec22b1cebf6"
+  },
+  "metric": {
+    "name": "mean single-reference word error rate",
+    "unit": "WER",
+    "lower_is_better": true,
+    "primary_split": "frozen open tuning",
+    "confirmation_reuse_forbidden": true
+  },
+  "history": [
+    {
+      "timestamp": "2026-10-09T14:40:00Z",
+      "description": "Fresh generic-stream architecture memorization gate",
+      "result": "15/16 exact hypotheses after 1,024 example updates; exact on all FLEURS, ASL-STEM, and OpenASL gate clips. One How2Sign clip remained imperfect.",
+      "checkpoint_sha256": "90852cb438a2de032e5fa55da50a85d5afd458453bb201df8458dd1544250b7e",
+      "evaluation": "runs/fresh-stream-v1/overfit16-fit.json"
+    },
+    {
+      "timestamp": "2026-10-09T16:20:00Z",
+      "description": "Full 6,722-example fresh stream decoder-stage training",
+      "result": "Regressed. Final no-repeat-3 tuning WER was 1.2937 How2Sign and 1.0155 FLEURS; all six intermediate checkpoints also failed the 0.9169/0.9508 compact baseline. Falling train loss with held-out phrase loops identifies decoder overfitting.",
+      "checkpoint_sha256": "d83a1632dafe555a07ce1bbbc11963dbf05012185885edf793832395d96aa145",
+      "evaluation": "runs/fresh-stream-v1/full-epoch1-lr1e4-open-tuning-nr3.json"
+    },
+    {
+      "timestamp": "2026-10-09T16:55:00Z",
+      "description": "Alignment-only generic-stream memorization gate",
+      "result": "Conditioning gate passed: exact on 5/16, with frozen T5 language layers and substantially reduced WER on multiple remaining examples. Proceeded to full generalization test.",
+      "checkpoint_sha256": "95ac6df247c42cdecff83723a371c0fd51bf59559f088f0f14218f04d2aaf1ca",
+      "evaluation": "runs/fresh-stream-v1/alignment-overfit16-fit.json"
+    },
+    {
+      "timestamp": "2026-10-09T18:30:00Z",
+      "description": "Full 6,722-example alignment-only fresh stream training",
+      "result": "No checkpoint beat baseline. Final no-repeat-3 WER was 0.9796 How2Sign and 1.0363 FLEURS; language collapse was reduced but mixed-domain alignment remained under-adapted.",
+      "checkpoint_sha256": "569b2fc59b78f5c43c8dc289b2020a293e04d29871d28fa17723194a6bf93376",
+      "evaluation": "runs/fresh-stream-v1/alignment-full-final-open-tuning-nr3.json"
+    },
+    {
+      "timestamp": "2026-10-09T19:45:00Z",
+      "description": "How2Sign/FLEURS alignment adaptation after all-data phase",
+      "result": "Regressed. Best intermediate WER was 0.9999 How2Sign and 1.0342 FLEURS, so the continuation was rejected.",
+      "checkpoint_sha256": "610b4fc4b99fcffa56375a18b4202eb7314b7588b17ca8e7382deb17b4c4f9ce",
+      "evaluation": "runs/fresh-stream-v1/alignment-target-adapt-step-001536-open-tuning-nr3.json"
+    },
+    {
+      "timestamp": "2026-10-09T23:17:00Z",
+      "description": "C5-state distillation into the fresh generic-stream visual encoder",
+      "result": "Rejected. Distillation reduced cosine loss, but the subsequent translation continuation still produced step-1536 WER of 1.2411 How2Sign and 1.2163 FLEURS before the run was externally interrupted.",
+      "checkpoint_sha256": "4d4f9105fdc643adcc10ca1470065a0272556f7144e71c779dd7557d04ea3680",
+      "evaluation": "runs/fresh-stream-v1/distilled-target-step-001536-open-tuning-nr3.json"
+    },
+    {
+      "timestamp": "2026-10-09T23:30:00Z",
+      "description": "Decoder continuation on the 6,204-example low-resolution inventory with 1,650 new How2Sign clips",
+      "result": "Regressed. Best new checkpoint was step 768 at 0.9220 How2Sign and 1.0223 FLEURS WER versus the 0.9169/0.9508 compact baseline; later checkpoints repeated phrase-loop degeneration.",
+      "checkpoint_sha256": "5522e055e7faddf137ae2222e1c826362910e1c1c86b326a9f5cb108255be419",
+      "evaluation": "runs/fresh-lowres-v4/decoder-step1024-v1-768-tuning.json"
+    },
+    {
+      "timestamp": "2026-10-10T01:20:00Z",
+      "description": "Encoder-only continuation on the 6,204-example low-resolution inventory",
+      "result": "Regressed. Best new checkpoint was step 512 at 0.9225 How2Sign and 1.0482 FLEURS WER; subsequent checkpoints collapsed further, so the branch was rejected.",
+      "checkpoint_sha256": "5251238bb7723d28e01e7f1703f93e59e4024fae65656cb6048b50039956d623",
+      "evaluation": "runs/fresh-lowres-v4/encoder-align-step1024-v1-512-tuning.json"
+    },
+    {
+      "timestamp": "2026-10-10T02:15:00Z",
+      "description": "Mild shift, blur and photometric augmentation during compact encoder alignment",
+      "result": "Regressed. The earliest checkpoint held FLEURS at 0.9508 but worsened How2Sign to 1.1099 WER; all later checkpoints were worse on at least one domain, so augmentation was rejected for this architecture.",
+      "checkpoint_sha256": "8e47401bf31ea5048346ce58b86925523664aa130870d02c775d752f6d37a6a4",
+      "evaluation": "runs/fresh-lowres-v4/encoder-align-aug-mild-step512-v1-128-tuning.json"
+    },
+    {
+      "timestamp": "2026-10-10T07:45:00Z",
+      "description": "Signer-balanced C5 continuation on 1,650 new How2Sign pre-cut clips",
+      "result": "Rejected after a larger unseen diagnostic. The best open-tuning point improved How2Sign from 0.8341 to 0.8113 and held FLEURS at 0.8806, but only two signers improved. On 134 expansion clips unseen by that checkpoint, mean WER was effectively flat at 0.92379 versus 0.92374 and paired outcomes were 9 improved, 116 tied and 9 regressed. The confirmed C5 candidate remains the baseline.",
+      "checkpoint_sha256": "c918248f30ee806052f8a1c6e768466b8bc0c74ad42e1a75f2bd582a0a7b3fb7",
+      "evaluation": "runs/c5-how2sign-precut-expansion-holdout-v1/decision.json"
+    },
+    {
+      "timestamp": "2026-10-10T11:25:00Z",
+      "description": "Matched C5 aspect-preserving source-resolution evaluation",
+      "result": "Rejected short-side 256 and 384. Against a pinned-landmark native control at 0.8215 How2Sign and 0.8354 FLEURS WER, 256 scored 0.8750 and 0.8853 and took 1.194 times as long. Short-side 384 scored 0.8496 and 0.8273 and took 1.079 times as long. The fixed 224-pixel DINO crops prevent source resizing from shrinking the model or reducing its main compute cost.",
+      "checkpoint_sha256": "419315ded8438bb59fe1b1a7e3c774012e098067db21335621789b56e9f98210",
+      "evaluation": "runs/c5-resolution-tuning-v1/decision-384.json"
+    },
+    {
+      "timestamp": "2026-10-10T13:25:00Z",
+      "description": "Confirmed C5 with 168-pixel DINO hand and face crops",
+      "result": "Retained only as an adaptation direction. Open tuning improved FLEURS from 0.8354 to 0.8157 and changed How2Sign from 0.8215 to 0.8294 while reducing paired active time by 4.2%. On a 134-clip internal How2Sign holdout, mean WER regressed from 0.92379 to 0.93534 and word-weighted WER from 0.90897 to 0.91293; 28 examples improved, 82 tied and 24 regressed. Native 224-pixel crops remain the runtime policy.",
+      "checkpoint_sha256": "419315ded8438bb59fe1b1a7e3c774012e098067db21335621789b56e9f98210",
+      "evaluation": "runs/c5-resolution-holdout-v1/decision-visual-crop-168.json"
+    },
+    {
+      "timestamp": "2026-10-10T18:45:00Z",
+      "description": "Confirmed C5 with calibrated 168-pixel DINO crops",
+      "result": "Retained as a research candidate pending fresh external confirmation. A signer-balanced affine calibrator improved open How2Sign WER from 0.8215 to 0.8101 and FLEURS from 0.8354 to 0.7756. Total paired active time fell 4.84% and DINO time fell 26%. On the 134-clip internal holdout, mean WER improved from 0.92379 to 0.91044 and paired outcomes were 29 improved, 80 tied and 25 regressed. A matched calibrator fit with clip-consistent horizontal and vertical shifts up to 4% scored 0.8174/0.7756 and was rejected. The standalone bundle was built and CPU-load verified, but was not installed in the miner.",
+      "checkpoint_sha256": "f2f0b23839c7de012d5aaf1c6bd9d10f156f28eb8f8bcf6f2ce4240a98de68c6",
+      "bundle_identity_sha256": "5067a1f5ce0d1b2cc12ae58976497c7db75128b1cf2c069a3f1ce87178d62357",
+      "evaluation": "runs/c5-resolution-holdout-v1/decision-visual-crop-168-calibrated-v4-cap32.json"
+    },
+    {
+      "timestamp": "2026-10-10T19:50:00Z",
+      "description": "One-shot 60-source OpenASL confirmation of calibrated 168-pixel C5 crops",
+      "result": "Passed every predeclared gate. Mean WER improved from 0.6320 to 0.6145, word-weighted WER improved from 0.6205 to 0.6152, paired outcomes were 15 improved, 35 tied and 10 regressed, and active time fell 6.7%. The integrity-checked CPU-load-verified confirmed bundle is the new production candidate; it was not installed in the miner.",
+      "checkpoint_sha256": "f2f0b23839c7de012d5aaf1c6bd9d10f156f28eb8f8bcf6f2ce4240a98de68c6",
+      "bundle_identity_sha256": "8c813666d4edadbf1e658b9edc747a2f6426950c90f44e712d48bec22b1cebf6",
+      "evaluation": "runs/c5-crop-openasl-confirmation-v1/decision.json"
+    },
+    {
+      "timestamp": "2026-10-10T20:30:00Z",
+      "description": "Anchored direct-projection continuation on a 1,024-example all-source mixture",
+      "result": "Rejected. The step-1024 checkpoint improved cached-stream How2Sign WER from 0.8341 to 0.8219 and held FLEURS at 0.8806, but only signers 2 and 5 improved and the equal-domain gain was 0.0061, below the predeclared 0.01 requirement. Direct projection drift stayed below 0.15%, ruling out catastrophic forgetting but not breaking the repeated two-signer ceiling. The confirmed calibrated crop bundle remains the production candidate.",
+      "checkpoint_sha256": "e290e334f606f0dfad6b5096b3d8d3ff40f2e618c12d40ea567f6a233da09baf",
+      "evaluation": "runs/c5-anchored-projection-v1/tuning-decision.json"
+    },
+    {
+      "timestamp": "2026-10-10T23:20:00Z",
+      "description": "T5-Small post-corrector trained on 1,024 real C5 training hypotheses",
+      "result": "Rejected on a frozen 205-example source-stratified holdout. Epoch 1 worsened mean WER by 0.1166. Identity replay made later checkpoints mostly preserve their inputs, but the best epoch still worsened mean WER by 0.0040, changing only three hypotheses. It did not reach open tuning or confirmation, and the confirmed calibrated crop bundle remains the production candidate.",
+      "checkpoint_sha256": "82f6e857686b67c28a306ae9465cfee5b0278fcdf0c8206c5f76528c8b906b39",
+      "evaluation": "checkpoints/c5-text-corrector-v1/decision.json"
+    },
+    {
+      "timestamp": "2026-10-12 09:19:06 UTC",
+      "description": "C5 continuation on 120 newly prepared OpenASL sources with balanced public replay",
+      "result": "Rejected. All 360 clips from 180 new sources were acquired, normalized, landmarked and cached; 240 clips from 120 sources entered the frozen 768-example training schedule. Step 768 improved matched native cached-stream How2Sign WER from 0.8341 to 0.8152, left FLEURS unchanged at 0.8806, and improved only two of five signers. The equal-domain gain of 0.00949 missed the 0.01 gate. A fixed 24-source training probe worsened WER from 0.5964 to 0.6042, with zero improvements and only two changed hypotheses; this conservative update learned little new-caption behavior. Both consumed confirmations and the new 60-source confirmation remained unused. The calibrated 168-pixel production candidate remains selected.",
+      "checkpoint_sha256": "302b8d50c4acafa04097f190d55ed68542df707e364106df7bd59ce91b1cc442",
+      "evaluation": "runs/c5-openasl-scale-v1-bound/tuning-decision.json",
+      "training_fit": "runs/c5-openasl-scale-v1-bound/training-fit24-decision.json"
+    },
+    {
+      "timestamp": "2026-10-12 12:18:59 UTC",
+      "description": "Fixed visual LoRA bypass in Fairseq fused attention",
+      "result": "The old LoRALinear.weight returned only frozen base weights, so fused SHuBERT q/v projections received no LoRA gradients. A real C5 audit reproduced all 16 visual parameters lacking gradients, then verified all eight visual B gradients after the fix, bit-identical zero-delta logits, and changed encoder states after one step with direct projection preserved. Regression tests cover functional weights, fused Fairseq attention, gradients and merged equivalence. Prior visual-adaptation conclusions are withdrawn; scored outputs and the selected merged bundle remain valid.",
+      "evaluation": "runs/c5-visual-lora-gradient-fix-v1/audit.json"
+    },
+    {
+      "timestamp": "2026-10-12 12:18:59 UTC",
+      "description": "Matched 768-example replay with functioning visual LoRA",
+      "result": "No checkpoint passed the three-signer gate. Step 768 improved How2Sign from 0.8341 to 0.8113 versus 0.8152 in the buggy matched control; FLEURS stayed at 0.8806, and only two signers improved. Every one of 192 updates retained gradient coverage for all 16 visual parameters. The quality gate and confirmation remained unchanged.",
+      "checkpoint_sha256": "0fa942906f4ba1bd7314a141351cbfd3c21053e8180025a80c55d1619216d7ff",
+      "evaluation": "runs/c5-openasl-scale-fixed-v1/tuning-decision.json"
+    },
+    {
+      "timestamp": "2026-10-12 12:18:59 UTC",
+      "description": "Matched 24-source trainability comparison after the fused-weight fix",
+      "result": "The 4e-6 control stayed near WER 0.600 after 32 passes. At 1e-4, WER fell from 0.5964 to 0.1009 with 17 exact translations, 20 examples improved and 24 distinct hypotheses. The predeclared training-fit gate first passed at epoch 16. This establishes trainability only: no tuning or confirmation was used, and these diagnostic weights did not initialize a full run.",
+      "checkpoint_sha256": "8877140fc568e09aabffedd5d2eba1e2abc26c08e3395e3e57f827420c56dba7",
+      "evaluation": "checkpoints/c5-visual-trainability-v1/decision.json"
+    },
+    {
+      "timestamp": "2026-10-12 12:18:59 UTC",
+      "description": "Fresh 768-example full replay at the passing 1e-4 trainability rate",
+      "result": "Rejected. Step 256 improved matched native cached-stream How2Sign to 0.8228 and FLEURS to 0.8481 but only two signers improved. Step 512 improved FLEURS from 0.8806 to 0.8324 while How2Sign regressed to 0.8429. Step 768 worsened How2Sign to 0.9087. No checkpoint passed all frozen gates. The confirmed calibrated crop bundle remains selected, and all confirmation data stayed sealed. The next test should separate visual and decoder learning rates rather than relax gates.",
+      "checkpoint_sha256": "cc628e7da883bd0a0a8e8b2ac1ae5fdd465424f2576571c5ce36c31732ba134a",
+      "evaluation": "runs/c5-openasl-scale-high-lr-v1/tuning-decision.json"
+    },
+    {
+      "timestamp": "2026-10-12 14:24:25 UTC",
+      "description": "Matched visual/decoder learning-rate isolation",
+      "result": "Both frozen arms failed promotion. Fast visual learning (1e-4 visual, 4e-6 decoder) reached native cached-stream FLEURS WER 0.7826 versus 0.8806, but worsened How2Sign to 0.8980. The reverse arm reached How2Sign 0.8041 with four improved signers at step 128, but FLEURS regressed to 0.8868. Neither lowering the decoder rate nor lowering the visual rate alone preserved both domains. Confirmation remained sealed.",
+      "evaluation": "runs/c5-openasl-split-rates-v1/decision.json"
+    },
+    {
+      "timestamp": "2026-10-12 14:24:25 UTC",
+      "description": "Complete prepared continuous-sign corpus audit",
+      "result": "Audited 8,492 prepared candidates and froze 7,732 eligible cached clips. Excluded 759 clips from protected How2Sign source recordings and one protected reference. The eligible manifest contains 2,048 ASL-STEM, 313 FLEURS, 5,131 How2Sign and 240 OpenASL clips. Exact cache hashes are unique, and source-specific loaders verify stream integrity. The audit does not independently establish perceptual deduplication across re-encodes or publisher pretraining overlap.",
+      "evaluation": "runs/c5-all-source-corpus-v1/audit.json"
+    },
+    {
+      "timestamp": "2026-10-12 14:24:25 UTC",
+      "description": "Balanced complete-corpus C5 training with warmup and cosine decay",
+      "result": "Rejected. Completed all 7,732 distinct eligible clips and 1,933 updates with visual gradients present throughout. Loss masses were 60% How2Sign with equal signer shares, 20% FLEURS, 15% ASL-STEM and 5% OpenASL; peak visual/decoder rates were 1e-5/3e-5 with 100-step warmup and 10% cosine floors. Step 512 improved matched native cached How2Sign WER to 0.8084 but regressed FLEURS to 0.8871 and improved only two signers. The final endpoint regressed to 0.9371/0.9451. All frozen checkpoints failed, all confirmations stayed sealed, and the confirmed calibrated crop bundle remains selected. Further volume increases without an explicit retention mechanism are not justified by this run.",
+      "checkpoint_sha256": "3d94c6cd49fbc6713232168901f53c24941a20884f1d68cfb4fb67ca7d310b03",
+      "evaluation": "runs/c5-all-source-v1/tuning-decision.json"
+    },
+    {
+      "timestamp": "2026-10-12 15:21:31 UTC",
+      "description": "Matched full-corpus adaptation with frozen-teacher token retention",
+      "result": "Rejected by the original three-signer gate. All 7,732 distinct clips and 1,933 updates completed with visual gradients present and direct projection preserved. Coefficient-1 teacher KL at temperature 2 was the only recipe change. Step 1024 improved matched native cached How2Sign/FLEURS WER from 0.8341/0.8806 to 0.8311/0.8392, but only signers 2 and 5 improved. Final WER was 0.8504/0.8987, less degraded than the no-retention control's 0.9371/0.9451 but still worse than baseline. No checkpoint passed all gates; no confirmation was reused and the selected crop bundle remains unchanged. The first 1024 examples contained nine signer-1 clips and 500 signer-8 clips despite balanced objective weights, motivating a separately frozen coverage-order test.",
+      "checkpoint_sha256": "c5c1c2f5ab631d03a2ef973a9fd52cc0fdfb1cfc21c84050481cf075d57cc273",
+      "evaluation": "runs/c5-all-source-retention-v1/tuning-decision.json"
+    },
+    {
+      "timestamp": "2026-10-12 15:21:31 UTC",
+      "description": "Historical 768-example replay source-group audit",
+      "result": "Found 25 training clips from protected internal How2Sign holdout recordings. The schedule was not reused for the retention experiment; both audited full-corpus runs exclude those entire sources. Historical replay outputs remain diagnostics and cannot establish internal-holdout independence.",
+      "artifact": "runs/c5-all-source-retention-v1/integrity.json"
+    },
+    {
+      "timestamp": "2026-10-12",
+      "description": "User-requested approach reassessment and face-input failure diagnosis",
+      "result": "The coverage-order training plan was not launched. A deterministic audit of 96 training and 23 existing open-tuning clips found frequent blank/frozen How2Sign face features. A separate three-frame probe on one predetermined training clip per each of eight signers detected faces in only 1/24 full frames, versus 24/24 using a pose-guided head ROI and the same pinned face model. Translation quality has not been evaluated for recovery. The prepared corpus represents approximately 15.46 clip-hours, and the baseline's exact training inventory is unknown. The next test should measure paired fixed-weight translation before more training or bulk cache rebuilding. The confirmed model and miner remain unchanged.",
+      "evaluation": "runs/c5-reassessment-v1/decision.json"
+    },
+    {
+      "timestamp": "2026-10-12",
+      "description": "Fresh public How2Sign validation capacity audit",
+      "result": "Of 115 official validation recordings, 57 are unused by prior local validation. All 575 remaining pre-cut duration/text candidates fail the existing 80% bidirectional timestamp-overlap rule. Raw-video recropping at realigned times offers 560 metadata candidates from 56 unused sources, with signer counts 114/152/74/213/7. No matching reference is in the prepared corpus or prior validation selection. Availability and clip fidelity remain unverified; no fresh benchmark was scored and confirmation stayed sealed.",
+      "evaluation": "runs/c5-reassessment-v1/validation-capacity.json"
+    },
+    {
+      "timestamp": "2026-10-12",
+      "description": "Fixed-weight pose-guided face recovery on the frozen open cohort",
+      "result": "Passed every original open screen but is not promoted. How2Sign mean single-reference WER improved from 0.83415 to 0.76585, an 8.19% relative reduction; signers 2, 3 and 5 improved, signers 1 and 8 regressed, and paired outcomes were eight improved, six regressed and two tied. FLEURS stayed at 0.88064. Every frozen control hypothesis reproduced exactly. All non-face inputs and model weights were unchanged. Recovery replaced 1272/1298 How2Sign and 6/974 FLEURS face frames. Outputs remained distinct and nonempty, with mean How2Sign length increasing from 12.38 to 15.44 words. This native cached-stream diagnostic is not a direct comparison against the selected crop168 runtime or official UMI scoring. Larger development evidence and runtime compatibility are still required; the confirmed candidate and miner are unchanged, and confirmation remains sealed.",
+      "evaluation": "runs/c5-face-fallback-v1/decision.json",
+      "evaluation_sha256": "1d3c71ac615296bf2b5a442120ad8119a875ca3183edbf5267c7a062f4469341"
+    },
+    {
+      "timestamp": "2026-10-12",
+      "description": "Fresh source-disjoint public How2Sign development acquisition",
+      "result": "Verified all 17 raw recordings for the frozen 71-clip cohort, with approximately 1.72 GiB of source bytes, an 80 GiB physical floor and a 4 GiB full-data budget. Six prior verified sources were reused by hash-checked hard links. Every clip is bound to its exact recording name and signer, and all selected intervals fit source duration. A content-ID grouping bug in the first acquisition plan incorrectly joined actor-specific annotations; a duration guard caught it before scoring. Recording-level grouping and new regression tests fixed it; the old plan, logs and valid assets were preserved, and the discarded temporary source was re-downloaded. Fresh clips remain uncropped, unencoded and unscored, training is forbidden and confirmation stayed sealed. The next step is preparing the fresh cohort and comparing fixed-weight native and selected crop-policy pipelines.",
+      "artifact": "runs/c5-fresh-development-v2/plan.json",
+      "artifact_sha256": "a049b1078e9b0e45a4ac37561bd69acc88006f5c2d19af1c37104b7292166bfb"
+    },
+    {
+      "timestamp": "2026-10-12",
+      "description": "Fresh fixed-weight crop168 face-recovery development comparison",
+      "result": "On 71 evaluation-only clips across 17 locally fresh content groups and five known How2Sign signers, mean WER was 0.79219 original checkpoint, 0.75418 selected crop168 and 0.69345 crop168 recovery. The research candidate passes every frozen fresh-development gate: 8.05% relative improvement over selected, all five signer means improved, word-weighted WER 0.67698 and paired content-group 95% interval [-0.10521,-0.01214]. Native224 recovery had a slightly better aggregate but failed the signer-regression gate. Original control shares stride2 and is not unmodified full-rate inference. Prototype timings exclude landmark preparation and cannot establish standalone latency. Candidate not promoted; weights, selected bundle and miner untouched, confirmation still sealed. Next: single-pass runtime parity and open cross-domain verification.",
+      "evaluation": "runs/c5-fresh-face-benchmark-v1/decision.json",
+      "evaluation_sha256": "3f9993659542fa60ef57e81026a64b41e7f9429b1d3f7cd3bb5527fe4fe251f1"
+    },
+    {
+      "timestamp": "2026-10-12",
+      "description": "Complete hybrid CPU runtime parity and open cross-domain verification",
+      "result": "All 68 requests completed, with unchanged legacy landmarks, hand/pose and unrecovered-face inputs, exact expected hypotheses and single-pass DINO streams. Open FLEURS WER improved 0.77560 to 0.76808. Ten deterministic fresh How parity clips reproduced 0.77705 to 0.71974; this subset is not independent new quality evidence. Complete warm hybrid latency increased 3.89%, failing the unchanged 2% speed-regression gate; repeats were stable, maximum spread 1.10%. Native macOS FaceLandmarker initialization failed before frame processing, so portability remains unproven. No promotion, confirmation or miner changes. Same-gate independent-graph scheduling optimization launched with CPU2 and GPU unused.",
+      "evaluation": "runs/c5-face-runtime-validation-v1/decision.json",
+      "evaluation_sha256": "16e58f4f4226e8437c02372b51522c83743d91cff7d7d85f10b0a04d460e1122"
+    },
+    {
+      "timestamp": "2026-10-12",
+      "description": "Independent-graph face-recovery scheduling optimization kept in research code",
+      "result": "All 68 repeated warm hybrid CPU requests passed exact landmark/hypothesis parity, preserved unrelated streams and reproduced cross-domain quality. Geometric latency fell 9.70% against selected: How parity subset 5.41% lower, FLEURS 15.49% lower. No individual clip regressed over 2%, and maximum repeat spread was 1.94%. This removes the earlier sequential 3.89% speed regression. CPU2, no GPU, no selected-bundle or miner changes. One candidate/control confirmation was frozen on 60 prepartitioned new OpenASL sources, verified source/reference-disjoint from prepared training and not previously decoded; the cohort will be consumed regardless of result.",
+      "evaluation": "runs/c5-face-runtime-validation-parallel-v1/decision.json",
+      "evaluation_sha256": "6a00f382ad279c26fd2b5a8319ec339ea65a092a07699e79eac01333bb62f53c"
+    },
+    {
+      "timestamp": "2026-10-12",
+      "description": "One-shot source-held-out OpenASL face-recovery confirmation rejected",
+      "result": "All 120 requests completed on 60 previously undecoded, locally source/reference-disjoint clips. Exact legacy and unrelated-stream invariants held and outputs were nonempty. Mean WER improved 0.58818 to 0.58184, word-weighted WER 0.62269 to 0.60290; nine improved, five regressed, 46 tied. Hybrid latency was 14.34% lower geometrically. Nevertheless, the source-bootstrap 95% interval [-0.03379,+0.02214] failed the frozen +0.02 noninferiority limit. Rejected for insufficient confirmation evidence, not worse aggregate point estimates. Cohort consumed permanently for variant selection; no gate relaxation, promotion or miner change. Next: a training-only face-recovered stream pilot and independent future evaluation.",
+      "evaluation": "runs/c5-face-openasl-confirmation-v1/decision.json",
+      "evaluation_sha256": "6b094e56d0b85659b91a304c8b31077fe9fa5926832ef1e3b09d308b10065dbf"
+    },
+    {
+      "timestamp": "2026-10-12",
+      "description": "Frozen training-only face-learning pilot and verified Metal gradient backend",
+      "result": "Prepared a matched two-arm experiment with 256 signer-balanced How2Sign clips, 64 FLEURS training clips and a separate 64-clip diagnostic holdout from 16 globally excluded How content groups. Both arms share the selected parent, zero-delta adapters, fixed direct projection, four balanced passes, split rates and frozen-parent training-prefix KL; they differ only in recovered faces. Both are evaluated on identical recovered-face inputs. Metal preflight had finite loss/norm, all 16 visual gradients and eight nonzero B gradients, no optimizer updates and about 2.52 GiB allocation. Twenty publisher 30fps clips are bound to verified 25fps derivatives. CPU preparation is source-bounded and Metal training will use equal active/idle duty cycle plus a six-GiB cap. The first 30-minute poll confirmed a live job and 174/384 committed paired features. No new learned-quality result, promotion or miner change; consumed confirmation remains excluded.",
+      "artifact": "runs/c5-face-learning-pilot-v1/plan.json",
+      "artifact_sha256": "904bb45ccad5ced3c67860d7d88d54b32d2695f75fa2759036fc4eab1630e766"
+    },
+    {
+      "timestamp": "2026-10-13T00:23:37Z",
+      "description": "Completed paired preparation and recovered the initial MPS decoding backend",
+      "result": "All 384 paired feature cases were committed. The first trainer stopped at initial generation before optimizer updates or saved weights: PyTorch imported before the fallback environment flag was set, leaving MPS isin unsupported. A new early launcher sets fallback before trainer imports; two import-order regression cases and a bounded real-MPS operator probe passed. The same frozen experiment restarted under a new checkpoint directory, preserving the failed run and empty teacher directory. Scientific plan, feature hashes, quality gates, selected bundle and miner are unchanged. No learned-quality result exists yet.",
+      "artifact": "runs/c5-face-learning-pilot-v1/cpu-fallback-recovery.json",
+      "plan_sha256": "904bb45ccad5ced3c67860d7d88d54b32d2695f75fa2759036fc4eab1630e766"
+    },
+    {
+      "timestamp": "2026-10-13T01:35:10Z",
+      "description": "Completed paired face-learning pilot rejected; future holdout protections extended",
+      "result": "Both arms completed 640 total optimizer updates and 512 diagnostic predictions. All six checkpoints failed. Same-input fixed parent WER was 0.78006; best legacy-face training was 0.81712 at epoch 1 (4.75% worse), best recovered-face training 0.82715 at epoch 2 (6.04% worse). Recorded MPS active/idle time was exactly equal at 1768.26 seconds, with about 2.55 GiB maximum allocation. Selected model, miner and consumed confirmation are unchanged. The global corpus guard now protects fresh face-development sources and pilot holdout sources/references, invalidating old corpus plans; a new source audit is running. A separately tested user-approved 100% GPU duty window expires at 2026-10-14T00:48:21Z and automatically restores 50% afterward for subsequent launches.",
+      "evaluation": "checkpoints/c5-face-learning-pilot-v1-cpu-fallback-retry/decision.json",
+      "evaluation_sha256": "d5e692c3c0cce0f09b99366108fd91c5ca4d830335b77d03b995abceb399b068"
+    },
+    {
+      "timestamp": "2026-10-13",
+      "description": "Replacement protected full-corpus audit completed",
+      "result": "From 8492 prepared candidates, 7529 remain eligible after 962 protected-source and one reference exclusion: 4928 How2Sign, 313 FLEURS, 2048 ASL STEM and 240 OpenASL. Frozen fresh face-development and pilot holdout plans now contribute protected source/reference sets and inventory hashes. Exact cache duplicate groups remain absent; perceptual deduplication and upstream pretraining novelty remain unproven. Older fixed7732 plans fail the updated protection hash check. Next: newly freeze an appropriately sized coverage-balanced MPS retention run under the user's expiring GPU budget.",
+      "evaluation": "runs/c5-all-source-corpus-v2/audit.json",
+      "evaluation_sha256": "f6cae0496685b28642e8cee0d946738f3b604cc65f6c1615e6498d3f48f54b86",
+      "training_manifest_sha256": "6c2724e89e4aeb50b748651f5ce914bc89ac5874fe889dbbc198e14411b825e9"
+    }
+  ],
+  "failed_attempts": [
+    {
+      "timestamp": "2026-10-09T14:00:00Z",
+      "description": "Fresh generic-stream overfit gate at learning rate 3e-4",
+      "result": "Stopped after update 8: the second accumulated MPS gradient norm was infinite and the next loss was non-finite.",
+      "artifact": "checkpoints/fresh-stream-v1-overfit16-lr3e4"
+    },
+    {
+      "timestamp": "2026-10-09T14:05:00Z",
+      "description": "Fresh generic-stream overfit gate at learning rate 1e-5 before fixed LayerNorm",
+      "result": "Reproduced at update 8. Gradient isolation identified non-finite MPS gradients only in affine stream LayerNorm parameters for sparse hand streams.",
+      "artifact": "checkpoints/fresh-stream-v1-overfit16-lr1e5"
+    }
+  ]
+}
