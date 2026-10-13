@@ -386,6 +386,29 @@
       "artifact_sha256": "9cc19560ed9adaaeb3abe3bb6a633f1ff0341ff9eb61657a21343570645683a9",
       "focused_tests_passed": 46,
       "asl_quality_verified": false
+    },
+    {
+      "timestamp": "2026-10-13T18:33:35Z",
+      "description": "Both custom RGB resolutions pass training-only fit; all-source raw-pixel proposal frozen",
+      "result": "Matched256-epoch controls completed6144updates perarm,864correct/wrong-video predictions and18checks.128 trainWER0.02778 with22exact andwrong-videoWER1.41761;192 WER0.07755 with21exact andwrong-video1.43722. Both originalfitgatespassed; loss0.07443/0.04527 and126finitegradient tensors. Identicalfreshvisual/bridge initialization andgenericT5language, no diagnosticwarmstart. MPSactive3598.39s,idle0,maxdriver5093687296bytes. This proves training-set learnability/video-input conditioning only, not specific signingcue reliance,humanlegibility,generalization,resolutionchoiceorbaselinewin. New planning-only full proposal includesall7529eligible rawclips,48800unit-weight exposures and12200updates perresolution,stationary60/20/15/5 domainmass and3660exposures pereach8How signers. Minorityrepeatmax88 overfitrisk.142open rawclips hash-matchfixedcontrol sources andremain source/reference isolated; both142C5controlscore sets reproduced. Original/current qualitygates unchanged. Streaming/cachetrainer,fullframe/targetvalidation andpreflight stillrequired beforelaunch; no newheldoutprediction,promotion,minermutationorconfirmationdecode.61focusedtests passed before codec additions. A byte-exact CPUresize-order attempt improved geometricmean1.62percent only,below5percentthreshold,andwasrolledback;CPU2 decoderboundretained. Batchedgradientguard correctness andlosslesspixelcodec work are infrastructure only; GPUperformance/qualityunproven. Original/currentbaseline identities preserved.",
+      "evaluation": "checkpoints/tiny-rgb-fit-v3-long/decision.json",
+      "evaluation_sha256": "52b8ea1548f271d3f7c9ae5f01db0d7b51db60e492b80dae330e8b0883f035f9",
+      "proposal": "runs/tiny-rgb-full-corpus-proposal-v1/proposal.json",
+      "proposal_sha256": "f1b2ac58f98a477d99654e5645db33bc78b4c116977836cd275f915529e1e33a",
+      "training_fit_gate_passed": true,
+      "held_out_quality_verified": false,
+      "selected_model_changed": false
+    },
+    {
+      "timestamp": "2026-10-13T19:03:49Z",
+      "description": "Exact temporal pixel codec verified for a bounded full-data cache",
+      "result": "CPUonly all48training-fitviews reconstruct everyRGBbyte andoriginalframeindex exactly. Unsigned wrapping,constant,randomandstridedarray tests pass. Storage284120302to174214543bytes,38.68percentreduction; medianobserveddecodeduration0.0270seconds/viewwithoutpairedinferenceorendtoend timing. This is storage-only infrastructure,notlearning,generalizationorbaselinewin. NewdecoderexplicitlyboundsFFmpeg to2threadsandretainsreferenceRGBresizeorderafterearlier1.62percentoptimizationwasrolledback. Batchedgradientguard unitcorrectness established,butrealMetalperformanceandfulltrainerintegrationpending. All65focusedtests pass. Fullframe/targetchecks,boundedcacheownership/eviction,fulltrainerandpreflightremain requiredbeforelaunch. No pretrainedvisualfeatures,modelupdates,minermutation,confirmationdecodeorbaselineidentitychange.",
+      "artifact": "runs/tiny-rgb-pixel-delta-v1/receipt.json",
+      "artifact_sha256": "762ffd1938e9081e87805e74b371aca0b08eaab94bcdb1dd8264c56f80ec7b7b",
+      "reference_pixel_cache_bytes": 284120302,
+      "delta_pixel_cache_bytes": 174214543,
+      "focused_tests_passed": 65,
+      "held_out_quality_verified": false
     }
   ],
   "failed_attempts": [
