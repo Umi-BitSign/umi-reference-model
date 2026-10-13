@@ -441,6 +441,18 @@
       "stage_completion_observed": false,
       "held_out_quality_verified": false,
       "selected_model_changed": false
+    },
+    {
+      "timestamp": "2026-10-13T21:30:25Z",
+      "description": "First full RGB trained checkpoint fails frozen quality gates",
+      "result": "128-cap2048-exposure142open diagnosticmeanWER How1.775107/F9.331366 vsselected0.806755/0.775603 andoriginalcommon0.833907/0.857370. Insertions permitWER>1. Allqualitygates/originalguardfailed,no confirmationeligible,promotionfalse. This is adverseearlydevelopment evidence,notcompletedrunverdict; previous24casefitdoesnotprovegeneralization. Ownedrunstilllive at5628exposures/1407updates/3034unique,126finitegradienttensors,maxdriver3499114496bytes=3.26GiB. Remaining8192/16384/32768/48800checks andfresh192arm pending. Originalrecipe,gates,schedule,pinnedcode unchanged. Miner,selected/originalbaseline andconfirmations unchanged; automatic50percentdutyexpiry retained. Nextobservation30minuteslater.",
+      "artifact": "checkpoints/tiny-rgb-full-v3-buckets/open-decisions.json",
+      "checkpoint": "checkpoints/tiny-rgb-full-v3-buckets/rgb-cap128-after-002048.safetensors",
+      "checkpoint_sha256": "d85deefc3eb3ded6b104b62a34c8596eedcef7a10fd1087398d35d7e4b956c61",
+      "checkpoint_open_gate_passed": false,
+      "stage_completion_observed": false,
+      "held_out_quality_verified": false,
+      "selected_model_changed": false
     }
   ],
   "failed_attempts": [
