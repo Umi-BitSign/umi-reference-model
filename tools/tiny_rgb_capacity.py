@@ -4,11 +4,10 @@ from __future__ import annotations
 
 from dataclasses import asdict
 
-from torch import nn
-
 from tiny_rgb_language_model import ScratchRgbVision, TinyRgbLanguageTranslator
 from tiny_rgb_model import TinyRgbConfig
 from tiny_rgb_mps_safe import replace_native_gelu
+from torch import nn
 
 
 def visual_config(capacity: str) -> TinyRgbConfig:
