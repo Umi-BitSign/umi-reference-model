@@ -41,6 +41,8 @@ def configure_model(model):
 
 
 def main():
+    if os.environ.get("PYTORCH_ENABLE_MPS_FALLBACK") != "1":
+        raise ValueError("use the early winner launcher before importing the trainer")
     for key, value in {
         "PYTHONDONTWRITEBYTECODE": "1",
         "PYTORCH_ENABLE_MPS_FALLBACK": "1",

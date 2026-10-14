@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
+import types
 from pathlib import Path
 
 import pytest
@@ -10,6 +12,26 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 from c5_winner_training import RECIPE, lr_factor, private_data
 from train_c5_winner_full import configure_model
+
+
+def test_early_launcher_sets_fallback_before_the_first_trainer_import(monkeypatch):
+    from launch_c5_winner_full import main
+
+    original_import = __import__
+    observed = []
+
+    def import_hook(name, *args, **kwargs):
+        if name == "train_c5_winner_full":
+            assert os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] == "1"
+            assert os.environ["HF_HUB_OFFLINE"] == "1"
+            observed.append(name)
+            return types.SimpleNamespace(main=lambda: observed.append("called"))
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setenv("PYTORCH_ENABLE_MPS_FALLBACK", "0")
+    monkeypatch.setattr("builtins.__import__", import_hook)
+    main()
+    assert observed == ["train_c5_winner_full", "called"]
 
 
 def test_full_corpus_horizon_and_fixed_winner_rates_are_not_a_small_fit_substitute():

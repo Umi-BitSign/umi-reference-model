@@ -45,6 +45,7 @@ def sources():
     names = (
         "c5_winner_training.py",
         "train_c5_winner_full.py",
+        "launch_c5_winner_full.py",
         "c5_winner_reference.py",
         "c5_winner_mps_safe.py",
         "probe_c5_winner_decoder.py",
