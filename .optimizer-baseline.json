@@ -792,6 +792,21 @@
       "gpu_used": false,
       "selected_serving_model_changed": false,
       "miner_modified": false
+    },
+    {
+      "timestamp": "2026-10-14T14:51:27Z",
+      "description": "Prepare stronger visual-supervision route under broader user-authorized search",
+      "implementation": "tools/tiny_rgb_visual_teacher.py",
+      "new_synthetic_cpu_tests_passed": 11,
+      "focused_tests_passed": 47,
+      "teacher_training_identities_checked": 24,
+      "teacher_feature_frame_counts_matching_raw": 24,
+      "teacher_supervised_optimizer_updates": 0,
+      "result": "New auxiliary heads predict existing face/left/right DINO features and pose from four raw-RGB spatial queries. Detached teacher targets, missing-hand masks, padding/shape checks and exact identity/timeline hash guard are implemented and CPU-tested. Protected training feature hashes verified for all24 pilot rows; frame counts match, but this does not establish complete native temporal provenance. Parent transform/source binding, immutable pilot and real-data numerical proof still required before learning. Current live CPU capacity plan untouched; no new GPU training or heldout predictions. Distinct from prior unsuccessful cached-stream C5-hidden-state distillation, which remains failed. Broader tracks include winner-preserving residual adaptation and native decoding/routing calibration. No quality gain claimed.",
+      "held_out_quality_verified": false,
+      "gpu_used": false,
+      "selected_serving_model_changed": false,
+      "miner_modified": false
     }
   ],
   "failed_attempts": [
