@@ -961,7 +961,12 @@
     "planned_updates": 30092,
     "trainable_student_parameters": 6474334,
     "frozen_winner_language_parameters": 167539584,
-    "optimizer_progress_observed": false,
+    "optimizer_progress_observed": true,
+    "latest_progress_observed_at": "2026-10-14T20:23:32Z",
+    "audited_contiguous_updates": 1854,
+    "verified_unique_training_clips_seen": 1854,
+    "all53_gradients_finite_nonzero": true,
+    "frozen_source_and_sampling_bindings_unchanged": true,
     "quality_improvement_verified": false,
     "promotion_authorized": false,
     "miner_modified": false
