@@ -543,6 +543,38 @@
       "new_quality_win_verified": false,
       "selected_serving_model_changed": false,
       "miner_modified": false
+    },
+    {
+      "timestamp": "2026-10-14T04:38:24Z",
+      "description": "Winner checkpoints 8192 and 16384 fail; CPU-only visual capacity controls implemented",
+      "winner_optimizer_updates": 2101,
+      "winner_training_exposures": 16808,
+      "winner_unique_training_clips": 5130,
+      "quality_checks": [
+        {
+          "exposures": 8192,
+          "checkpoint_sha256": "2b732e02a018b27065fb13168a7238ef0854088c57c6f99ebcac7170e6e5c151",
+          "how2sign_mean_wer": 0.8070904508717149,
+          "fleurs_mean_wer": 0.8186175666438824,
+          "passes_open_development_gate": false
+        },
+        {
+          "exposures": 16384,
+          "checkpoint_sha256": "cfd2568d4cf2436e40e44b8adcd73d73129f119070a7b10718f0dbd727bb5f88",
+          "how2sign_mean_wer": 0.8547420381486247,
+          "fleurs_mean_wer": 0.888989112391368,
+          "passes_open_development_gate": false
+        }
+      ],
+      "capacity_visual_parameters": [986384, 3663056, 16928592],
+      "capacity_preparation_cpu_tests_passed": 9,
+      "capacity_asl_examples_used": 0,
+      "capacity_optimizer_updates": 0,
+      "result": "Owned winner session live, actual training continues with finite gradients and frozen source/recipe. All four completed winner-based quality checks fail, with no promotion or confirmation. 8192 slightly improves How weighted WER but fails How mean, FLEURS and signer guards; 16384 regresses both domains. Separately implemented new CPU-only scratch-visual width/depth controls preserving pixel geometry, convolution stem, per-frame tokens and supplied language interface. Actual visual sizes are 0.986M/3.663M/16.929M; synthetic interface/gradient tests pass. This is executable preparation, not ASL fit, Metal qualification, speed or generalization evidence. No live pinned file changed, concurrent GPU job or miner mutation. Historical original/current baseline fields preserved.",
+      "run_complete": false,
+      "new_quality_win_verified": false,
+      "selected_serving_model_changed": false,
+      "miner_modified": false
     }
   ],
   "failed_attempts": [
