@@ -290,6 +290,18 @@ The user-requested `2026-10-14T14:30:21Z` observation found the medium arm live 
 
 At `2026-10-14T15:00:21Z`, medium completed all 6,144 updates with 24/24 exact training translations and zero mean training WER. Wrong-video WER is 1.442429. All medium steps are contiguous with 126 finite nonzero gradients throughout; all 432 predictions reproduce nine fit decisions and all three checkpoint hashes verify. Final medium SHA-256: `0c9ebe2120dae2f3b2320cd02e703b13878cf46b49078f2e66506ed4b39736f7`. Large passed its complete six-case CPU proof and is live at update 1,277 / epoch 54, with all 166 tensors receiving finite nonzero gradients at the latest step. All 36 preflight stage records across the three capacities reproduce their original guards. No held-out quality or baseline win is established. Next routine observation `2026-10-14T15:30:21Z`.
 
+The matched CPU experiment completed with terminal exit 0, observed at `2026-10-14T16:00:21Z`. All three arms passed the training-fit gate at the final 256-pass horizon:
+
+| Visual capacity | Visual parameters | Final training mean WER | Exact / 24 | Wrong-video WER |
+|-----------------|-------------------|-------------------------|------------|-----------------|
+| Small           | 986,384           | 0.175926                | 23         | 1.629929        |
+| Medium          | 3,663,056         | 0.000000                | 24         | 1.442429        |
+| Large           | 16,928,592        | 0.147321                | 22         | 1.479466        |
+
+Each completed 6,144 updates at the same 192-pixel short side with the same 24 clips, pretrained language initialization, rates and exposure order. Medium passes at the scheduled epoch-128 check; small and large first pass at 256. Medium is the most promising training-fit control here, not an established generalization winner. Increasing attention width/depth is not monotonically better at this seed/recipe. No diagnostic weight initializes a broad-data run.
+
+`tools/audit_tiny_rgb_capacity_cpu_fit.py` independently checked the frozen plan/runtime/data/source bindings, all 18,432 contiguous updates, all 1,296 predictions and 27 fit decisions, all nine saved checkpoint hashes and all 36 real CPU preflight stage records. Every small/medium update retained 126 nonzero finite gradients; every large update retained 166. Decision SHA-256 is `1b4c338b3aa50a467f0709e75272616a07b60b63cb35f6e61b6489f50c494167`; post-run receipt `runs/tiny-rgb-capacity-cpu-fit-v1/post-run-audit.json` SHA-256 is `d67046dc149af3333486536a53a356491fefe24b51f7c020e8d4c4960632e03d`. Large final weight SHA-256 is `fabdaf6e1bf1ad45b038e4481d868e202bb4e172a38686d8a76a2ac4498d131c`. All records/weights remain; about 82 GiB is physically free. No model job or observation timer remains active at this handoff. The competitive-quality goal is unachieved: this control uses training data only, has no held-out model-quality result and does not beat the C5 winner. Next: separately freeze and numerically qualify the new raw-pixel/feature-teacher pilot, then fresh broader-data learning and generalization evaluation.
+
 ## Broader experimental search, October 14, 2026
 
 The user broadened the methodological goal: beat the base model, with freedom to choose the approach. Architecture and training strategy may change in new experiments; public-model-track rights, protected-data exclusions, honest quality comparisons and the ban on miner changes still apply. Existing frozen experiments and their failed results remain unchanged.
