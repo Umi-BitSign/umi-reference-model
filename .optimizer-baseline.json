@@ -646,6 +646,22 @@
       "new_quality_win_verified": false,
       "selected_serving_model_changed": false,
       "miner_modified": false
+    },
+    {
+      "timestamp": "2026-10-14T10:04:49Z",
+      "description": "Capacity activation and padding checks separated after verified padding-only CPU difference",
+      "plan": "runs/tiny-rgb-capacity-numerics-v4-separate-stages/plan.json",
+      "plan_sha256": "36f4c8f9e8993295cc7c461b8683558c4eb8e8cc85a624f41e515a3994fc50e1",
+      "failed_v3_comparisons_sha256": "7a1c85981b8f23725d3cda10771bb8bd93a51facff8ec3513344018d547ebfc0",
+      "cpu_isolation": "runs/tiny-rgb-capacity-cpu-isolation-v2-padding/summary.json",
+      "focused_cpu_tests_passed": 23,
+      "focused_metal_tests_passed": 1,
+      "optimizer_updates": 0,
+      "result": "V3terminal1 after4real small-capacity CPU/MPS cases112/1frames bothresolutions pass126 gradients, confirming observedMetalstorage repair. Long197 caseCPUcombinedcheckfailsat.000158310; activation-onlyequivalence exactlyzero, all difference ispadding. New schema2 explicitlyseparates same-shapeactivation.0001 fromexistingfullRGBpadding.001 andCPU/MPS.001 guards, preserving.005perparam/norm and.0005loss eachstage. This is a numerical-test scope correction; oldfrozenv3remainsfailed,noerrordisguised,nocandidatequalitygatechange. New thirdall-gradientcomparison added. Same4cases/3caps/2sides/weights;24focusedtests23CPU1Metalpass. Job42999launched, numericalsuccessunobserved until30minutecheck; no weightupdates, qualitygain,promotion,confirmations orminermutation.",
+      "numerical_stage_complete": false,
+      "new_quality_win_verified": false,
+      "selected_serving_model_changed": false,
+      "miner_modified": false
     }
   ],
   "failed_attempts": [
