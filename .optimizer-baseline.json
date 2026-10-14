@@ -632,6 +632,20 @@
       "new_quality_win_verified": false,
       "selected_serving_model_changed": false,
       "miner_modified": false
+    },
+    {
+      "timestamp": "2026-10-14T09:24:02Z",
+      "description": "Pinned Metal channels-last GELU forward bug isolated; contiguous capacity qualification launched",
+      "plan": "runs/tiny-rgb-capacity-numerics-v3-contiguous-forward/plan.json",
+      "plan_sha256": "65bd4eb10c9ca9a14b82ef6ced6fe61d8bbb5cae2a3d8fccb564cf77f163639a",
+      "focused_cpu_tests_passed": 22,
+      "focused_metal_tests_passed": 1,
+      "optimizer_updates": 0,
+      "result": "Second actual probe exited1: firstCPUforward equivalence exact, butMPSstemgradients roughly96-101percentwrong. Shortsyntheticoperatorisolation showsnativeMetalGELU misreads4Dchannels-last images: forwarderror3.27841,nativegradrelative1.77071;contiguousnative andoldportable accurate. Analyticalderivativealone fixedisolatedbackwardbutretainedwrongnativeforward. Capacity-onlymodule nowcanonicalizesMetalnativeforward andderivative operands withoutchangingpixelvalues/weights, retainsoriginalCPUforward, all limits unchanged. DirectMetalchannels-last regressionandnoncontiguoussecond-derivative tests pass;23focusedtests22CPU+1Metal. Newv3immutablejob19290 launchedsame4trainingcases/3capacities/2sides; fullnumericalsuccessunobserved until30-minutecheck. Oldsharedhelper/oldC5RGBsources andeveryfailedplan/snapshot/record preserved. No ASLlearning/newweight/evaluation/qualityclaim/miner change.",
+      "numerical_stage_complete": false,
+      "new_quality_win_verified": false,
+      "selected_serving_model_changed": false,
+      "miner_modified": false
     }
   ],
   "failed_attempts": [
