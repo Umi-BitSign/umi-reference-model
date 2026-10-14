@@ -49,6 +49,7 @@ def test_cases_cover_real_extrema_and_fleurs_without_evaluation_headers():
         "how2sign",
         "fleurs",
         "asl_stem_original",
+        "openasl_scale",
     }
     assert all(r["training"]["training_allowed"] is True for r in selected)
 

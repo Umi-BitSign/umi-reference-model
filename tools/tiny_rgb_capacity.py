@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import asdict
 
 from tiny_rgb_capacity_activations import replace_capacity_gelu
+from tiny_rgb_capacity_positions import CanonicalPositionsVision
 from tiny_rgb_language_model import ScratchRgbVision, TinyRgbLanguageTranslator
 from tiny_rgb_model import TinyRgbConfig
 from torch import nn
@@ -25,6 +26,10 @@ def visual_config(capacity: str) -> TinyRgbConfig:
 def build_capacity_translator(language_model: nn.Module, capacity: str):
     """Construct scratch vision without reinitializing the supplied language decoder."""
     model = TinyRgbLanguageTranslator(language_model, visual_config(capacity))
+    # Preserve the originally seeded vision weights rather than initialize a new experiment.
+    vision = CanonicalPositionsVision(model.vision.config)
+    vision.load_state_dict(model.vision.state_dict(), strict=True)
+    model.vision = vision
     replace_capacity_gelu(model.vision)
     return model
 

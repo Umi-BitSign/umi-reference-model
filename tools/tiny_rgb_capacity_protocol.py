@@ -50,6 +50,11 @@ def select_cases(rows, headers):
     if not fleurs:
         raise ValueError("capacity qualification lacks an eligible FLEURS training clip")
     chosen.append(fleurs[0])
+    for prefix in ("asl_stem", "openasl"):
+        family = [key for key in keys if key[0].startswith(prefix)]
+        if not family:
+            raise ValueError(f"capacity qualification lacks eligible {prefix} training")
+        chosen.append(family[0])
     return [{"training": inventory[key], "header": training[key]} for key in sorted(set(chosen))]
 
 
@@ -93,6 +98,7 @@ def sources():
     for name in (
         "tiny_rgb_capacity.py",
         "tiny_rgb_capacity_activations.py",
+        "tiny_rgb_capacity_positions.py",
         "tiny_rgb_capacity_protocol.py",
         "probe_tiny_rgb_capacity.py",
         "c5_certification_budget.py",
