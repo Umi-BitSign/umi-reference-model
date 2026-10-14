@@ -12,7 +12,9 @@
     "local_quality_and_runtime_verified": false,
     "new_resource_policy": "runs/c5-resource-policy-v2-certification48/gpu-budget.json",
     "unthrottled_compute_expires_at": "2026-10-15T22:47:28Z",
-    "next_training_scope": "full functional translator, preserving separate fingerspelling component and router; qualifying numerics before updates",
+    "next_training_scope": "Winner full functional-translator recipe completed and rejected; next qualify small-input scratch-visual capacity controls with the same pinned pretrained language decoder",
+    "latest_training_decision": "checkpoints/c5-winner-full-v2-early/decision.json",
+    "latest_full_translator_recipe_improved_quality": false,
     "historical_original_and_current_baseline_fields_preserved": true,
     "miner_modified": false
   },
@@ -575,6 +577,29 @@
       "new_quality_win_verified": false,
       "selected_serving_model_changed": false,
       "miner_modified": false
+    },
+    {
+      "timestamp": "2026-10-14T07:38:24Z",
+      "description": "Full C5-winner fine-tuning completed and rejected on all six quality checks",
+      "decision": "checkpoints/c5-winner-full-v2-early/decision.json",
+      "decision_sha256": "9dd8065503cbd6cc496a7de48236de46581652bbc355bda5879c77845a5735bd",
+      "optimizer_updates": 6100,
+      "training_exposures": 48800,
+      "unique_training_clips": 7529,
+      "prediction_records": 994,
+      "trained_quality_check_count": 6,
+      "passed_quality_check_count": 0,
+      "final_checkpoint_sha256": "c51834051bc93d5914c7c8d60e73321836c748a7d65dbc319a0f632dfc8b430b",
+      "final_how2sign_mean_wer": 0.8646735274618617,
+      "final_fleurs_mean_wer": 0.8695655534941249,
+      "maximum_driver_allocated_bytes": 24385748992,
+      "mps_active_seconds": 20390.022493559052,
+      "result": "Owned session99765 terminal exit0 with full corpus/schedule completion. All6100 contiguous updates retain456 finite nonzero gradients. Post-run checked_plan succeeds, all six checkpoint hashes verified, and quality decisions independently reproduce from all994 saved diagnostic predictions. Every trained How mean is worse than the frozen winner; final How/F mean .864674/.869566 vs .797674/.780638, relative worsening8.40/11.39percent. All6 frozen quality gates fail, so reject this exact recipe and retain active winner/historical serving guards. No native composite promotion or confirmation consumption. CPU-only existing-prediction audit shows distinct nonempty outputs, increased How repetition and longer outputs; F regression persists without repeated trigrams, no causal verdict. Next actual training-only/real-language/Metal qualification of new small-input visual capacity controls. All records and weights preserved, about84GiB free, no deletion. Goal quality unachieved.",
+      "run_complete": true,
+      "new_quality_win_verified": false,
+      "selected_serving_model_changed": false,
+      "miner_modified": false,
+      "confirmation_decoded": false
     }
   ],
   "failed_attempts": [
