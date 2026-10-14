@@ -492,6 +492,26 @@
       "new_quality_win_verified": false,
       "selected_serving_model_changed": false,
       "miner_modified": false
+    },
+    {
+      "timestamp": "2026-10-14T02:06:24Z",
+      "description": "Winner matched translator control complete; training-only teacher preparation live",
+      "plan": "runs/c5-winner-full-v2-early/plan.json",
+      "plan_sha256": "c3270ed287990d3fa838f546e30af66ee6095fd90e3e8051657ca716e40e56f1",
+      "control": "checkpoints/c5-winner-full-v2-early/winner-control.json",
+      "predictions_sha256": "670918bf107851efe40a862e26f3911e0e4356f28bf4a0a26980187bee69ed06",
+      "how2sign_mean_wer": 0.7976740755997405,
+      "fleurs_mean_wer": 0.7806382840217426,
+      "how2sign_word_weighted_wer": 0.7862753203803224,
+      "fleurs_word_weighted_wer": 0.7844827586206896,
+      "teacher_cases_observed_at_subsequent_scoped_count": 2998,
+      "teacher_cases_required": 7529,
+      "optimizer_updates_on_winner": 0,
+      "result": "Initial winner control completed on 142 already-open calibrated168 stride2 clips with winner decoding. Translator-only development evidence; no native complete-composite or official score. Historical original/current scores and fields retained, with historical decoding differences disclosed. Early launcher successfully enabled required CPU fallback before Torch initialization. Fresh frozen-winner teacher logits are being generated for all training-only prefixes before updates. No trained checkpoint or new quality gain yet; code and gates remain frozen while live. User-requested observation, then resume 30-minute monitoring.",
+      "new_quality_win_verified": false,
+      "full_composite_or_official_score": false,
+      "selected_serving_model_changed": false,
+      "miner_modified": false
     }
   ],
   "failed_attempts": [
