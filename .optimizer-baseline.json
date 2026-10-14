@@ -724,6 +724,28 @@
       "new_quality_win_verified": false,
       "selected_serving_model_changed": false,
       "miner_modified": false
+    },
+    {
+      "timestamp": "2026-10-14T13:12:37Z",
+      "description": "Actual CPU scratch-RGB learning reaches 2938 verified small-arm updates",
+      "plan": "runs/tiny-rgb-capacity-cpu-fit-v1/plan.json",
+      "observed_capacity": "small",
+      "optimizer_updates": 2938,
+      "training_epoch_in_progress": 123,
+      "real_cpu_proof_stages_passed": 12,
+      "maximum_cpu_relative_gradient_error": 0.002125190527336025,
+      "gradient_tensors_finite_nonzero_every_step": 126,
+      "median_step_seconds": 0.4254113544593565,
+      "epoch64_training_mean_wer": 1.9022063237688238,
+      "epoch64_training_exact_translations": 3,
+      "epoch64_wrong_video_mean_wer": 2.820809018051665,
+      "passes_training_fit_gate": false,
+      "result": "Session66336 live. Small six-case nativeCPU activation and maskedpadding proofs pass unchangedlimits; bitexactactivationforward, maxpaddinglogit.000108719. First2938contiguousupdates independently checked, all126grads finite/nonzero eachstep; small32 savedcheckpoint hashverified. Teacherforcedloss declines to.544471 at120, but latestcompleted64freegeneration meanWER1.902206 and3/24exact failfitgate; wrongvideoWER2.820809. Medium/large notstarted, nocapacityconclusion/generalization/winnerwin. ContinueimmutableCPUrun; nextassistantobservation30minlater. NoGPUused/minermutation/confirmationconsumption.",
+      "run_complete": false,
+      "gpu_used": false,
+      "new_quality_win_verified": false,
+      "selected_serving_model_changed": false,
+      "miner_modified": false
     }
   ],
   "failed_attempts": [
