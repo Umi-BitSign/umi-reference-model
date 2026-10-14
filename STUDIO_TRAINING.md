@@ -192,6 +192,18 @@ At the user-requested observation on October 13, 2026 at 10:06 p.m. Eastern, the
 
 The subsequent scoped manifest count observed 2,998 of 7,529 training-only winner teacher prefixes committed, with no optimizer-step ledger or trained quality checkpoint yet. Last emitted teacher progress was 2,560 cases, with about 4.70 GiB maximum driver allocation, unthrottled permitted GPU duty and eight CPU threads. This is preparation progress, not a trained-model improvement. The first trained quality check remains at 512 exposures; the full schedule remains 48,800 exposures / 6,100 updates. Keep every pinned source and gate unchanged while live. User status requests permit an immediate observation; routine checks remain 30 minutes apart. No serving-model promotion, miner-service mutation or new confirmation use occurred.
 
+## First winner-training quality checks
+
+At the scheduled October 13, 2026, 11:08 p.m. Eastern observation, session 99765 remained live. All 7,529 training-only teacher prefixes are prepared. Training reached 3,072 exposures / 384 optimizer updates / 2,016 distinct training clips, with all 456 meaningful gradient tensors finite and nonzero at the latest update. Maximum observed Metal driver allocation is 14,686,355,456 bytes (13.68 GiB). The original model numerics, pinned recipe, source/signer replay and quality gates remain unchanged.
+
+| Winner-based translator checkpoint | How2Sign mean WER | FLEURS mean WER | Open gate |
+|-----------------------------------|-------------------|-----------------|-----------|
+| Frozen winner control             | 79.77%            | 78.06%          | Reference |
+| 512 training exposures            | 85.79%            | 83.15%          | Failed    |
+| 2,048 training exposures          | 82.35%            | 77.74%          | Failed    |
+
+The 512 checkpoint regressed on both domains; its How source-bootstrap 95% mean-delta interval is [+0.01720, +0.11256]. At 2,048, How worsened by 3.24% relatively, with interval [-0.01403, +0.06720] and substantial signer-1/9 regressions. FLEURS mean WER improved by 0.33 percentage points, with word-weighted WER tied. Neither passes the fixed gates or permits independent confirmation. These are matched winner-decoding comparisons on the same already-open calibrated168 stride2 translator inputs, not complete-composite or official scores. Checkpoint SHA-256 values are `65050323cb9fa5d06aa0d215911f5702d2acbccc201a5aa068be355c6256de33` (512) and `4a79c9f5985751cee61be2bb9e562ae0fbbba01f2eb1f6724f963254ac0efac5` (2,048). Preserve both and continue the frozen schedule; next evaluation is at 8,192 exposures. No serving promotion, miner mutation or confirmation use occurred.
+
 ## Small-input visual capacity hypothesis
 
 The user proposes increasing model capacity while preserving the small pixel input. Input resolution and learned parameter count can be varied independently. The current custom visual encoder has 986,384 parameters, with a separate 99,328-parameter bridge and 41,625,344 pretrained language parameters. A future capacity comparison should enlarge the scratch visual encoder first, retain the same aspect-preserving small inputs, complete frame sequence, pretrained language initialization, data/schedule and evaluation gates, and isolate capacity from resolution or augmentation changes. Approximate four- and sixteen-million-parameter visual targets are proposals, not instantiated or measured models.

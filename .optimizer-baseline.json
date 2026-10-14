@@ -512,6 +512,37 @@
       "full_composite_or_official_score": false,
       "selected_serving_model_changed": false,
       "miner_modified": false
+    },
+    {
+      "timestamp": "2026-10-14T03:08:24Z",
+      "description": "Winner full-translator training active; first two quality checkpoints fail",
+      "plan": "runs/c5-winner-full-v2-early/plan.json",
+      "teacher_cases_completed": 7529,
+      "optimizer_updates_on_winner": 384,
+      "training_exposures": 3072,
+      "unique_training_clips_seen": 2016,
+      "maximum_driver_allocated_bytes": 14686355456,
+      "quality_checks": [
+        {
+          "exposures": 512,
+          "checkpoint_sha256": "65050323cb9fa5d06aa0d215911f5702d2acbccc201a5aa068be355c6256de33",
+          "how2sign_mean_wer": 0.8579404359125868,
+          "fleurs_mean_wer": 0.831488624157797,
+          "passes_open_development_gate": false
+        },
+        {
+          "exposures": 2048,
+          "checkpoint_sha256": "4a79c9f5985751cee61be2bb9e562ae0fbbba01f2eb1f6724f963254ac0efac5",
+          "how2sign_mean_wer": 0.8234852433673421,
+          "fleurs_mean_wer": 0.7773577612863327,
+          "passes_open_development_gate": false
+        }
+      ],
+      "result": "All fresh winner teacher targets complete, then real full-translator optimizer updates. Latest update covers all 456 meaningful gradient tensors with finite nonzero gradients. Both initial trained checkpoints fail the unchanged winner-based quality gates: 512 regresses both domains; 2048 improves FLEURS mean slightly with tied weighted WER but worsens How mean/weighted and signer guards. This is partial already-open translator-only development evidence, not a completed schedule or native composite/official result. Original/current historical baseline fields retained. Continue live immutable recipe to its remaining frozen checks, next at 8192 exposures. No confirmation or promotion.",
+      "run_complete": false,
+      "new_quality_win_verified": false,
+      "selected_serving_model_changed": false,
+      "miner_modified": false
     }
   ],
   "failed_attempts": [
