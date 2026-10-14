@@ -38,12 +38,13 @@ def run(plan_path, output):
     from probe_tiny_rgb_capacity import compare, native_gelus, state_digest
     from tiny_rgb_capacity_protocol import verified_comparison
     from tiny_rgb_data import pixel_tensor
-    from tiny_rgb_full_training_tools import decode_rgb_video_fast, masked_length_buckets
+    from tiny_rgb_full_training_tools import decode_rgb_video_fast
     from tiny_rgb_visual_teacher_data import load_targets
     from tiny_rgb_winner_student import (
         RawRgbWinnerStudent,
         load_frozen_winner_encoder,
         student_objective,
+        winner_length_buckets,
     )
     from tiny_rgb_winner_student_protocol import BUDGET, RECIPE, ROOT, checked_plan
     from transformers import ByT5Tokenizer
@@ -125,7 +126,7 @@ def run(plan_path, output):
         )
         if teacher_error > 1e-3 or not torch.isfinite(actual_latent).all():
             raise RuntimeError("winner semantic teacher CPU/Metal forward mismatch")
-        padded, mask, target_labels = masked_length_buckets(video, labels, torch)
+        padded, mask, target_labels = winner_length_buckets(video, labels)
         latent_padded = latent.new_zeros(1, padded.shape[1], 1536)
         latent_padded[:, : video.shape[1]] = latent
         targets_padded = {}

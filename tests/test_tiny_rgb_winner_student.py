@@ -10,7 +10,7 @@ from transformers import T5Config
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 from c5_winner_language_decoder import WinnerLanguageDecoder
 from tiny_rgb_visual_teacher import STREAM_WIDTHS
-from tiny_rgb_winner_student import RawRgbWinnerStudent, student_objective
+from tiny_rgb_winner_student import RawRgbWinnerStudent, student_objective, winner_length_buckets
 
 
 def language():
@@ -78,3 +78,25 @@ def test_generation_uses_only_raw_student_and_frozen_language():
         do_sample=False,
     )
     assert tokens.shape[0] == 1
+
+
+@pytest.mark.parametrize("length", [8, 80, 256, 289, 512])
+def test_winner_byte_buckets_preserve_every_target_and_frame(length):
+    from tiny_rgb_full_training_tools import masked_length_buckets
+
+    video = torch.randn(1, 3, 3, 32, 48)
+    labels = torch.arange(length)[None]
+    padded, mask, target = winner_length_buckets(video, labels)
+    assert torch.equal(padded[:, :3], video) and mask.sum() == 3
+    assert torch.equal(target[:, :length], labels)
+    assert (target[:, length:] == -100).all()
+    if length <= 256:
+        original = masked_length_buckets(video, labels, torch)
+        assert all(
+            torch.equal(left, right)
+            for left, right in zip((padded, mask, target), original, strict=True)
+        )
+    else:
+        assert target.shape[1] == (384 if length == 289 else 512)
+    with pytest.raises(ValueError, match="truncate"):
+        winner_length_buckets(video, torch.zeros(1, 513, dtype=torch.long))

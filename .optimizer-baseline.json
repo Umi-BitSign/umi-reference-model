@@ -932,6 +932,24 @@
       "held_out_quality_verified": false,
       "selected_serving_model_changed": false,
       "miner_modified": false
+    },
+    {
+      "timestamp": "2026-10-14T18:48:44Z",
+      "description": "Student byte-reference bucket support repaired after three passing real caption cases",
+      "failed_plan": "runs/tiny-rgb-winner-student-preflight-v1/plan.json",
+      "passed_actual_caption_cases": 3,
+      "maximum_passed_relative_gradient_error": 0.000006531324863171891,
+      "maximum_passed_caption_logit_difference": 0.0000040531158447265625,
+      "complete_byte_target_triggering_shape_failure": 289,
+      "plan": "runs/tiny-rgb-winner-student-preflight-v2-byte-buckets/plan.json",
+      "plan_sha256": "f45ae74305292428254820d6517b4002c6fc78bf8f5b661cbd882e49297d4564",
+      "focused_tests_passed": 81,
+      "optimizer_updates": 0,
+      "result": "Owned first proof terminal1: three complete real caption cases pass53gradient checks and fourth semantic teacher forward passes, then inherited helper cannot bucket289byte target. Old sources/13stage records retained. New winner-only helper extends384/512 targets, preserving allbytes/frames and bitexact old8/80/256 buckets; rejects>512, original shared helper untouched. Same six cases/model/objective/nativeinputs/frozenlanguage/teacher and alllimits. Fresh proof job70636 launched; numerical completion unobserved until30-minutecheck. No update/weight/eval/quality/miner change; full streaming trainer still required ifpasses.",
+      "numerical_stage_complete": false,
+      "held_out_quality_verified": false,
+      "selected_serving_model_changed": false,
+      "miner_modified": false
     }
   ],
   "failed_attempts": [

@@ -11,6 +11,29 @@ from train_tiny_rgb_visual_teacher import build_student
 from transformers.modeling_outputs import BaseModelOutput
 
 
+def winner_length_buckets(video, labels):
+    """Extend only this byte-decoder family's target buckets, without dropping tokens."""
+    from tiny_rgb_full_training_tools import masked_length_buckets
+
+    padded, mask, _ = masked_length_buckets(video, None, torch)
+    if labels is None:
+        return padded, mask, None
+    length = labels.shape[1]
+    size = next(
+        (
+            size
+            for size in (8, 16, 24, 32, 48, 64, 80, 96, 128, 192, 256, 384, 512)
+            if size >= length
+        ),
+        None,
+    )
+    if length < 1 or size is None:
+        raise ValueError("winner student cannot truncate a byte reference")
+    target = labels.new_full((labels.shape[0], size), -100)
+    target[:, :length] = labels
+    return padded, mask, target
+
+
 class RawRgbWinnerStudent(nn.Module):
     def __init__(self, language):
         super().__init__()
