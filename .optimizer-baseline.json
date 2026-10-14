@@ -12,7 +12,7 @@
     "local_quality_and_runtime_verified": false,
     "new_resource_policy": "runs/c5-resource-policy-v2-certification48/gpu-budget.json",
     "unthrottled_compute_expires_at": "2026-10-15T22:47:28Z",
-    "next_training_scope": "Raw192 student with frozen winner language passes all six real CPU-Metal numerical cases; freeze and launch fresh full7523-corpus human-caption/online-winner-distillation training before quality comparison",
+    "next_training_scope": "Fresh raw192 full7523-corpus human-caption/online-winner-distillation run launched after complete real numerical qualification; observe optimizer progress and four unchanged quality checks before native-composite validation",
     "latest_training_decision": "checkpoints/c5-winner-full-v2-early/decision.json",
     "latest_full_translator_recipe_improved_quality": false,
     "historical_original_and_current_baseline_fields_preserved": true,
@@ -952,6 +952,20 @@
       "miner_modified": false
     }
   ],
+  "latest_student_training_launch": {
+    "launched_at": "2026-10-14T19:53:18Z",
+    "plan": "runs/tiny-rgb-winner-full-v1/plan.json",
+    "plan_sha256": "1f8ea7b61b6193670f8b41955eb230b47534744bc459f9640ad3cb1eff7a0477",
+    "output": "checkpoints/tiny-rgb-winner-full-v1",
+    "verified_training_clips": 7523,
+    "planned_updates": 30092,
+    "trainable_student_parameters": 6474334,
+    "frozen_winner_language_parameters": 167539584,
+    "optimizer_progress_observed": false,
+    "quality_improvement_verified": false,
+    "promotion_authorized": false,
+    "miner_modified": false
+  },
   "latest_student_numerical_qualification": {
     "observed_at": "2026-10-14T19:18:44Z",
     "plan": "runs/tiny-rgb-winner-student-preflight-v2-byte-buckets/plan.json",
