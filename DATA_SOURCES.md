@@ -1,6 +1,6 @@
 # Known sign-language data sources
 
-Updated 2026-10-12. This is the project's discovery catalog, not a blanket rights clearance. The project owner reports counsel's advice that UMI's public model track may use How2Sign and other noncommercial datasets to train an open-weight model; counsel treats Bittensor miner grants as grants for that open-source work. This handling applies to the public model track. Review each source's exact version and terms before download, and record the applicable counsel decision, attribution, access conditions and transform history in the experiment ledger. Permission-gated access and third-party source-video or redistribution terms require separate review.
+Updated 2026-10-14. This is the project's discovery catalog, not a blanket rights clearance. The project owner reports counsel's advice that UMI's public model track may use How2Sign and other noncommercial datasets to train an open-weight model; counsel treats Bittensor miner grants as grants for that open-source work. This handling applies to the public model track. Review each source's exact version and terms before download, and record the applicable counsel decision, attribution, access conditions and transform history in the experiment ledger. Permission-gated access and third-party source-video or redistribution terms require separate review.
 
 ## Data used in the public UMI S1 lineage
 
@@ -30,6 +30,10 @@ Updated 2026-10-12. This is the project's discovery catalog, not a blanket right
 | Public YouTube/web acquisition | https://research.youtube.com/ | Potential weak supervision only. Platform access, copyright, consent, caption quality and deletion handling require a separate ingestion policy. |
 
 The OpenASL scale tranche's 60-source confirmation partition described above has now been consumed by the frozen face-recovery candidate. The candidate improved mean WER from 0.58818 to 0.58184, but its clustered 95% upper confidence bound (+0.02214) exceeded the prespecified +0.02 noninferiority limit. It was rejected and the selected model is unchanged. Neither this partition nor its reserve clips may be used to select later candidates. See `runs/c5-face-openasl-confirmation-v1/decision.json` and `runs/openasl-scale-v1/face-recovery-confirmation-claim.json`.
+
+### Local raw-clip integrity quarantine
+
+An annotation-only duration audit on October 14, 2026 found six of the 4,928 local How2Sign training bindings severely truncated: actual duration is less than half the publisher's realigned interval. One contains a single frame for a 3.30-second sentence, including in its original aligned source. Keep all source files and historical experiments intact, but exclude these six identities from new raw-video training until the source video is recovered and re-audited. The complete finding list, pinned annotation/source hashes and selection rule are in `runs/tiny-rgb-duration-integrity-v1/receipt.json`, SHA-256 `a9e2eadb88a8f3f8363ec67cb65f3d6c69c0ee794c68a94e85d73e50e50ac756`. Future raw training currently has 7,523 eligible bindings across How2Sign, FLEURS, ASL STEM and OpenASL. This integrity check uses no model scores and does not establish that the remaining labels are semantically aligned or explain all previous regressions.
 
 ## ASL isolated signs, lexicons and linguistic annotations
 
