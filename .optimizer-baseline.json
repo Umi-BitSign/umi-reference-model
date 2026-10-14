@@ -746,6 +746,29 @@
       "new_quality_win_verified": false,
       "selected_serving_model_changed": false,
       "miner_modified": false
+    },
+    {
+      "timestamp": "2026-10-14T13:42:37Z",
+      "description": "Small-input scratch RGB passes matched CPU learnability gate",
+      "plan": "runs/tiny-rgb-capacity-cpu-fit-v1/plan.json",
+      "completed_capacity": "small",
+      "verified_optimizer_updates": 6144,
+      "verified_predictions": 432,
+      "verified_fit_decisions": 9,
+      "verified_checkpoints": 3,
+      "final_checkpoint_sha256": "39eedd3a770ff83c46330cbfb1cf7294689b3ea01952136ffb83df4f1a1cb0c6",
+      "training_mean_wer": 0.17592592592592593,
+      "training_exact_translations": 23,
+      "wrong_video_mean_wer": 1.6299287282252968,
+      "wrong_video_wer_increase": 1.454002802299371,
+      "passes_training_fit_gate": true,
+      "medium_cpu_preflight_stages_passed": 12,
+      "result": "Small arm complete with contiguous updates and all 126 gradients finite/nonzero throughout. All nine fit decisions independently reproduce from 432 predictions, and three saved checkpoint hashes verify. Small training-fit gate first passes at epoch 256; epoch 128 has 16 exact but mean WER 0.300482 and fails. Final single FLEURS outlier has 18 reference words versus 90 generated words and accounts for every remaining error; retain without exclusion or decoder retuning. Medium real CPU preflight passes; owned process remains live. Large pending. This establishes small-input learnability, not generalization, a capacity win or superiority to the C5 winner. No promotion or confirmation use.",
+      "run_complete": false,
+      "held_out_quality_verified": false,
+      "gpu_used": false,
+      "selected_serving_model_changed": false,
+      "miner_modified": false
     }
   ],
   "failed_attempts": [
