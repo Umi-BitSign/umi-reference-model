@@ -11,6 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 REFERENCE_PLAN = ROOT / "runs/tiny-rgb-full-v3-buckets/plan.json"
 BUDGET = ROOT / "runs/c5-resource-policy-v2-certification48/gpu-budget.json"
+DURATION_AUDIT = ROOT / "runs/tiny-rgb-duration-integrity-v1/receipt.json"
 CAPACITIES = ("small", "medium", "large")
 SIDES = (128, 192)
 LIMITS = {
@@ -102,18 +103,26 @@ def sources():
         "tiny_rgb_capacity_protocol.py",
         "probe_tiny_rgb_capacity.py",
         "c5_certification_budget.py",
+        "audit_tiny_rgb_duration.py",
     ):
         result[f"tools/{name}"] = sha256(ROOT / "tools" / name)
     return result
 
 
 def inputs():
+    from audit_tiny_rgb_duration import checked_duration_audit
     from tiny_rgb_full_corpus import read_rows
-    from tiny_rgb_full_run import checked_full_plan, training_inventory
+    from tiny_rgb_full_run import checked_full_plan
 
     parent = checked_full_plan(REFERENCE_PLAN)
-    rows = training_inventory(parent)
-    return parent, select_cases(rows, read_rows(ROOT / parent["headers"]))
+    _, rows = checked_duration_audit(DURATION_AUDIT)
+    allowed = {(row["source"], row["example_id"]) for row in rows}
+    headers = [
+        row
+        for row in read_rows(ROOT / parent["headers"])
+        if row["role"] != "training" or (row["source"], row["example_id"]) in allowed
+    ]
+    return parent, select_cases(rows, headers)
 
 
 def checked_plan(path):
@@ -132,6 +141,7 @@ def checked_plan(path):
         or plan["runtime_binding"] != runtime_binding()
         or plan["reference_plan_sha256"] != sha256(REFERENCE_PLAN)
         or plan["resource_policy_sha256"] != sha256(BUDGET)
+        or plan["duration_audit_sha256"] != sha256(DURATION_AUDIT)
         or plan["visual_budgets"] != [visual_budget(name) for name in CAPACITIES]
     ):
         raise ValueError("capacity immutable qualification settings changed")
@@ -165,6 +175,8 @@ def freeze(path):
     for relative in (
         str(REFERENCE_PLAN.relative_to(ROOT)),
         str(BUDGET.relative_to(ROOT)),
+        str(DURATION_AUDIT.relative_to(ROOT)),
+        "data/how2sign/source/how2sign_realigned_train.csv",
         parent["training_inventory"],
         parent["headers"],
         "C5_BASELINE_REFERENCE.json",
@@ -191,6 +203,10 @@ def freeze(path):
         "reference_plan_sha256": sha256(REFERENCE_PLAN),
         "resource_policy": str(BUDGET.relative_to(ROOT)),
         "resource_policy_sha256": sha256(BUDGET),
+        "duration_audit_sha256": sha256(DURATION_AUDIT),
+        "duration_audit": str(DURATION_AUDIT.relative_to(ROOT)),
+        "eligible_training_clips": 7523,
+        "quarantined_truncated_clips": 6,
         "language_path": parent["language_path"],
         "target_fps": 12.5,
         "max_frames": 512,
