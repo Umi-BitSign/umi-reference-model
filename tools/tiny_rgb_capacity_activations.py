@@ -13,11 +13,15 @@ class _NativeForwardExactGelu(torch.autograd.Function):
     @staticmethod
     def forward(ctx, value):
         ctx.save_for_backward(value)
-        return F.gelu(value, approximate="none")
+        # The pinned Metal native kernel misreads channels-last image storage.
+        operand = value.contiguous() if value.device.type == "mps" else value
+        return F.gelu(operand, approximate="none")
 
     @staticmethod
     def backward(ctx, gradient):
         (value,) = ctx.saved_tensors
+        value = value.contiguous()
+        gradient = gradient.contiguous()
         normal_cdf = 0.5 * (1.0 + torch.erf(value * math.sqrt(0.5)))
         normal_pdf = torch.exp(-0.5 * value.square()) / math.sqrt(2.0 * math.pi)
         return gradient * (normal_cdf + value * normal_pdf)

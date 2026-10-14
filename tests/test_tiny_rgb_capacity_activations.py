@@ -50,3 +50,31 @@ def test_replacement_keeps_weights_keys_and_native_forward():
 def test_approximate_activation_is_rejected():
     with pytest.raises(ValueError, match="exact"):
         replace_capacity_gelu(nn.Sequential(nn.GELU(approximate="tanh")))
+
+
+def test_noncontiguous_double_second_derivatives_are_correct():
+    value = (
+        torch.tensor([[-2.0, -0.7, 0.0], [0.5, 1.0, 3.0]], dtype=torch.float64)
+        .transpose(0, 1)
+        .requires_grad_()
+    )
+    assert not value.is_contiguous()
+    assert torch.autograd.gradgradcheck(NativeForwardExactGelu(), (value,))
+
+
+@pytest.mark.skipif(not torch.backends.mps.is_available(), reason="native Metal required")
+def test_channels_last_metal_forward_and_backward_match_native_cpu():
+    torch.manual_seed(317)
+    value = torch.randn(2, 16, 8, 12).contiguous(memory_format=torch.channels_last)
+    weight = torch.randn_like(value)
+    cpu = value.clone().requires_grad_()
+    reference = F.gelu(cpu, approximate="none")
+    (reference * weight).sum().backward()
+    metal = value.to("mps").requires_grad_()
+    actual = NativeForwardExactGelu()(metal)
+    (actual * weight.to("mps")).sum().backward()
+    assert float((actual.detach().cpu() - reference.detach()).abs().max()) < 1e-6
+    relative = (
+        metal.grad.detach().cpu().double() - cpu.grad.double()
+    ).norm() / cpu.grad.double().norm()
+    assert float(relative) < 1e-5
