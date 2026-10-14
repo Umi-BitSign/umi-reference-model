@@ -23,12 +23,13 @@ def state_digest(values):
 
 
 def native_gelus(model):
+    from tiny_rgb_capacity_activations import NativeForwardExactGelu
     from tiny_rgb_mps_safe import PortableGelu
     from torch import nn
 
     replacements = 0
     for name, child in tuple(model.named_children()):
-        if isinstance(child, PortableGelu):
+        if isinstance(child, PortableGelu | NativeForwardExactGelu):
             setattr(model, name, nn.GELU())
             replacements += 1
         else:

@@ -87,6 +87,7 @@ def sources():
     result = original_sources()
     for name in (
         "tiny_rgb_capacity.py",
+        "tiny_rgb_capacity_activations.py",
         "tiny_rgb_capacity_protocol.py",
         "probe_tiny_rgb_capacity.py",
         "c5_certification_budget.py",

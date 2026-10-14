@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from dataclasses import asdict
 
+from tiny_rgb_capacity_activations import replace_capacity_gelu
 from tiny_rgb_language_model import ScratchRgbVision, TinyRgbLanguageTranslator
 from tiny_rgb_model import TinyRgbConfig
-from tiny_rgb_mps_safe import replace_native_gelu
 from torch import nn
 
 
@@ -25,7 +25,7 @@ def visual_config(capacity: str) -> TinyRgbConfig:
 def build_capacity_translator(language_model: nn.Module, capacity: str):
     """Construct scratch vision without reinitializing the supplied language decoder."""
     model = TinyRgbLanguageTranslator(language_model, visual_config(capacity))
-    replace_native_gelu(model.vision)
+    replace_capacity_gelu(model.vision)
     return model
 
 
@@ -35,7 +35,7 @@ def visual_budget(capacity: str, language_width: int = 512) -> dict:
         raise ValueError("language width must be positive")
     config = visual_config(capacity)
     model = ScratchRgbVision(config)
-    replacements = replace_native_gelu(model)
+    replacements = replace_capacity_gelu(model)
     total = sum(parameter.numel() for parameter in model.parameters())
     stem = sum(parameter.numel() for parameter in model.stem.parameters())
     temporal = sum(parameter.numel() for parameter in model.encoder.parameters()) + sum(
