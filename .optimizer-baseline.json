@@ -600,6 +600,22 @@
       "selected_serving_model_changed": false,
       "miner_modified": false,
       "confirmation_decoded": false
+    },
+    {
+      "timestamp": "2026-10-14T08:00:13Z",
+      "description": "Real-ASL training-only CPU/Metal qualification launched for fixed-input visual capacities",
+      "plan": "runs/tiny-rgb-capacity-numerics-v1/plan.json",
+      "plan_sha256": "4ca263dc84e6a34c4167f919b4c72ab1c2e699d2aded31b8ced6d9b009950859",
+      "training_cases": 4,
+      "visual_parameters": [986384, 3663056, 16928592],
+      "short_side_controls": [128, 192],
+      "cpu_tests_passed": 16,
+      "optimizer_updates": 0,
+      "result": "Frozen source/runtime/clip/language/resource bindings checked. New native-unpadded versus portable-masked CPU and CPU/Metal all-parameter gradient qualification uses actual generic T5-Small and approved training extrema plus FLEURS, retaining original 0.5percent gradient guards. Two future full-float AdamW moments reserved, no optimizer update or weight save. Owned session9347 launched; actual completion/numerical success unobserved until scheduled30-minute check. No second GPU job, baseline change, private certification or miner access. This is implementation/preparation progress, not ASL fitting, held-out quality or a speed claim. Historical original/current baseline fields retained.",
+      "numerical_stage_complete": false,
+      "new_quality_win_verified": false,
+      "selected_serving_model_changed": false,
+      "miner_modified": false
     }
   ],
   "failed_attempts": [
