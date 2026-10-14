@@ -12,7 +12,7 @@
     "local_quality_and_runtime_verified": false,
     "new_resource_policy": "runs/c5-resource-policy-v2-certification48/gpu-budget.json",
     "unthrottled_compute_expires_at": "2026-10-15T22:47:28Z",
-    "next_training_scope": "Raw192 visual student/bridge with frozen winner language assembled; six real semantic-teacher/caption CPU-Metal gradient cases launched before fresh full-corpus training and quality comparison",
+    "next_training_scope": "Raw192 student with frozen winner language passes all six real CPU-Metal numerical cases; freeze and launch fresh full7523-corpus human-caption/online-winner-distillation training before quality comparison",
     "latest_training_decision": "checkpoints/c5-winner-full-v2-early/decision.json",
     "latest_full_translator_recipe_improved_quality": false,
     "historical_original_and_current_baseline_fields_preserved": true,
@@ -952,6 +952,19 @@
       "miner_modified": false
     }
   ],
+  "latest_student_numerical_qualification": {
+    "observed_at": "2026-10-14T19:18:44Z",
+    "plan": "runs/tiny-rgb-winner-student-preflight-v2-byte-buckets/plan.json",
+    "receipt_sha256": "fdb0ce7e62dc26aa82ebe9bd48555c3895e629cfc33bef1ae8d99c5e1c238c45",
+    "complete_real_training_cases": 6,
+    "comparison_records": 24,
+    "checked_trainable_parameter_tensors": 53,
+    "maximum_relative_gradient_error": 0.000006531324863171891,
+    "maximum_teacher_forward_difference": 0.000029385089874267578,
+    "optimizer_updates": 0,
+    "quality_improvement_verified": false,
+    "miner_modified": false
+  },
   "failed_attempts": [
     {
       "timestamp": "2026-10-09T14:00:00Z",
