@@ -769,6 +769,29 @@
       "gpu_used": false,
       "selected_serving_model_changed": false,
       "miner_modified": false
+    },
+    {
+      "timestamp": "2026-10-14T14:30:21Z",
+      "description": "Medium visual capacity passes matched training-fit gate earlier at fixed192 input",
+      "plan": "runs/tiny-rgb-capacity-cpu-fit-v1/plan.json",
+      "verified_medium_updates": 4751,
+      "verified_medium_predictions": 384,
+      "recomputed_medium_decisions": 8,
+      "verified_medium_checkpoints": 2,
+      "medium_epoch128_checkpoint_sha256": "6258244691892f2cfd482682018fd2aa4de44ad903cc2efa262703e2a7851f0a",
+      "medium_epoch128_training_mean_wer": 0.10287873482726423,
+      "medium_epoch128_exact_translations": 17,
+      "medium_epoch128_wrong_video_mean_wer": 1.4214719381018401,
+      "small_epoch128_training_mean_wer": 0.3004820261437908,
+      "small_epoch128_exact_translations": 16,
+      "medium_first_passing_scheduled_updates": 3072,
+      "small_first_passing_scheduled_updates": 6144,
+      "result": "User-requested observation: session 66336 live, medium epoch 198 / update 4751. Same192 pixels and24 training identities, pretrained language, rates and order across capacities. Medium passes fit gate at128 with17 exact and WER0.102879; matched small128 has16 exact and WER0.300482 and fails. Medium reaches a passing scheduled check in half the updates, but only one seed and training data; no generalization or speed claim. All4751 contiguous medium steps retain126 finite nonzero gradients. Recomputed384 predictions/eight decisions and verified two checkpoints. Large pending. Continue immutable run; no quality promotion or miner change.",
+      "run_complete": false,
+      "held_out_quality_verified": false,
+      "gpu_used": false,
+      "selected_serving_model_changed": false,
+      "miner_modified": false
     }
   ],
   "failed_attempts": [
