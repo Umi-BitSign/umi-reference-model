@@ -678,6 +678,24 @@
       "new_quality_win_verified": false,
       "selected_serving_model_changed": false,
       "miner_modified": false
+    },
+    {
+      "timestamp": "2026-10-14T11:41:28Z",
+      "description": "Six independently truncated raw clips quarantined; duration-vetted capacity qualification launched",
+      "duration_audit": "runs/tiny-rgb-duration-integrity-v1/receipt.json",
+      "duration_audit_sha256": "a9e2eadb88a8f3f8363ec67cb65f3d6c69c0ee794c68a94e85d73e50e50ac756",
+      "original_training_bindings": 7529,
+      "valid_raw_training_bindings": 7523,
+      "quarantined_incomplete_clips": 6,
+      "plan": "runs/tiny-rgb-capacity-numerics-v6-duration-integrity/plan.json",
+      "plan_sha256": "4e008d551ac1f783e8642cf1024fee1f65640250a2be54b953aa16aec32b04b8",
+      "focused_tests_passed": 27,
+      "optimizer_updates": 0,
+      "result": "V5terminal1 afterSTEM/FLEURS pairs bothsizespass, one-framecase languagewi gradient .00656206>.005; preservednotrelabelled. Independentlyffprobe confirmsone-frame0.04sec vs official3.30sec annotatedsentence, originalalignedsource alsooneframe. Whole4928How annotation-only durationaudit flags6actualdurations<half expected, no scoresused. Preserveandquarantine6pendingrawsource recovery/re-audit; validraw7523, notclaimglobalfailureexplained. Futurecase selection derivesfromvettedinventory andbindsaudit/annotations, all source/reference exclusions andquality/numericlimits unchanged.27focusedtestspass. Newimmutable36-pairjob1558launched; completionunobserved until30mincheck. Oldplans/sources/features/scores unchanged, no learning/weights/heldout/promotion/miner changes.",
+      "numerical_stage_complete": false,
+      "new_quality_win_verified": false,
+      "selected_serving_model_changed": false,
+      "miner_modified": false
     }
   ],
   "failed_attempts": [
