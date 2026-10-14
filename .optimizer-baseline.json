@@ -807,6 +807,26 @@
       "gpu_used": false,
       "selected_serving_model_changed": false,
       "miner_modified": false
+    },
+    {
+      "timestamp": "2026-10-14T15:00:21Z",
+      "description": "Medium small-input model reaches 24/24 exact; large CPU fitting starts",
+      "verified_medium_updates": 6144,
+      "verified_medium_predictions": 432,
+      "recomputed_medium_decisions": 9,
+      "verified_medium_checkpoints": 3,
+      "medium_final_checkpoint_sha256": "0c9ebe2120dae2f3b2320cd02e703b13878cf46b49078f2e66506ed4b39736f7",
+      "medium_final_training_mean_wer": 0.0,
+      "medium_final_exact_translations": 24,
+      "medium_final_wrong_video_mean_wer": 1.4424287282252972,
+      "large_observed_updates": 1277,
+      "real_cpu_preflight_stages_verified_all_capacities": 36,
+      "result": "Owned CPU session 66336 live. Medium completes the matched6144-update horizon with every training translation exact, versus small23/24. Correct/wrong-video prediction audit reproduces all nine medium fit decisions; all three weights hash-verify and all steps retain126 finite nonzero gradients. Large passes all six native CPU activation/padding proofs and begins actual learning, update1277/epoch54; latest166 gradients finite/nonzero. All36 preflight stage comparisons verified against unchanged guards. No heldout quality, baseline superiority, GPU qualification, deployment or miner change is claimed. Broader raw-pixel teacher-supervision objective prepared separately; existing run unchanged.",
+      "run_complete": false,
+      "held_out_quality_verified": false,
+      "gpu_used": false,
+      "selected_serving_model_changed": false,
+      "miner_modified": false
     }
   ],
   "failed_attempts": [
