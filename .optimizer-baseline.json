@@ -616,6 +616,22 @@
       "new_quality_win_verified": false,
       "selected_serving_model_changed": false,
       "miner_modified": false
+    },
+    {
+      "timestamp": "2026-10-14T08:42:03Z",
+      "description": "Capacity GELU forward mismatch isolated; native-forward analytical-backward qualification relaunched",
+      "failed_plan": "runs/tiny-rgb-capacity-numerics-v1/plan.json",
+      "failed_comparisons_sha256": "93ded7d389f3b19c6765cbc87667f241e7b0476e2ce9d0169a97b36cb4356573",
+      "cpu_isolation": "runs/tiny-rgb-capacity-cpu-isolation-v1/summary.json",
+      "plan": "runs/tiny-rgb-capacity-numerics-v2-native-forward/plan.json",
+      "plan_sha256": "89d22efc4597aef8c6f48b00a73289e72a3be1344b384cff3fd6c941f0bd5695",
+      "cpu_tests_passed": 21,
+      "optimizer_updates": 0,
+      "result": "First actual probe terminalexit1: small128 CPU/MPS126gradientspass; small192 CPUforwarddifference.000135422 exceedsunchanged.0001guard, whileloss andallgradientsagree. CPUisolation showszero pad-onlydifference andsameactivation-onlydifferenceatbothshapes. New capacity-specific native exact-GELU forward with analyticalbackward preserves native forward values and avoids known native Metal backward kernel. Original shared helper untouched, no thresholds relaxed. FiveadditionalCPU tests include first/second derivative checks;21focusedtestspass. New immutable plan retains4trainingcases/3capacities/2sides andfullrealT5assets, job28103 launched; numericalsuccessunobserved until30minutecheck. Allfailedplans/sources/records retained, no ASLupdates/weights/evaluation/qualityclaim/minermutation.",
+      "numerical_stage_complete": false,
+      "new_quality_win_verified": false,
+      "selected_serving_model_changed": false,
+      "miner_modified": false
     }
   ],
   "failed_attempts": [
