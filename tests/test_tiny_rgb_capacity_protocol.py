@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-from tiny_rgb_capacity_protocol import select_cases, verified_comparison
+from tiny_rgb_capacity_protocol import STAGES, select_cases, verified_comparison
 
 
 def data():
@@ -80,6 +80,15 @@ def test_nonfinite_or_excessive_gradient_error_is_rejected(value):
 def test_cpu_equivalence_uses_stricter_forward_limit():
     record = comparison()
     record["logit_maximum_absolute_difference"] = 0.0005
+    verified_comparison(record, 1)
+    with pytest.raises(ValueError, match="parity"):
+        verified_comparison(record, 1, cpu_equivalence=True)
+
+
+def test_padding_and_activation_are_distinct_existing_tolerance_stages():
+    assert set(STAGES) == {"cpu_equivalence", "cpu_padding", "cpu_mps_comparison"}
+    record = comparison()
+    record["logit_maximum_absolute_difference"] = 0.00015831
     verified_comparison(record, 1)
     with pytest.raises(ValueError, match="parity"):
         verified_comparison(record, 1, cpu_equivalence=True)

@@ -160,14 +160,18 @@ def main():
             original_gradients = gradients(native)
             del result, native
             gc.collect()
-            padded, padded_mask, target = masked_length_buckets(video, label, torch)
-            result = model(padded, padded_mask, target)
-            cpu_loss = float(result.loss)
-            cpu_logits = result.logits[:, : label.shape[1]].detach().clone()
+            result = model(video, mask, label)
+            plain_loss = float(result.loss)
+            plain_logits = result.logits.detach().clone()
             result.loss.backward()
-            cpu_gradients = gradients(model)
+            plain_gradients = gradients(model)
             equivalence = compare(
-                original_gradients, cpu_gradients, native_loss, cpu_loss, native_logits, cpu_logits
+                original_gradients,
+                plain_gradients,
+                native_loss,
+                plain_loss,
+                native_logits,
+                plain_logits,
             )
             parameter_tensors = len(list(model.parameters()))
             report = {
@@ -195,6 +199,23 @@ def main():
             cpu_error = verified_comparison(equivalence, parameter_tensors, cpu_equivalence=True)
             model.zero_grad(set_to_none=True)
             del result, original_gradients
+            gc.collect()
+            padded, padded_mask, target = masked_length_buckets(video, label, torch)
+            result = model(padded, padded_mask, target)
+            cpu_loss = float(result.loss)
+            cpu_logits = result.logits[:, : label.shape[1]].detach().clone()
+            result.loss.backward()
+            cpu_gradients = gradients(model)
+            padding = compare(
+                plain_gradients, cpu_gradients, plain_loss, cpu_loss, plain_logits, cpu_logits
+            )
+            report["cpu_padding"] = padding
+            output.joinpath("comparisons.json").write_text(
+                json.dumps(records, indent=2, sort_keys=True) + "\n"
+            )
+            padding_error = verified_comparison(padding, parameter_tensors)
+            model.zero_grad(set_to_none=True)
+            del result, plain_gradients, plain_logits
             gc.collect()
 
             def metal_probe(
@@ -251,6 +272,7 @@ def main():
                         "frames": len(pixels),
                         "parameter_tensors": parameter_tensors,
                         "cpu_maximum_relative_error": cpu_error,
+                        "padding_maximum_relative_error": padding_error,
                         "mps_maximum_relative_error": mps_error,
                         "moment_driver_bytes": moment_peak,
                     }
@@ -276,7 +298,7 @@ def main():
     if len(records) != len(plan["capacities"]) * len(plan["short_sides"]) * len(plan["cases"]):
         raise RuntimeError("capacity qualification coverage is incomplete")
     receipt = {
-        "schema": "umi-studio-tiny-rgb-capacity-numerics/1",
+        "schema": "umi-studio-tiny-rgb-capacity-numerics/2",
         "plan_sha256": sha256(args.plan),
         "comparisons_sha256": sha256(output / "comparisons.json"),
         "numerics_passed": True,

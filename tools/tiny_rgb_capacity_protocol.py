@@ -20,6 +20,11 @@ LIMITS = {
     "maximum_logit_difference": 1e-3,
     "maximum_native_portable_cpu_logit_difference": 1e-4,
 }
+STAGES = {
+    "cpu_equivalence": "native versus capacity activation at same unpadded shapes; 0.0001 logits",
+    "cpu_padding": "capacity unpadded versus masked inputs; existing full-RGB 0.001 padding logits",
+    "cpu_mps_comparison": "masked CPU versus masked Metal; 0.001 logits",
+}
 
 
 def select_cases(rows, headers):
@@ -112,8 +117,9 @@ def checked_plan(path):
 
     plan = json.loads(path.read_text())
     if (
-        plan["schema"] != "umi-studio-tiny-rgb-capacity-qualification/1"
+        plan["schema"] != "umi-studio-tiny-rgb-capacity-qualification/2"
         or plan["limits"] != LIMITS
+        or plan["comparison_stages"] != STAGES
         or plan["capacities"] != list(CAPACITIES)
         or plan["short_sides"] != list(SIDES)
         or plan["source_sha256"] != sources()
@@ -165,11 +171,12 @@ def freeze(path):
         if sha256(ROOT / relative) != digest:
             raise ValueError("capacity freezing found changed source/language bytes")
     plan = {
-        "schema": "umi-studio-tiny-rgb-capacity-qualification/1",
+        "schema": "umi-studio-tiny-rgb-capacity-qualification/2",
         "capacities": list(CAPACITIES),
         "short_sides": list(SIDES),
         "seed": 317,
         "limits": dict(LIMITS),
+        "comparison_stages": dict(STAGES),
         "cases": cases,
         "visual_budgets": [visual_budget(name) for name in CAPACITIES],
         "source_sha256": sources(),
@@ -187,7 +194,7 @@ def freeze(path):
         "training_only": True,
         "miner_modified": False,
         "qualification": "Real pinned language assets and approved training-only RGB extrema; "
-        "native unpadded CPU versus portable masked CPU and paired Metal gradients. "
+        "separate same-shape native/activation, masked-padding and CPU/Metal all-parameter checks. "
         "No ASL fitting, held-out quality, native composite or promotion claim.",
     }
     path.parent.mkdir(parents=True)
