@@ -662,6 +662,22 @@
       "new_quality_win_verified": false,
       "selected_serving_model_changed": false,
       "miner_modified": false
+    },
+    {
+      "timestamp": "2026-10-14T10:52:42Z",
+      "description": "Backend sinusoidal constant drift isolated; canonical-position four-family qualification launched",
+      "plan": "runs/tiny-rgb-capacity-numerics-v5-canonical-positions/plan.json",
+      "plan_sha256": "534e252263c0c1f48dc94ea4ee3468773492f418e5f556380155b2c734de05e3",
+      "failed_v4_comparisons_sha256": "ebbd6c537cb4bea5c2091b4b26c4c5acbc8ba8608132bea6b07545a2164ec266",
+      "metal_isolation": "runs/tiny-rgb-capacity-metal-forward-isolation-v2-positions/summary.json",
+      "training_cases": 6,
+      "focused_tests_passed": 26,
+      "optimizer_updates": 0,
+      "result": "V4terminal1: fourshortrealpairs pass; long197CPUequivalence/paddingpass, CPU/MPSlogits.00107384 exceed.001 whileallgrads/losswithinlimits. DiagnosticdecoderwithexactCPUmemory error.000087738, alternativeGELUforwarddoesn'tfix. SinusoidalCPU/MPSpositionsdrift.0000610347; CPUgeneratedconstants reduceencodedmemoryerror5.78e-5to1.67e-6 andlogits.00107384to.000135422. Newcapacity-onlyvisionusesnonpersistentnonlearnedCPUpositionbuffers, copiesoriginalseededweights/state, keepspixels/masks/CPUoutputs. Originalsharedsourcesunchanged. AddSTEM/OpenASL casescoverall4families, sixidentities;26focusedtestspass. Same scopednumerical/qualitylimits, newimmutable36-pairjob30194launched;completionunobserved until30minutecheck. CPUheaderauditfoundonlyoneone-frameclip,zeroemptyrefs/no widespreadshortclipdefect, no semanticguarantee or exclusions. Nooptimizerupdates,weightfile,eval,qualitygain orminermutation.",
+      "numerical_stage_complete": false,
+      "new_quality_win_verified": false,
+      "selected_serving_model_changed": false,
+      "miner_modified": false
     }
   ],
   "failed_attempts": [
