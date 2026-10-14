@@ -23,12 +23,17 @@ UNUSED_FEATURE_PARAMETERS = {
         *(f"heads.{index}.{kind}" for index in range(4) for kind in ("weight", "bias")),
     )
 }
+INVARIANT_KEY_BIASES = {
+    UNUSED_PREFIX + f"encoder.layers.{index}.self_attn.k_proj.bias" for index in range(12)
+}
 
 
 def trainable_full(model):
     selected = {}
     for name, parameter in model.named_parameters():
-        parameter.requires_grad_(name not in UNUSED_FEATURE_PARAMETERS)
+        # A key bias shifts every key's score for a query equally; softmax
+        # cancels it. Its analytical gradient is zero, not a learning signal.
+        parameter.requires_grad_(name not in UNUSED_FEATURE_PARAMETERS | INVARIANT_KEY_BIASES)
         if parameter.requires_grad:
             selected[name] = parameter
     if not selected:
@@ -83,6 +88,8 @@ def main():
     parser.add_argument("--scope", choices=("decoder", "full"), default="decoder")
     parser.add_argument("--resource-policy", type=Path)
     parser.add_argument("--portable-fairseq-gelu", action="store_true")
+    parser.add_argument("--portable-native-gelu", action="store_true")
+    parser.add_argument("--portable-layernorm", action="store_true")
     args = parser.parse_args()
     output = args.output.absolute()
     if output.exists() or not output.is_relative_to(ROOT / "runs"):
@@ -153,6 +160,8 @@ def main():
     )
     replacements = 0
     native_activations = []
+    native_modules = []
+    native_normalizations = []
     if args.portable_fairseq_gelu:
         from c5_winner_mps_safe import replace_fairseq_exact_gelu
 
@@ -167,8 +176,36 @@ def main():
         replacements = replace_fairseq_exact_gelu(model)
         if replacements != 12:
             raise RuntimeError("winner exact-GELU topology differs from the reviewed twelve layers")
+    if args.portable_native_gelu:
+        from tiny_rgb_mps_safe import PortableGelu
+
+        native_modules = [
+            (parent, name, child)
+            for parent in model.modules()
+            for name, child in parent.named_children()
+            if isinstance(child, torch.nn.GELU)
+        ]
+        if len(native_modules) != 1 or any(
+            child.approximate != "none" for _, _, child in native_modules
+        ):
+            raise RuntimeError("winner native positional-GELU topology differs")
+        for parent, name, _ in native_modules:
+            setattr(parent, name, PortableGelu())
+    if args.portable_layernorm:
+        from c5_winner_mps_safe import PortableLayerNorm
+
+        native_normalizations = [
+            (parent, name, child, PortableLayerNorm(child))
+            for parent in model.modules()
+            for name, child in parent.named_children()
+            if isinstance(child, torch.nn.LayerNorm)
+        ]
+        if not native_normalizations:
+            raise RuntimeError("winner has no supported native LayerNorm modules")
+        for parent, name, _, replacement in native_normalizations:
+            setattr(parent, name, replacement)
     selected = trainable_full(model) if args.scope == "full" else trainable_decoder(model)
-    if args.scope == "full" and not UNUSED_FEATURE_PARAMETERS.issubset(
+    if args.scope == "full" and not (UNUSED_FEATURE_PARAMETERS | INVARIANT_KEY_BIASES).issubset(
         dict(model.named_parameters())
     ):
         raise ValueError("winner unused-feature topology differs from the reviewed architecture")
@@ -201,12 +238,17 @@ def main():
             }
             inputs = {key: torch.from_numpy(value).unsqueeze(0) for key, value in arrays.items()}
             native_result = None
-            if args.portable_fairseq_gelu:
+            if args.portable_fairseq_gelu or args.portable_native_gelu or args.portable_layernorm:
                 from c5_winner_mps_safe import portable_fairseq_gelu
+                from tiny_rgb_mps_safe import PortableGelu
 
                 try:
                     for module, function in native_activations:
                         module.activation_fn = function
+                    for parent, child_name, child in native_modules:
+                        setattr(parent, child_name, child)
+                    for parent, child_name, child, _ in native_normalizations:
+                        setattr(parent, child_name, child)
                     with torch.no_grad():
                         native_result = model(
                             **inputs, labels=labels, use_cache=False, return_dict=True
@@ -214,6 +256,10 @@ def main():
                 finally:
                     for module, _ in native_activations:
                         module.activation_fn = portable_fairseq_gelu
+                    for parent, child_name, _ in native_modules:
+                        setattr(parent, child_name, PortableGelu())
+                    for parent, child_name, _, replacement in native_normalizations:
+                        setattr(parent, child_name, replacement)
             result = model(**inputs, labels=labels, use_cache=False, return_dict=True)
             result.loss.backward()
             decoder_gradient_guard(model, selected, torch)
@@ -318,11 +364,16 @@ def main():
     report = {
         "schema": "umi-studio-c5-winner-translator-preflight/1",
         "training_scope": args.scope,
+        "frozen_softmax_invariant_key_biases": sorted(INVARIANT_KEY_BIASES)
+        if args.scope == "full"
+        else [],
         "frozen_unused_parameters": sorted(UNUSED_FEATURE_PARAMETERS)
         if args.scope == "full"
         else [],
         "resource_policy": budget.record if budget else None,
         "portable_fairseq_gelu_replacements": replacements,
+        "portable_native_gelu_replacements": len(native_modules),
+        "portable_layer_norm_replacements": len(native_normalizations),
         "numerics_passed": all(row.get("passes_cpu_mps_parity", True) for row in records),
         "model_bundle_sha256": reference["model_bundle_sha256"],
         "checkpoint_sha256": reference["translator_checkpoint_sha256"],

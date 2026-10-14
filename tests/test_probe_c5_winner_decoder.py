@@ -37,6 +37,17 @@ def test_full_translator_scope_includes_encoder_and_keeps_values_unchanged():
     assert all(torch.equal(value, before[name]) for name, value in candidate.state_dict().items())
 
 
+def test_uniform_key_bias_has_zero_signal_and_keeps_attention_unchanged():
+    torch.manual_seed(317)
+    query, keys, values = (torch.randn(1, 7, 32) for _ in range(3))
+    bias = torch.randn(32, requires_grad=True)
+    original = (query @ (keys + bias).transpose(1, 2)).softmax(-1) @ values
+    changed = (query @ (keys + bias + 0.5).transpose(1, 2)).softmax(-1) @ values
+    assert torch.allclose(original, changed, atol=5e-6, rtol=5e-6)
+    gradient = torch.autograd.grad(original.square().mean(), bias)[0]
+    assert gradient.norm() < 5e-6
+
+
 @pytest.mark.parametrize("bad", ("missing", "nan", "frozen"))
 def test_decoder_preflight_rejects_bad_gradients_or_encoder_updates(bad):
     candidate = model()

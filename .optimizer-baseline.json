@@ -480,6 +480,18 @@
       "new_quality_win_verified": false,
       "selected_serving_model_changed": false,
       "miner_modified": false
+    },
+    {
+      "timestamp": "2026-10-14T00:49:13Z",
+      "description": "Full C5-winner training numerics qualified after operator isolation",
+      "result": "Nativefullgradients failedCPUagreementdespiteforwardmatch; positionalGELUrepairreducedmillion-foldgradienterror,andexplicitcenteredLayerNormrepairedremainingaffinebackwardmismatch. Twelveanalyticallysoftmax-invariantkeybiases arefrozen withoutchangingtheirvalues; allothermeaningfulgradients stillmeetunchanged0.5percentthreshold,notrelaxed. Fullscope670149192trainable/670950728total,456gradienttensors perthreeprotectedtrainingcases,197frames/289bytetokenextrema. Worstgradientrelativeerror3.21408e-5=0.003214percent,logitdiff4.43459e-5,nativeCPUforwardequivalence2.24113e-5. FutureAdamWmoments reserved,maxdriver12557451264bytes=11.70GiB underusernewuncapped48hpolicy. Exactprobe/helpersourcesarchived. No optimizerupdateorweightsaved, no newlocalqualityscoreorbaselinewin. ActiveworkingC5winner00a74422andhistoricaloriginal/selectedbaseline fields preserved; FSweights/router unchanged, completecompositeverificationrequired. Next freezewinner-initfullFTpilotandmatchedwinnercontrols. Miner/privatecertification/confirmation untouched.",
+      "proof": "runs/c5-winner-full-preflight-v7-functional/mps.json",
+      "proof_sha256": "d2b0ac82d11a27b5cef0399ad0e6e818712a540ee3c784af522db80f13f627d5",
+      "training_numerics_qualified": true,
+      "optimizer_updates_on_winner": 0,
+      "new_quality_win_verified": false,
+      "selected_serving_model_changed": false,
+      "miner_modified": false
     }
   ],
   "failed_attempts": [
