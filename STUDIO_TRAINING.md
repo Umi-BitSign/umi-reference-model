@@ -588,6 +588,20 @@ Of368 student training candidates,356 score0,11 score1 and1 scores2. Teacher can
 
 At `2026-10-15T20:42:26Z`, the teacher arm is live at424 new-arm exposures /53 updates, all90 observed gradient tensors finite/nonzero and pinned sources unchanged. There are432 completed rollouts, no failure/stop receipts and a23,155,179,520-byte maximum process peak, below32GiB. The512 quality checkpoint is pending; no new quality result. Next observation `2026-10-15T21:12:26Z`.
 
+### Teacher arm at512: lower WER, persistent generic output
+
+The scheduled `2026-10-15T21:12:39Z` observation confirms session88910 live at648 new-arm exposures /81 optimizer steps, all90 gradients finite/nonzero at every observed update. There are654 completed rollouts, no failure/stop receipts, and a24,128,897,024-byte maximum process peak. The512 visual/optimizer checkpoint is complete: visual SHA-256 `f74c4ac7c371d3022550c040342b8e827e702a2facaa1a46a210ee7e75f4b3cf`, optimizer `0bb18867e3383d3f11f7749cf91b558c5b8c3b7a4f1c31210f54ba475004e789`.
+
+The512 checkpoint fails the unchanged C5 gate after104 How2Sign clips, with no FLEURS or complete benchmark score. Compare the same90 identities available for its initialization and both teacher-arm checkpoints:
+
+| Same90 How2Sign clips, lower is better | C5 control | Terra2048 initialization | Teacher arm +128 | Teacher arm +512 |
+| --- | ---: | ---: | ---: | ---: |
+| Mean WER | 79.15% | 114.22% | 114.31% | 99.34% |
+| Word-weighted WER | 77.94% | 104.88% | 106.18% | 96.81% |
+| Unique hypotheses | 90 | 15 | 29 | 16 |
+
+The WER decrease accompanies shorter generic text, not demonstrated sentence understanding. Across the104 predictions, “That's what it looks like” and “That's what the heat is looking for” each occur21 times; “That's what you're going to want to do” occurs19 times. Of1,296 generated student training candidates,1,257 score0,37 score1 and2 score2. Teacher training scores span0-10, but they are not the student's independent accuracy. No baseline change or promotion. Continue the same frozen arm toward2,048 new exposures; next observation `2026-10-15T21:42:39Z`. Miner and LB remain untouched.
+
 ## Hard boundaries
 
 - The user requests commits and pushes for this work. Commit verified code, tests and research notes to `studio-competitive-training` and push that branch to `origin` at completed milestones. Keep datasets, transformed data, checkpoints, run logs and local artifacts out of Git; publish selected model weights through an explicit release workflow.
