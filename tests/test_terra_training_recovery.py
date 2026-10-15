@@ -13,6 +13,18 @@ from terra_training_recovery import compatible_plans, restore_checkpoint, restor
 from train_tiny_rgb_feature_winner_full import optimizer_payload
 
 
+def test_graceful_checkpoint_signal_only_sets_a_boundary_flag():
+    import signal
+
+    from terra_training_recovery import CheckpointRequest
+
+    handlers = {}
+    request = CheckpointRequest(install=lambda name, handler: handlers.update({name: handler}))
+    assert not request.requested and set(handlers) == {signal.SIGUSR1}
+    handlers[signal.SIGUSR1](signal.SIGUSR1, None)
+    assert request.requested
+
+
 def fixture_state():
     torch.manual_seed(317)
     model = torch.nn.Linear(3, 2)
@@ -242,7 +254,7 @@ def test_rollout_guard_failure_preserves_exact_clip_and_unchanged_limits():
         )
     context = caught.value.terra_rollout_context
     assert context["example_id"] == "1" and context["seed"] == 318
-    assert context["unchanged_cpu_limits"] == before == CPU_LIMITS
+    assert context["enforced_cpu_limits"] == before == CPU_LIMITS
     assert events[-1]["stage"] == "rollout_failed" and len(events) == 4
 
 

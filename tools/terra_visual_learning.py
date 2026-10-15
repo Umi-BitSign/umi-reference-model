@@ -58,10 +58,13 @@ def bounded_candidate(tokens, maximum_tokens):
 
 
 @torch.no_grad()
-def candidate_pool(student, tokenizer, video, mask, reference, *, seed, maximum_tokens=512):
+def candidate_pool(
+    student, tokenizer, video, mask, reference, *, seed, maximum_tokens=512, budget_factory=None
+):
     """Reference never conditions generation; it enters the objective afterward."""
     from evaluate_tiny_rgb_feature_winner import CpuBudget
 
+    budget_factory = CpuBudget if budget_factory is None else budget_factory
     student.eval()
     gold = tokenizer(reference, truncation=False).input_ids
     if not gold or gold[-1] != 1 or len(gold) > maximum_tokens:
@@ -85,7 +88,7 @@ def candidate_pool(student, tokenizer, video, mask, reference, *, seed, maximum_
             "num_beams": 1,
             "do_sample": sample,
             "use_cache": True,
-            "stopping_criteria": StoppingCriteriaList([CpuBudget()]),
+            "stopping_criteria": StoppingCriteriaList([budget_factory()]),
         }
         if sample:
             arguments.update(temperature=1.0, top_k=0, top_p=1.0)

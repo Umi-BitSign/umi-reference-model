@@ -3,11 +3,23 @@
 from __future__ import annotations
 
 import json
+import signal
 import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTROL_SOURCES = {"tools/train_terra_visual.py", "tools/terra_training_recovery.py"}
+
+
+class CheckpointRequest:
+    """SIGUSR1 requests a save/stop at a batch boundary; SIGTERM remains immediate."""
+
+    def __init__(self, *, install=signal.signal):
+        self.requested = False
+        install(signal.SIGUSR1, self.request)
+
+    def request(self, signum, frame):
+        self.requested = True
 
 
 def artifact(path, *, root=ROOT):
@@ -174,7 +186,7 @@ def streamed_pools(pairs, *, prepare, generate, seed, emit):
                 **context,
                 "generation_seconds": time.perf_counter() - started,
                 "process_peak_bytes": peak_bytes(),
-                "unchanged_cpu_limits": CPU_LIMITS,
+                "enforced_cpu_limits": getattr(error, "terra_resource_limits", CPU_LIMITS),
             }
             emit({**error.terra_rollout_context, "stage": "rollout_failed"})
             raise

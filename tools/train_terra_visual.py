@@ -1,4 +1,4 @@
-"""Fresh small-input vision trained against Terra medium's semantic error."""
+"""Small-input vision with Terra-scored, reference-blind C5 teacher candidates."""
 
 from __future__ import annotations
 
@@ -11,6 +11,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PARENT = ROOT / "runs/tiny-rgb-feature-winner-full-v1/plan.json"
+INITIAL_PLAN = ROOT / "runs/terra-visual-training-v6-memory-continuation/plan.json"
+INITIAL_VISUAL = (
+    ROOT
+    / "checkpoints/terra-visual-training-v6-memory-continuation/visual-after-002048.safetensors"
+)
+INITIAL_VISUAL_SHA = "0af5d57ea7ee111d29ffb2d9a0a8c5f9dfd39c252708b54f0f997ee2161632e5"
 RECIPE = {
     "seed": 317,
     "capacity": "large",
@@ -30,14 +36,37 @@ RECIPE = {
     "checkpoint_counter_unit": "training_examples",
     "generated_candidates": 2,
     "gold_in_candidate_pool": True,
-    "old_visual_weights_reused": False,
+    "old_visual_weights_reused": True,
+    "visual_initialization": (
+        "our Terra-only2048 visual checkpoint; reset optimizer; new actual gradient proof"
+    ),
+    "teacher_candidates": 1,
+    "teacher_candidate_source": (
+        "fixedC5 native approved training features; no human reference in generation"
+    ),
+    "teacher_candidate_decode": "CPU greedy beam1, explicit512-token horizon",
+    "teacher_decode_arguments": {
+        "max_length": 513,
+        "num_beams": 1,
+        "do_sample": False,
+        "use_cache": True,
+    },
+    "teacher_candidate_quality": "actual Terra score, including0; no presumed teacher correctness",
+    "teacher_text_cache_maximum_bytes": 128 * 1024**2,
+    "graceful_checkpoint_signal": "SIGUSR1",
+    "training_rollout_limits": {
+        "maximum_process_peak_bytes": 32 * 1024**3,
+        "maximum_seconds_per_clip": 1200,
+    },
     "latent_distillation": False,
     "feature_distillation": False,
     "judge_model": "gpt-5.6-terra",
     "judge_reasoning_effort": "medium",
     "error": "10 minus Terra semantic quality",
     "augmentation": "none",
-    "storage_policy": "60GiB physical floor plus128MiB headroom and remaining2GiB output reserve",
+    "storage_policy": (
+        "60GiB floor plus128MiB headroom,2GiB run outputs and128MiB teacher-text reserve"
+    ),
     "training_rollouts": "EOS or explicit512-token horizon; no invented termination token",
 }
 
@@ -56,6 +85,7 @@ def sources():
         "evaluate_terra_visual.py",
         "terra_training_storage.py",
         "terra_training_recovery.py",
+        "terra_teacher_candidates.py",
     ):
         result[f"tools/{name}"] = sha256(ROOT / "tools" / name)
     return result
@@ -95,6 +125,19 @@ def checked_plan(path):
         != sha256(path)
     ):
         raise ValueError("Terra training plan/source/data/benchmark bindings changed")
+    from terra_teacher_candidates import (
+        DECODE,
+        TRAINING_ROLLOUT_LIMITS,
+        checked_visual_initialization,
+    )
+
+    if (
+        RECIPE["teacher_decode_arguments"] != DECODE
+        or RECIPE["training_rollout_limits"] != TRAINING_ROLLOUT_LIMITS
+        or any(pair.get("feature_pretraining_allowed") is not True for pair in pairs)
+    ):
+        raise ValueError("teacher training generation/resources/feature permissions changed")
+    checked_visual_initialization(plan, expected_sha256=INITIAL_VISUAL_SHA)
     if "resume" in plan:
         from terra_training_recovery import checked_resume
 
@@ -141,6 +184,11 @@ def freeze(path, *, resume_plan=None, resume_checkpoint=None, qualification=None
             )
         },
     }
+    from terra_teacher_candidates import make_visual_initialization
+
+    plan["visual_initialization"] = make_visual_initialization(
+        INITIAL_PLAN, INITIAL_VISUAL, plan, expected_sha256=INITIAL_VISUAL_SHA
+    )
     if resume_plan is not None or resume_checkpoint is not None:
         from terra_training_recovery import make_resume
 
@@ -259,7 +307,13 @@ def run(path, output, *, qualification_only=False, qualification=None, restore_o
     from c5_winner_language_decoder import load_winner_language
     from probe_tiny_rgb_capacity import compare, state_digest
     from probe_tiny_rgb_feature_winner import gradients
+    from terra_teacher_candidates import (
+        TeacherTextCache,
+        install_visual_initialization,
+        teacher_augmented_pool,
+    )
     from terra_training_recovery import (
+        CheckpointRequest,
         checked_resume,
         record_preupdate_failure,
         restore_checkpoint,
@@ -271,7 +325,6 @@ def run(path, output, *, qualification_only=False, qualification=None, restore_o
     from terra_visual_learning import (
         backward_candidate_risk,
         candidate_labels,
-        candidate_pool,
         synchronize_visual_policy,
         training_pixels,
     )
@@ -294,6 +347,11 @@ def run(path, output, *, qualification_only=False, qualification=None, restore_o
         raise ValueError("Terra training needs a new checkpoint directory")
     storage(215000000)
     output.mkdir(parents=True)
+    checkpoint_request = CheckpointRequest()
+    teacher_cache = TeacherTextCache(
+        ROOT / "runs/terra-teacher-text-cache-v1",
+        maximum_bytes=RECIPE["teacher_text_cache_maximum_bytes"],
+    )
     budget = CertificationComputeWindow(ROOT / plan["resource_policy"])
     torch.set_num_threads(budget.cpu_threads())
     torch.set_num_interop_threads(1)
@@ -303,6 +361,7 @@ def run(path, output, *, qualification_only=False, qualification=None, restore_o
     language, reference = load_winner_language()
     encoder = load_frozen_winner_encoder(reference)
     cpu = RawFeatureWinnerStudent(encoder, language).eval()
+    install_visual_initialization(cpu, plan, expected_sha256=INITIAL_VISUAL_SHA)
     initial_visual = state_digest(cpu.trainable_parameters())
     fixed = {
         "language": state_digest(language.state_dict()),
@@ -314,6 +373,7 @@ def run(path, output, *, qualification_only=False, qualification=None, restore_o
     if gpu_reference != reference:
         raise RuntimeError("CPU and Metal policies loaded different winning references")
     gpu = RawFeatureWinnerStudent(load_frozen_winner_encoder(reference), gpu_language).eval()
+    install_visual_initialization(gpu, plan, expected_sha256=INITIAL_VISUAL_SHA)
     if state_digest(gpu.trainable_parameters()) != initial_visual or fixed != {
         "language": state_digest(gpu.language.state_dict()),
         "encoder": state_digest(gpu.semantic_encoder.state_dict()),
@@ -329,8 +389,12 @@ def run(path, output, *, qualification_only=False, qualification=None, restore_o
                 "plan_sha256": sha256(path),
                 "initial_visual_sha256": initial_visual,
                 "fixed_backbones": fixed,
-                "fresh_visual_weights": resume_paths is None,
-                "old_visual_weights_loaded": False,
+                "fresh_visual_weights": False,
+                "old_visual_weights_loaded": True,
+                "old_feature_MSE_visual_weights_loaded": False,
+                "visual_initialization": plan["visual_initialization"],
+                "optimizer_reset_for_teacher_arm": resume_paths is None,
+                "graceful_checkpoint_signal": "SIGUSR1",
                 "terra_checkpoint_resumed": resume_paths is not None,
                 "resume": plan.get("resume"),
                 "loss": "expected Terra semantic error plus 0.1 human caption CE",
@@ -340,9 +404,24 @@ def run(path, output, *, qualification_only=False, qualification=None, restore_o
         + "\n"
     )
     print(
-        json.dumps({"stage": "fresh_model_loaded", "initial_visual_sha256": initial_visual}),
+        json.dumps(
+            {"stage": "teacher_arm_initial_model_loaded", "initial_visual_sha256": initial_visual}
+        ),
         flush=True,
     )
+
+    def make_pool(pair, video, mask, seed):
+        return teacher_augmented_pool(
+            cpu,
+            tokenizer,
+            video,
+            mask,
+            pair["raw"]["reference"],
+            pair=pair,
+            seed=seed,
+            checkpoint_sha=reference["translator_checkpoint_sha256"],
+            cache=teacher_cache,
+        )
 
     def check_fixed(model):
         for module in (model.language, model.semantic_encoder):
@@ -383,9 +462,7 @@ def run(path, output, *, qualification_only=False, qualification=None, restore_o
         proof_pairs = plan["proof_cases"]
         proof_data = [training_pixels(pair, RECIPE) for pair in proof_pairs]
         pools = [
-            candidate_pool(
-                cpu, tokenizer, video, mask, pair["raw"]["reference"], seed=RECIPE["seed"] + index
-            )
+            make_pool(pair, video, mask, RECIPE["seed"] + index)
             for index, (pair, (video, mask)) in enumerate(zip(proof_pairs, proof_data, strict=True))
         ]
         qualities, judge = score_pools(proof_pairs, pools, output / "qualification-terra")
@@ -531,6 +608,30 @@ def run(path, output, *, qualification_only=False, qualification=None, restore_o
         ordered = sorted(pairs, key=lambda pair: order_key(pair, epoch))
         offset, skip_examples = skip_epoch(skip_examples, len(ordered))
         while offset < len(ordered):
+            if checkpoint_request.requested:
+                stopped = {
+                    "training_complete": False,
+                    "requested_stop": True,
+                    "training_examples": examples,
+                    "optimizer_updates": optimizer_updates,
+                    "signal": "SIGUSR1",
+                    "next_batch_optimizer_applied": False,
+                }
+                if optimizer_updates:
+                    checkpoint = save_checkpoint(
+                        gpu,
+                        optimizer,
+                        output,
+                        path,
+                        reference["translator_checkpoint_sha256"],
+                        examples,
+                        optimizer_updates,
+                        recovery=True,
+                    )
+                    stopped["recovery_checkpoint"] = str(checkpoint.relative_to(ROOT))
+                (output / "requested-stop.json").write_text(json.dumps(stopped, indent=2) + "\n")
+                print(json.dumps(stopped), flush=True)
+                return
             next_check = next(value for value in RECIPE["checks_after_updates"] if value > examples)
             count = min(RECIPE["batch_clips"], len(ordered) - offset, next_check - examples)
             batch = ordered[offset : offset + count]
@@ -552,9 +653,7 @@ def run(path, output, *, qualification_only=False, qualification=None, restore_o
                 pools = streamed_pools(
                     batch,
                     prepare=lambda pair: training_pixels(pair, RECIPE),
-                    generate=lambda pair, video, mask, seed: candidate_pool(
-                        cpu, tokenizer, video, mask, pair["raw"]["reference"], seed=seed
-                    ),
+                    generate=make_pool,
                     seed=RECIPE["seed"] + examples,
                     emit=lambda event, update=optimizer_updates + 1: append(
                         output,
@@ -567,7 +666,7 @@ def run(path, output, *, qualification_only=False, qualification=None, restore_o
                 )
                 preparation_stage = "terra_scoring"
                 qualities, judge = score_pools(batch, pools, receipt_path)
-            except (RuntimeError, ValueError) as error:
+            except (RuntimeError, ValueError, OSError) as error:
                 # Both preparation stages precede zero_grad/backward/step.
                 record_preupdate_failure(
                     output,
