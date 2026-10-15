@@ -1109,11 +1109,11 @@
     "next_combined_observation_at": null
   },
   "terra_visual_restart": {
-    "launched_at": "2026-10-15T01:19:49Z",
-    "owned_session": 42369,
-    "plan": "runs/terra-visual-training-v1/plan.json",
-    "plan_sha256": "40409217aa791b5d48a145c53ea2f47e2807c9818d4180fe1f2f9f45187d626c",
-    "output": "checkpoints/terra-visual-training-v1",
+    "launched_at": "2026-10-15T01:59:37Z",
+    "owned_session": 24878,
+    "plan": "runs/terra-visual-training-v2-independent-load/plan.json",
+    "plan_sha256": "e3a1d4ce8891fb0af159d4c82263f93c400422f4e13668d9688c98962f6080aa",
+    "output": "checkpoints/terra-visual-training-v2-independent-load",
     "training_clips": 7523,
     "planned_training_examples": 30092,
     "model": "fresh17.53M small-input visual front-end with fixed complete C5 sequence/language backbone",
@@ -1125,12 +1125,28 @@
     "actual_terra_only_numerics_required_before_optimizer_updates": true,
     "all6_real_case_numerical_completion_observed": false,
     "optimizer_progress_observed": false,
-    "focused_tests_passed": 38,
+    "focused_tests_passed": 40,
+    "first_attempt": {
+      "owned_session": 42369,
+      "terminal_exit_code": 1,
+      "failure": "legacy weight_norm cached nonleaf tensor cannot be deepcopied",
+      "terra_requests": 0,
+      "optimizer_updates": 0,
+      "receipt": "checkpoints/terra-visual-training-v1/setup-failure.json"
+    },
+    "independent_policy_tensors_hash_checked_before_metal": true,
+    "storage_physical_floor_gib": 60,
+    "storage_maximum_run_output_gib": 2,
+    "bulk_data_ingestion_storage_policy_changed": false,
+    "obsolete_weight_cleanup_receipt": "runs/terra-obsolete-weight-cleanup-v1/completion.json",
+    "obsolete_weight_files_removed": 12,
+    "obsolete_weight_logical_bytes_removed": 19728393475,
+    "obsolete_weight_physical_reclamation_verified": false,
     "owner_approved_terra_scoring_cost": true,
     "quality_improvement_verified": false,
     "fixed_wer_gate_changed": false,
     "miner_modified": false,
-    "next_observation_at": "2026-10-15T01:49:49Z"
+    "next_observation_at": "2026-10-15T02:29:37Z"
   },
   "latest_student_numerical_qualification": {
     "observed_at": "2026-10-14T19:18:44Z",

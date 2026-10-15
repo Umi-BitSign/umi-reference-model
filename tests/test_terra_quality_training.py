@@ -198,11 +198,60 @@ def test_terra_evaluator_preserves_all_existing_generation_and_quality_gates():
     expected = original.replace(
         "from train_tiny_rgb_capacity_cpu import storage\n"
         "    from train_tiny_rgb_feature_winner_full import checked_plan",
-        "from train_terra_visual import checked_plan\n"
-        "    from train_tiny_rgb_capacity_cpu import storage",
+        "from terra_training_storage import storage\n"
+        "    from train_terra_visual import checked_plan",
     ).replace('"raw_feature_winner_student_cpu"', '"terra_raw_feature_winner_student_cpu"')
     before = ast.parse(expected)
     after = ast.parse((root / "evaluate_terra_visual.py").read_text())
     before.body.pop(0)
     after.body.pop(0)
+    # Imports are sorted by Ruff. Only loader, resource guard and model label
+    # differ; generation, metric calculation, rejection and promotion do not.
+    for tree in (before, after):
+        function = next(
+            node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "run"
+        )
+        imports = [node for node in function.body if isinstance(node, ast.Import | ast.ImportFrom)]
+        statements = [node for node in function.body if node not in imports]
+        function.body = sorted(imports, key=ast.dump) + statements
     assert ast.dump(before) == ast.dump(after)
+
+
+def test_legacy_weight_norm_policy_is_independently_loaded_instead_of_deepcopied():
+    import ast
+    import copy
+
+    layer = torch.nn.utils.weight_norm(torch.nn.Linear(3, 4)).requires_grad_(False)
+    with pytest.raises(RuntimeError, match="deepcopy"):
+        copy.deepcopy(layer)
+    source = Path(__file__).resolve().parents[1] / "tools/train_terra_visual.py"
+    tree = ast.parse(source.read_text())
+    calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)]
+    assert not any(
+        isinstance(node.func, ast.Attribute) and node.func.attr == "deepcopy" for node in calls
+    )
+
+
+def test_training_storage_reserves_future_outputs_without_lowering_ingestion_guards(tmp_path):
+    from types import SimpleNamespace
+
+    from terra_training_storage import POLICY, storage
+
+    output = tmp_path / "checkpoints" / "terra-test"
+    output.mkdir(parents=True)
+    required = (
+        POLICY["physical_floor_bytes"] + POLICY["headroom_bytes"] + POLICY["output_budget_bytes"]
+    )
+    result = storage(
+        215000000,
+        output=output,
+        root=tmp_path,
+        disk_usage=lambda root: SimpleNamespace(free=required),
+    )
+    assert result["remaining_output_reserve_bytes"] == 2 * 1024**3
+    with pytest.raises(RuntimeError, match="physical floor"):
+        storage(root=tmp_path, disk_usage=lambda root: SimpleNamespace(free=required - 1))
+    with pytest.raises(RuntimeError, match="output budget"):
+        storage(POLICY["output_budget_bytes"] + 1, root=tmp_path)
+    with pytest.raises(ValueError, match="checkpoint subtree"):
+        storage(output=tmp_path / "data", root=tmp_path)

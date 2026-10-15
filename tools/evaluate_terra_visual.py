@@ -69,13 +69,13 @@ def run(path, checkpoint, update, output):
     from probe_tiny_rgb_capacity import state_digest
     from safetensors import safe_open
     from safetensors.torch import load_file
+    from terra_training_storage import storage
     from tiny_rgb_data import pixel_tensor
     from tiny_rgb_feature_winner_student import RawFeatureWinnerStudent
     from tiny_rgb_full_training_tools import decode_rgb_video_fast
     from tiny_rgb_winner_student import load_frozen_winner_encoder, winner_length_buckets
     from tiny_rgb_winner_student_protocol import BUDGET
     from train_terra_visual import checked_plan
-    from train_tiny_rgb_capacity_cpu import storage
     from transformers import ByT5Tokenizer, StoppingCriteriaList
 
     plan, _ = checked_plan(path)

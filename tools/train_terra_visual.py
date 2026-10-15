@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import copy
 import json
 import math
 import os
@@ -38,6 +37,7 @@ RECIPE = {
     "judge_reasoning_effort": "medium",
     "error": "10 minus Terra semantic quality",
     "augmentation": "none",
+    "storage_policy": "60GiB physical floor plus128MiB headroom and remaining2GiB output reserve",
 }
 
 
@@ -53,6 +53,7 @@ def sources():
         "semantic_quality_judge.py",
         "probe_jeff_terra_quality.py",
         "evaluate_terra_visual.py",
+        "terra_training_storage.py",
     ):
         result[f"tools/{name}"] = sha256(ROOT / "tools" / name)
     return result
@@ -98,8 +99,8 @@ def checked_plan(path):
 def freeze(path):
     from benchmark_fleurs_dev import sha256
     from c5_experiment_sources import archive_sources
+    from terra_training_storage import storage
     from tiny_rgb_feature_winner_protocol import select_cases
-    from train_tiny_rgb_capacity_cpu import storage
     from train_tiny_rgb_feature_winner_full import checked_plan as parent_plan
 
     path = path.resolve()
@@ -185,6 +186,7 @@ def run(path, output):
     from probe_tiny_rgb_capacity import compare, state_digest
     from probe_tiny_rgb_feature_winner import gradients
     from safetensors.torch import save_file
+    from terra_training_storage import storage
     from terra_visual_learning import (
         backward_candidate_risk,
         candidate_labels,
@@ -195,7 +197,6 @@ def run(path, output):
     from tiny_rgb_capacity_protocol import verified_comparison
     from tiny_rgb_feature_winner_student import RawFeatureWinnerStudent
     from tiny_rgb_winner_student import load_frozen_winner_encoder
-    from train_tiny_rgb_capacity_cpu import storage
     from train_tiny_rgb_feature_winner_full import lr_factor, optimizer_payload, order_key
     from transformers import ByT5Tokenizer
 
@@ -219,7 +220,18 @@ def run(path, output):
         "language": state_digest(language.state_dict()),
         "encoder": state_digest(encoder.state_dict()),
     }
-    gpu = duty.run(lambda: copy.deepcopy(cpu).to("mps"))
+    # Legacy weight_norm caches a nonleaf tensor until its first forward.
+    # Construct the second policy from pinned tensors; never deepcopy that cache.
+    gpu_language, gpu_reference = load_winner_language()
+    if gpu_reference != reference:
+        raise RuntimeError("CPU and Metal policies loaded different winning references")
+    gpu = RawFeatureWinnerStudent(load_frozen_winner_encoder(reference), gpu_language).eval()
+    if state_digest(gpu.trainable_parameters()) != initial_visual or fixed != {
+        "language": state_digest(gpu.language.state_dict()),
+        "encoder": state_digest(gpu.semantic_encoder.state_dict()),
+    }:
+        raise RuntimeError("independently loaded CPU and Metal policy tensors differ")
+    gpu = duty.run(lambda: gpu.to("mps"))
     tokenizer = ByT5Tokenizer.from_pretrained(
         ROOT / reference["bundle_root"] / "model/models/byt5_base", local_files_only=True
     )
@@ -494,7 +506,7 @@ def run(path, output):
                 ),
                 flush=True,
             )
-            storage(215000000)
+            storage(215000000, output=output)
             if examples not in RECIPE["checks_after_updates"]:
                 continue
             checkpoint = output / f"visual-after-{examples:06d}.safetensors"
