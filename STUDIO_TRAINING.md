@@ -518,6 +518,8 @@ At `2026-10-15T15:57:52Z`, the first scheduled v5 observation confirms session73
 
 At `2026-10-15T16:28:03Z`, session73351 is confirmed live at1,128 exposures /141 optimizer steps,77 new steps since restore. The previous failing batch101 (exposures800-808) completed, proving progress beyond that interruption. All observed90 gradients remain finite/nonzero;624 per-clip rollouts completed, still at most7.079 seconds each. Peak recorded process RSS is24,526,176,256 bytes (22.84GiB), below but near the unchanged24GiB limit; no pre-update or gateway failure receipt is present. Passing one prior failure point does not prove the full dataset will stay within memory. The next2,048-exposure quality check remains pending, with no new accuracy claim. Next observation `2026-10-15T16:58:03Z`.
 
+At `2026-10-15T16:58:16Z`, session73351 remains confirmed live at1,480 exposures /185 steps,121 new updates since restore, all90 observed gradients finite/nonzero. No pre-update or API failure receipt is present. Recorded process peak is25,259,589,632 bytes (23.52GiB), close to the unchanged24GiB limit. The new save-before-stop handler remains available if the guard trips. The2,048 quality evaluation is pending; no accuracy improvement is inferred from optimizer progress. Next observation `2026-10-15T17:28:16Z`.
+
 ## Hard boundaries
 
 - The user requests commits and pushes for this work. Commit verified code, tests and research notes to `studio-competitive-training` and push that branch to `origin` at completed milestones. Keep datasets, transformed data, checkpoints, run logs and local artifacts out of Git; publish selected model weights through an explicit release workflow.
