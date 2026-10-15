@@ -186,6 +186,92 @@ def test_resume_corpus_offset_does_not_replay_previous_epochs():
         assert remaining(11, 4, start) == full[start:]
 
 
+def test_streamed_rollouts_release_each_clip_and_preserve_all_ordered_seeds():
+    from terra_training_recovery import streamed_pools
+
+    class Clip:
+        live = 0
+        maximum_live = 0
+
+        def __init__(self):
+            Clip.live += 1
+            Clip.maximum_live = max(Clip.live, Clip.maximum_live)
+
+        def __del__(self):
+            Clip.live -= 1
+
+    pairs = [{"raw": {"source": "training", "example_id": str(i)}} for i in range(8)]
+    events = []
+
+    def prepare(pair):
+        assert Clip.live == 0
+        return Clip(), None
+
+    result = streamed_pools(
+        pairs,
+        prepare=prepare,
+        generate=lambda pair, video, mask, seed: (pair["raw"]["example_id"], seed),
+        seed=317,
+        emit=events.append,
+    )
+    assert result == [(str(i), 317 + i) for i in range(8)]
+    assert Clip.maximum_live == 1 and Clip.live == 0
+    assert [event["stage"] for event in events] == ["rollout_started", "rollout_complete"] * 8
+
+
+def test_rollout_guard_failure_preserves_exact_clip_and_unchanged_limits():
+    from evaluate_tiny_rgb_feature_winner import CPU_LIMITS
+    from terra_training_recovery import streamed_pools
+
+    pairs = [{"raw": {"source": "training", "example_id": str(i)}} for i in range(3)]
+    events = []
+
+    def generate(pair, video, mask, seed):
+        if pair["raw"]["example_id"] == "1":
+            raise RuntimeError("full-backbone CPU scoring exceeded its resource policy")
+        return seed
+
+    before = dict(CPU_LIMITS)
+    with pytest.raises(RuntimeError, match="resource policy") as caught:
+        streamed_pools(
+            pairs,
+            prepare=lambda pair: (None, None),
+            generate=generate,
+            seed=317,
+            emit=events.append,
+        )
+    context = caught.value.terra_rollout_context
+    assert context["example_id"] == "1" and context["seed"] == 318
+    assert context["unchanged_cpu_limits"] == before == CPU_LIMITS
+    assert events[-1]["stage"] == "rollout_failed" and len(events) == 4
+
+
+@pytest.mark.parametrize("stage", ["rollout", "terra_scoring"])
+def test_preupdate_failure_checkpoints_completed_updates_and_never_retries(tmp_path, stage):
+    from terra_training_recovery import record_preupdate_failure
+
+    saves = []
+
+    def save():
+        # Failure evidence must exist even if checkpoint serialization itself fails.
+        before = json.loads((tmp_path / "preupdate-stop.json").read_text())
+        assert before["optimizer_updates"] == 100
+        saves.append(1)
+        return "checkpoints/recovery-at-800.safetensors"
+
+    result = record_preupdate_failure(
+        tmp_path,
+        stage=stage,
+        error=RuntimeError("injected"),
+        examples=800,
+        updates=100,
+        save=save,
+    )
+    assert saves == [1] and result["failed_batch_optimizer_applied"] is False
+    assert result["failed_batch"] == 101 and result["automatic_retries"] == 0
+    assert (tmp_path / "scoring-stop.json").exists() == (stage == "terra_scoring")
+
+
 def test_checkpoint_pair_has_complete_hash_receipt_and_never_overwrites(monkeypatch, tmp_path):
     from benchmark_fleurs_dev import sha256
     from terra_training_recovery import save_checkpoint

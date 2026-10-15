@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -149,6 +150,71 @@ def skip_epoch(remaining, length):
         raise ValueError("invalid Terra recovery corpus offset")
     offset = min(remaining, length)
     return offset, remaining - offset
+
+
+def streamed_pools(pairs, *, prepare, generate, seed, emit):
+    """Keep one decoded clip resident; preserve candidate order, seeds and tokens."""
+    from evaluate_tiny_rgb_feature_winner import CPU_LIMITS, peak_bytes
+
+    pools = []
+    for index, pair in enumerate(pairs):
+        context = {
+            "source": pair["raw"]["source"],
+            "example_id": pair["raw"]["example_id"],
+            "batch_index": index,
+            "seed": seed + index,
+        }
+        started = time.perf_counter()
+        video, mask = prepare(pair)
+        emit({**context, "stage": "rollout_started", "process_peak_bytes": peak_bytes()})
+        try:
+            pools.append(generate(pair, video, mask, seed + index))
+        except RuntimeError as error:
+            error.terra_rollout_context = {
+                **context,
+                "generation_seconds": time.perf_counter() - started,
+                "process_peak_bytes": peak_bytes(),
+                "unchanged_cpu_limits": CPU_LIMITS,
+            }
+            emit({**error.terra_rollout_context, "stage": "rollout_failed"})
+            raise
+        finally:
+            del video, mask
+        emit(
+            {
+                **context,
+                "stage": "rollout_complete",
+                "generation_seconds": time.perf_counter() - started,
+                "process_peak_bytes": peak_bytes(),
+            }
+        )
+    return pools
+
+
+def record_preupdate_failure(output, *, stage, error, examples, updates, save):
+    """The failed preparation/scoring batch has not changed optimizer parameters."""
+    from evaluate_tiny_rgb_feature_winner import peak_bytes
+
+    result = {
+        "training_complete": False,
+        "stage": stage,
+        "training_examples": examples,
+        "optimizer_updates": updates,
+        "failed_batch": updates + 1,
+        "error": str(error),
+        "automatic_retries": 0,
+        "failed_batch_optimizer_applied": False,
+        "process_peak_bytes": peak_bytes(),
+        "rollout_context": getattr(error, "terra_rollout_context", None),
+    }
+    target = output / "preupdate-stop.json"
+    target.write_text(json.dumps(result, indent=2) + "\n")
+    if updates:
+        result["recovery_checkpoint"] = str(save())
+    target.write_text(json.dumps(result, indent=2) + "\n")
+    if stage == "terra_scoring":
+        (output / "scoring-stop.json").write_text(json.dumps(result, indent=2) + "\n")
+    return result
 
 
 def restore_state(parameters, optimizer, values, metadata, *, updates, restore_rng):

@@ -261,9 +261,11 @@ def run(path, output, *, qualification_only=False, qualification=None, restore_o
     from probe_tiny_rgb_feature_winner import gradients
     from terra_training_recovery import (
         checked_resume,
+        record_preupdate_failure,
         restore_checkpoint,
         save_checkpoint,
         skip_epoch,
+        streamed_pools,
     )
     from terra_training_storage import storage
     from terra_visual_learning import (
@@ -544,36 +546,37 @@ def run(path, output, *, qualification_only=False, qualification=None, restore_o
                 != policy_sha
             ):
                 raise RuntimeError("CPU rollout and GPU optimizer policies differ")
-            data = [training_pixels(pair, RECIPE) for pair in batch]
-            pools = [
-                candidate_pool(
-                    cpu,
-                    tokenizer,
-                    video,
-                    mask,
-                    pair["raw"]["reference"],
-                    seed=RECIPE["seed"] + examples + index,
-                )
-                for index, (pair, (video, mask)) in enumerate(zip(batch, data, strict=True))
-            ]
             receipt_path = output / "terra" / f"batch-{optimizer_updates + 1:06d}"
+            preparation_stage = "rollout"
             try:
+                pools = streamed_pools(
+                    batch,
+                    prepare=lambda pair: training_pixels(pair, RECIPE),
+                    generate=lambda pair, video, mask, seed: candidate_pool(
+                        cpu, tokenizer, video, mask, pair["raw"]["reference"], seed=seed
+                    ),
+                    seed=RECIPE["seed"] + examples,
+                    emit=lambda event, update=optimizer_updates + 1: append(
+                        output,
+                        "rollout-resources.jsonl",
+                        {
+                            "optimizer_update": update,
+                            **event,
+                        },
+                    ),
+                )
+                preparation_stage = "terra_scoring"
                 qualities, judge = score_pools(batch, pools, receipt_path)
-            except RuntimeError as error:
-                # Scoring precedes zero_grad/backward/step. Save only completed updates,
-                # then stop without retrying or touching the gateway's configuration.
-                failure = {
-                    "training_complete": False,
-                    "training_examples": examples,
-                    "optimizer_updates": optimizer_updates,
-                    "failed_batch": optimizer_updates + 1,
-                    "error": str(error),
-                    "automatic_retries": 0,
-                    "failed_batch_optimizer_applied": False,
-                }
-                (output / "scoring-stop.json").write_text(json.dumps(failure, indent=2) + "\n")
-                if optimizer_updates:
-                    checkpoint = save_checkpoint(
+            except (RuntimeError, ValueError) as error:
+                # Both preparation stages precede zero_grad/backward/step.
+                record_preupdate_failure(
+                    output,
+                    stage=preparation_stage,
+                    error=error,
+                    examples=examples,
+                    updates=optimizer_updates,
+                    save=lambda examples=examples,
+                    optimizer_updates=optimizer_updates: save_checkpoint(
                         gpu,
                         optimizer,
                         output,
@@ -582,9 +585,8 @@ def run(path, output, *, qualification_only=False, qualification=None, restore_o
                         examples,
                         optimizer_updates,
                         recovery=True,
-                    )
-                    failure["recovery_checkpoint"] = str(checkpoint.relative_to(ROOT))
-                (output / "scoring-stop.json").write_text(json.dumps(failure, indent=2) + "\n")
+                    ).relative_to(ROOT),
+                )
                 raise
             append(
                 output,
@@ -609,7 +611,10 @@ def run(path, output, *, qualification_only=False, qualification=None, restore_o
             for group in optimizer.param_groups:
                 group["lr"] = rate
             measurements = []
-            for (video, mask), pool, quality in zip(data, pools, qualities, strict=True):
+            for pair, pool, quality in zip(batch, pools, qualities, strict=True):
+                # Decode again rather than retaining eight float pixel tensors through
+                # all CPU rollouts and GPU updates. The same byte/timeline checks apply.
+                video, mask = training_pixels(pair, RECIPE)
                 labels = candidate_labels(video, pool)
                 result = duty.run(
                     lambda video=video,
@@ -629,6 +634,7 @@ def run(path, output, *, qualification_only=False, qualification=None, restore_o
                 )
                 result.pop("gold_logits")
                 measurements.append(result)
+                del video, mask, labels
                 torch.mps.empty_cache()
 
             def step():
