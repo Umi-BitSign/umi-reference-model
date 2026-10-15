@@ -578,6 +578,14 @@ One24-pair Terra medium call completed in5.44 seconds, using2,054 input and254 o
 
 Full teacher-assisted training launched at `2026-10-15T19:41:56Z`, owned session88910, output `checkpoints/terra-visual-training-v7-teacher-candidates/`, with the same immutable plan and its own verified qualification receipt. New optimizer progress is unobserved at launch. Its first quality check is128 new-arm exposures, on top of2,048 initialization exposures; scheduled counters must not be conflated with the stopped old arm's2,936 exposures. The existing compute window still expires at `2026-10-15T22:47:28Z`, automatically returning GPU pacing to50% and CPU threads to2. Next long-job observation is `2026-10-15T20:11:56Z`, with no intermediate training polls. All quality/generation gates and miner/LB boundaries remain unchanged; no C5 win is claimed.
 
+### First teacher-assisted checkpoint remains below C5
+
+At the scheduled `2026-10-15T20:12:11Z` observation, session88910 is live at184 new-arm exposures /23 optimizer steps, with all90 gradient tensors finite/nonzero at every logged update. No scoring, rollout or checkpoint-stop failure is recorded. Frozen source hashes match;192 per-clip rollouts completed and the maximum observed process peak is19,832,340,480 bytes, below the explicit32GiB training guard. The128-exposure visual/optimizer checkpoint is complete, visual SHA-256 `c6e5e63e0118456df7418a4044226ff62f7b15f66e5da7686e067aaf95cae3f8`.
+
+That checkpoint fails the unchanged C5 gate after90 How2Sign clips, with no FLEURS or complete benchmark score. Mean/weighted WER is114.31% /106.18%, versus114.22% /104.88% for its2,048-exposure initialization on the same90. On the common62 checkpoint identities, mean/weighted WER changes from118.77% /108.17% to114.94% /107.86%; the C5 control remains79.30% /78.08%. Mixed partial diagnostics do not establish a quality gain. Generic phrases still dominate despite26 unique hypotheses versus15 on those62. There is no promotion or confirmation. Next quality checkpoint is512 new-arm exposures.
+
+Of368 student training candidates,356 score0,11 score1 and1 scores2. Teacher candidates have a wider score range, including24 zeroes and6 tens among181 retained teacher candidates. These training scores show candidate diversity, not independent generated accuracy. Next observation: `2026-10-15T20:42:11Z`, with no intermediate training polls. Miner and LB remain untouched.
+
 ## Hard boundaries
 
 - The user requests commits and pushes for this work. Commit verified code, tests and research notes to `studio-competitive-training` and push that branch to `origin` at completed milestones. Keep datasets, transformed data, checkpoints, run logs and local artifacts out of Git; publish selected model weights through an explicit release workflow.
