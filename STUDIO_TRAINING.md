@@ -602,6 +602,8 @@ The512 checkpoint fails the unchanged C5 gate after104 How2Sign clips, with no F
 
 The WER decrease accompanies shorter generic text, not demonstrated sentence understanding. Across the104 predictions, “That's what it looks like” and “That's what the heat is looking for” each occur21 times; “That's what you're going to want to do” occurs19 times. Of1,296 generated student training candidates,1,257 score0,37 score1 and2 score2. Teacher training scores span0-10, but they are not the student's independent accuracy. No baseline change or promotion. Continue the same frozen arm toward2,048 new exposures; next observation `2026-10-15T21:42:39Z`. Miner and LB remain untouched.
 
+At `2026-10-15T21:42:51Z`, session88910 is live at912 new-arm exposures /114 updates, all90 gradients finite/nonzero,920 completed rollouts and no failure/stop receipts. Maximum process peak25,267,126,272 bytes remains below32GiB. Quality is unchanged since the rejected512 checkpoint; the2,048 check is pending. Next observation `2026-10-15T22:12:51Z`.
+
 ## Hard boundaries
 
 - The user requests commits and pushes for this work. Commit verified code, tests and research notes to `studio-competitive-training` and push that branch to `origin` at completed milestones. Keep datasets, transformed data, checkpoints, run logs and local artifacts out of Git; publish selected model weights through an explicit release workflow.
