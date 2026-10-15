@@ -1068,6 +1068,23 @@
     "promotion_authorized": false,
     "miner_modified": false
   },
+  "semantic_error_judge_research": {
+    "requested_by_owner": true,
+    "requested_metric": "model_assigned_semantic_error_percent",
+    "project": "https://github.com/firelex/jeff",
+    "reviewed_commit": "3720e7c66d73b79a6e90189f3d5b0d6ecf03ddc0",
+    "local_cpu_and_apple_runtime_documented": true,
+    "code_declared_license": "MIT",
+    "base_declared_license": "Apache-2.0",
+    "raw_confidence_is_error_percentage": false,
+    "score_requires_defined_rubric_and_domain_calibration": true,
+    "training_only_calibration_required": true,
+    "judge_downloaded_or_started": false,
+    "semantic_reward_optimizer_updates": 0,
+    "live_training_source_changed": false,
+    "fixed_wer_gate_changed": false,
+    "quality_improvement_verified": false
+  },
   "latest_student_numerical_qualification": {
     "observed_at": "2026-10-14T19:18:44Z",
     "plan": "runs/tiny-rgb-winner-student-preflight-v2-byte-buckets/plan.json",
