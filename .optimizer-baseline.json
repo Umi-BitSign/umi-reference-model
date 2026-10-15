@@ -1111,7 +1111,7 @@
   "terra_visual_restart": {
     "launched_at": "2026-10-15T02:40:36Z",
     "owned_session": 60535,
-    "current_phase": "stopped_after_gateway_HTTP502; owner_holding_scoring_for_codex_lb_maintenance",
+    "current_phase": "full_continuation_launched_after_owner_confirmed_codex_lb_ready",
     "plan": "runs/terra-visual-training-v3-bounded-rollouts/plan.json",
     "plan_sha256": "244135dbd8aa40ee3916129f2182dd19848b9b7d39ccb90e52bcc466633b756b",
     "output": "checkpoints/terra-visual-training-v3-bounded-rollouts",
@@ -1160,7 +1160,29 @@
     "maximum_inflight_judge_requests": 1,
     "maximum_pairs_per_training_judge_request": 24,
     "automatic_judge_retries": 0,
-    "scoring_held_until_owner_go_ahead": true,
+    "scoring_held_until_owner_go_ahead": false,
+    "continuation": {
+      "owner_confirmed_codex_lb_ready": true,
+      "launched_at": "2026-10-15T13:47:47Z",
+      "owned_session": 79557,
+      "plan": "runs/terra-visual-training-v4-recovery/plan.json",
+      "plan_sha256": "331c56ed927ffb89cd7a8ceb6bd56c30099376dad3a751c30f58cfff1b686d78",
+      "output": "checkpoints/terra-visual-training-v4-recovery",
+      "resume_training_examples": 128,
+      "resume_optimizer_updates": 16,
+      "new_optimizer_progress_observed": false,
+      "maximum_inflight_judge_requests": 1,
+      "automatic_retries": 0,
+      "checkpoint_on_scoring_failure": true,
+      "next_scheduled_quality_checkpoint_examples": 512,
+      "cpu_threads_at_launch": 8,
+      "gpu_duty_fraction_at_launch": 1.0,
+      "unthrottled_window_expires_at": "2026-10-15T22:47:28Z",
+      "after_window_gpu_duty_fraction": 0.5,
+      "quality_improvement_verified": false,
+      "miner_modified": false,
+      "codex_lb_modified": false
+    },
     "codex_lb_inspected_or_modified": false,
     "first128clip_checkpoint_evaluation": {
       "evaluated_how2sign_clips": 106,
@@ -1227,7 +1249,7 @@
     "quality_improvement_verified": false,
     "fixed_wer_gate_changed": false,
     "miner_modified": false,
-    "next_observation_at": null,
+    "next_observation_at": "2026-10-15T14:17:47Z",
     "observation_policy": "collect bounded setup/qualification promptly; check long actualtraining no more often than30minutes"
   },
   "latest_student_numerical_qualification": {
