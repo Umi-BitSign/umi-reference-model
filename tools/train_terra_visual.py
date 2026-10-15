@@ -55,6 +55,7 @@ def sources():
         "probe_jeff_terra_quality.py",
         "evaluate_terra_visual.py",
         "terra_training_storage.py",
+        "terra_training_recovery.py",
     ):
         result[f"tools/{name}"] = sha256(ROOT / "tools" / name)
     return result
@@ -94,10 +95,14 @@ def checked_plan(path):
         != sha256(path)
     ):
         raise ValueError("Terra training plan/source/data/benchmark bindings changed")
+    if "resume" in plan:
+        from terra_training_recovery import checked_resume
+
+        checked_resume(plan)
     return plan, pairs
 
 
-def freeze(path):
+def freeze(path, *, resume_plan=None, resume_checkpoint=None, qualification=None):
     from benchmark_fleurs_dev import sha256
     from c5_experiment_sources import archive_sources
     from terra_training_storage import storage
@@ -136,6 +141,12 @@ def freeze(path):
             )
         },
     }
+    if resume_plan is not None or resume_checkpoint is not None:
+        from terra_training_recovery import make_resume
+
+        if any(value is None for value in (resume_plan, resume_checkpoint, qualification)):
+            raise ValueError("recovery freeze needs source plan, checkpoint and qualification")
+        plan["resume"] = make_resume(resume_plan, resume_checkpoint, qualification, plan)
     storage(len(json.dumps(plan).encode()) + 1024**2)
     path.parent.mkdir(parents=True)
     path.write_text(json.dumps(plan, indent=2, sort_keys=True) + "\n")
@@ -241,14 +252,19 @@ def checked_qualification(receipt, path, initial_visual, fixed, proof_cases):
     return result
 
 
-def run(path, output, *, qualification_only=False, qualification=None):
+def run(path, output, *, qualification_only=False, qualification=None, restore_only=False):
     import torch
     from benchmark_fleurs_dev import sha256
     from c5_certification_budget import CertificationComputeWindow, WinnerDutyCycle
     from c5_winner_language_decoder import load_winner_language
     from probe_tiny_rgb_capacity import compare, state_digest
     from probe_tiny_rgb_feature_winner import gradients
-    from safetensors.torch import save_file
+    from terra_training_recovery import (
+        checked_resume,
+        restore_checkpoint,
+        save_checkpoint,
+        skip_epoch,
+    )
     from terra_training_storage import storage
     from terra_visual_learning import (
         backward_candidate_risk,
@@ -260,10 +276,17 @@ def run(path, output, *, qualification_only=False, qualification=None):
     from tiny_rgb_capacity_protocol import verified_comparison
     from tiny_rgb_feature_winner_student import RawFeatureWinnerStudent
     from tiny_rgb_winner_student import load_frozen_winner_encoder
-    from train_tiny_rgb_feature_winner_full import lr_factor, optimizer_payload, order_key
+    from train_tiny_rgb_feature_winner_full import lr_factor, order_key
     from transformers import ByT5Tokenizer
 
     plan, pairs = checked_plan(path)
+    resume_paths = checked_resume(plan) if "resume" in plan else None
+    if restore_only and resume_paths is None:
+        raise ValueError("local restore-only mode requires a frozen recovery plan")
+    if resume_paths is not None:
+        if qualification is not None or qualification_only:
+            raise ValueError("recovery uses only its frozen zero-update qualification")
+        qualification = resume_paths["qualification"]
     output = output.resolve()
     if output.exists() or not output.is_relative_to(ROOT / "checkpoints"):
         raise ValueError("Terra training needs a new checkpoint directory")
@@ -304,8 +327,10 @@ def run(path, output, *, qualification_only=False, qualification=None):
                 "plan_sha256": sha256(path),
                 "initial_visual_sha256": initial_visual,
                 "fixed_backbones": fixed,
-                "fresh_visual_weights": True,
+                "fresh_visual_weights": resume_paths is None,
                 "old_visual_weights_loaded": False,
+                "terra_checkpoint_resumed": resume_paths is not None,
+                "resume": plan.get("resume"),
                 "loss": "expected Terra semantic error plus 0.1 human caption CE",
             },
             indent=2,
@@ -330,7 +355,8 @@ def run(path, output, *, qualification_only=False, qualification=None):
             raise RuntimeError("Terra training changed fixed backbone values")
 
     if qualification is not None:
-        checked_qualification(qualification, path, initial_visual, fixed, plan["proof_cases"])
+        proof_path = resume_paths["qualification_plan"] if resume_paths is not None else path
+        checked_qualification(qualification, proof_path, initial_visual, fixed, plan["proof_cases"])
         (output / "qualification-reuse.json").write_text(
             json.dumps(
                 {
@@ -338,6 +364,9 @@ def run(path, output, *, qualification_only=False, qualification=None):
                     "receipt_sha256": sha256(qualification),
                     "fresh_initial_visual_sha256": initial_visual,
                     "optimizer_updates": 0,
+                    "qualification_plan": str(proof_path),
+                    "qualification_plan_sha256": sha256(proof_path),
+                    "current_plan_sha256": sha256(path),
                 },
                 indent=2,
             )
@@ -455,11 +484,50 @@ def run(path, output, *, qualification_only=False, qualification=None):
         weight_decay=RECIPE["weight_decay"],
         foreach=False,
     )
+    (output / "steps.jsonl").touch(exist_ok=False)
     versions = {name: p._version for name, p in gpu.named_parameters() if not p.requires_grad}
     examples, optimizer_updates, decisions = 0, 0, []
+    if resume_paths is not None:
+
+        def restore_rng(cpu_rng, mps_rng):
+            torch.mps.set_rng_state(mps_rng)
+            torch.set_rng_state(cpu_rng)
+
+        examples, optimizer_updates = duty.run(
+            lambda: restore_checkpoint(
+                plan,
+                resume_paths,
+                gpu.trainable_parameters(),
+                optimizer,
+                initial_visual=initial_visual,
+                fixed=fixed,
+                restore_rng=restore_rng,
+            )
+        )
+        # Fresh fixed tensors remain unchanged; only qualified Terra-trained vision resumes.
+        check_fixed_hashes(gpu)
+        if "source_decisions" in resume_paths:
+            decisions = json.loads(resume_paths["source_decisions"].read_text())
+            (output / "open-decisions.json").write_text(json.dumps(decisions, indent=2) + "\n")
+        restored = {
+            "stage": "checkpoint_restored",
+            "training_examples": examples,
+            "optimizer_updates": optimizer_updates,
+            "visual_sha256": state_digest(gpu.trainable_parameters()),
+            "source_visual_file_sha256": plan["resume"]["visual"]["sha256"],
+            "source_optimizer_file_sha256": plan["resume"]["optimizer"]["sha256"],
+            "terra_requests_during_restore": 0,
+            "restore_only": restore_only,
+            "resource_receipt": duty.receipt(),
+        }
+        (output / "resume-restored.json").write_text(json.dumps(restored, indent=2) + "\n")
+        print(json.dumps(restored), flush=True)
+        if restore_only:
+            return
+    skip_examples = examples
     for epoch in range(1, RECIPE["epochs"] + 1):
         ordered = sorted(pairs, key=lambda pair: order_key(pair, epoch))
-        offset = 0
+        offset, skip_examples = skip_epoch(skip_examples, len(ordered))
         while offset < len(ordered):
             next_check = next(value for value in RECIPE["checks_after_updates"] if value > examples)
             count = min(RECIPE["batch_clips"], len(ordered) - offset, next_check - examples)
@@ -489,7 +557,35 @@ def run(path, output, *, qualification_only=False, qualification=None):
                 for index, (pair, (video, mask)) in enumerate(zip(batch, data, strict=True))
             ]
             receipt_path = output / "terra" / f"batch-{optimizer_updates + 1:06d}"
-            qualities, judge = score_pools(batch, pools, receipt_path)
+            try:
+                qualities, judge = score_pools(batch, pools, receipt_path)
+            except RuntimeError as error:
+                # Scoring precedes zero_grad/backward/step. Save only completed updates,
+                # then stop without retrying or touching the gateway's configuration.
+                failure = {
+                    "training_complete": False,
+                    "training_examples": examples,
+                    "optimizer_updates": optimizer_updates,
+                    "failed_batch": optimizer_updates + 1,
+                    "error": str(error),
+                    "automatic_retries": 0,
+                    "failed_batch_optimizer_applied": False,
+                }
+                (output / "scoring-stop.json").write_text(json.dumps(failure, indent=2) + "\n")
+                if optimizer_updates:
+                    checkpoint = save_checkpoint(
+                        gpu,
+                        optimizer,
+                        output,
+                        path,
+                        reference["translator_checkpoint_sha256"],
+                        examples,
+                        optimizer_updates,
+                        recovery=True,
+                    )
+                    failure["recovery_checkpoint"] = str(checkpoint.relative_to(ROOT))
+                (output / "scoring-stop.json").write_text(json.dumps(failure, indent=2) + "\n")
+                raise
             append(
                 output,
                 "candidate-pools.jsonl",
@@ -602,30 +698,14 @@ def run(path, output, *, qualification_only=False, qualification=None):
             storage(215000000, output=output)
             if examples not in RECIPE["checks_after_updates"]:
                 continue
-            checkpoint = output / f"visual-after-{examples:06d}.safetensors"
-            save_file(
-                {
-                    name: value.detach().cpu().contiguous()
-                    for name, value in gpu.trainable_parameters().items()
-                },
-                str(checkpoint),
-                metadata={
-                    "plan_sha256": sha256(path),
-                    "update": str(examples),
-                    "optimizer_updates": str(optimizer_updates),
-                    "fixed_winner_checkpoint": reference["translator_checkpoint_sha256"],
-                },
-            )
-            values, metadata = optimizer_payload(
+            checkpoint = save_checkpoint(
+                gpu,
                 optimizer,
-                gpu.trainable_parameters(),
-                {"cpu": torch.get_rng_state(), "mps": torch.mps.get_rng_state()},
-            )
-            optimizer_path = checkpoint.with_name(checkpoint.stem + "-optimizer.safetensors")
-            save_file(
-                values,
-                str(optimizer_path),
-                metadata={"plan_sha256": sha256(path), "update": str(examples), **metadata},
+                output,
+                path,
+                reference["translator_checkpoint_sha256"],
+                examples,
+                optimizer_updates,
             )
             check_fixed_hashes(gpu)
             import subprocess
@@ -689,18 +769,27 @@ if __name__ == "__main__":
     parser.add_argument("--freeze", type=Path)
     parser.add_argument("--plan", type=Path)
     parser.add_argument("--output-dir", type=Path)
+    parser.add_argument("--resume-plan", type=Path)
+    parser.add_argument("--resume-checkpoint", type=Path)
+    parser.add_argument("--restore-only", action="store_true")
     stage = parser.add_mutually_exclusive_group()
     stage.add_argument("--qualification-only", action="store_true")
     stage.add_argument("--qualification", type=Path)
     args = parser.parse_args()
     if args.freeze:
-        freeze(args.freeze)
+        freeze(
+            args.freeze,
+            resume_plan=args.resume_plan,
+            resume_checkpoint=args.resume_checkpoint,
+            qualification=args.qualification,
+        )
     elif args.plan and args.output_dir:
         run(
             args.plan,
             args.output_dir,
             qualification_only=args.qualification_only,
             qualification=args.qualification,
+            restore_only=args.restore_only,
         )
     else:
         parser.error("provide --freeze or --plan with --output-dir")
