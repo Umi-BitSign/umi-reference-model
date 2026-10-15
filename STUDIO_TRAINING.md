@@ -530,6 +530,34 @@ A fresh-process continuation launched `2026-10-15T17:30:43Z`, session45399, with
 
 At `2026-10-15T18:00:59Z`, session45399 is confirmed live at2,048 exposures /256 steps,37 new steps since the complete1,752 restore. All observed90 gradients are finite/nonzero; recorded rollout process peak21,738,668,032 bytes remains below24GiB and there is no pre-update failure receipt. The2,048 visual and optimizer/RNG pair is saved with a complete hash receipt: visual `0af5d57ea7ee111d29ffb2d9a0a8c5f9dfd39c252708b54f0f997ee2161632e5`, optimizer `a7a4e094e6b0b78d3bbd1245114d5d08a060cffc362e776b2e3dc01d95d1737b`. The CPU quality-evaluation phase has not produced a decision at this observation. Do not infer improved quality from reaching the checkpoint. Next combined observation `2026-10-15T18:30:59Z`.
 
+### Terra2048 rejected; training-only teacher-candidate pilot
+
+The `2026-10-15T18:31:14Z` observation confirms session45399 live at2,352 exposures /294 optimizer steps, all observed90 gradients finite/nonzero. The2,048 checkpoint is rejected after90 How2Sign clips; no FLEURS was decoded and the benchmark is incomplete. Its all90 mean/weighted WER is114.22% /104.88%. For comparison across all checkpoints, restrict to the same62 identities:
+
+| Same 62 How2Sign clips, lower is better | C5 winner | Terra128 | Terra512 | Terra2048 |
+| --- | ---: | ---: | ---: | ---: |
+| Mean WER | 79.30% | 97.03% | 165.96% | 118.77% |
+| Word-weighted WER | 78.08% | 95.86% | 139.40% | 108.17% |
+
+Terra2048 recovers some of the512 regression, but remains worse than128 and C5. It has15 unique hypotheses across these62 clips. Across all90, four generic phrases occur16,13,13,12 times. No checkpoint is promoted; C5 remains unbeaten. The existing schedule's next quality check is8,192 exposures. Next training observation `2026-10-15T19:01:14Z`.
+
+A separate CPU-only probe tested six already-approved training identities from the original numerical qualification, using two CPU threads on this32-core host, zero GPU work and zero optimizer updates. The same frozen winning sequence encoder/language decoder produced teacher text from previously audited native training feature caches, while the student used raw192-pixel inputs and its saved2,048 checkpoint. Teacher inputs contain no human reference; references enter only the subsequent scoring. Both use training decode policy (greedy, horizon512), not the published benchmark's generation policy. Frozen model hashes stay unchanged. The probe completed in28.58 seconds; output/hash receipt and source are in `runs/terra-teacher-candidate-pilot-v1/`.
+
+Terra medium then judged human/teacher/student triplets:
+
+| Approved training case | Teacher quality | Student2048 quality |
+| --- | ---: | ---: |
+| Canal du Midi / concrete | 7 | 0 |
+| Bobek / Partizan | 3 | 0 |
+| Telescope choices | 5 | 1 |
+| Pinch twist | 2 | 0 |
+| Eliminate acne | 0 | 0 |
+| Luke Perry death | 10 | 0 |
+
+All six exact-human controls score10. The teacher's “Actor Lueperry died today” receives10 against “Actor Luke Perry died today,” consistent with semantic/typo tolerance; wrong teacher dates and claims receive lower scores. This small training-only diagnostic supports testing a richer candidate pool, not a generalization gain. The initial coordinator found a possible in-flight training request and sent no extra call. A later bounded coordination waited for request completion, paused only verified owned trainer PID967, confirmed no pending own scoring request, sent one18-pair request, then resumed in a `finally` block after4.206 seconds. No miner/LB service was inspected or changed. Pause-contaminated training timing is not valid throughput evidence. Selected response SHA-256 `7ba11bbb5294683ca4753ebd2921345c610bc0f316870f30415f4383405a34c9`.
+
+An independent private prototype adds a reference-blind C5 teacher candidate to the existing human/greedy/sampled pool, deduplicates actual token sequences, and gives it the same actual Terra error rather than presumed correctness. Its text cache is bounded128MiB and binds fixed C5 weights, approved native features/timeline, decode policy and implementation. Six prototype tests and Ruff pass for teacher-path reference exclusion, protected-role rejection, seed preservation/deduplication, cache corruption/storage boundaries, cache revision keys and score-directed gradient signs. The live trainer's source/objective/candidate pool remains unchanged. No teacher-assisted optimizer run or held-out improvement has been demonstrated.
+
 ## Hard boundaries
 
 - The user requests commits and pushes for this work. Commit verified code, tests and research notes to `studio-competitive-training` and push that branch to `origin` at completed milestones. Keep datasets, transformed data, checkpoints, run logs and local artifacts out of Git; publish selected model weights through an explicit release workflow.
