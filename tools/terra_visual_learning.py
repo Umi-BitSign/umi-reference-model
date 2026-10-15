@@ -45,6 +45,18 @@ def complete_candidate(tokens, *, start_id=0, eos_id=1, pad_id=0):
     return values[1 : end + 1]
 
 
+def bounded_candidate(tokens, maximum_tokens):
+    """An unfinished training rollout remains an explicitly marked prefix.
+
+    Never invent EOS or silently accept an unexpected short/interrupted output.
+    This finite training horizon does not change benchmark generation.
+    """
+    values = tokens.tolist()
+    if values and values[0] == 0 and 1 not in values[1:] and len(values) == maximum_tokens + 1:
+        return {"tokens": values[1:], "truncated": True, "termination": "training_token_horizon"}
+    return {"tokens": complete_candidate(tokens), "truncated": False, "termination": "eos"}
+
+
 @torch.no_grad()
 def candidate_pool(student, tokenizer, video, mask, reference, *, seed, maximum_tokens=512):
     """Reference never conditions generation; it enters the objective afterward."""
@@ -55,7 +67,15 @@ def candidate_pool(student, tokenizer, video, mask, reference, *, seed, maximum_
     if not gold or gold[-1] != 1 or len(gold) > maximum_tokens:
         raise ValueError("Terra learning never truncates the human caption")
     memory, frame_mask = student.encode(video, mask)
-    candidates = [{"tokens": gold, "text": reference, "kind": "human_anchor"}]
+    candidates = [
+        {
+            "tokens": gold,
+            "text": reference,
+            "kind": "human_anchor",
+            "truncated": False,
+            "termination": "eos",
+        }
+    ]
     torch.manual_seed(seed)
     for sample in (False, True):
         arguments = {
@@ -69,11 +89,12 @@ def candidate_pool(student, tokenizer, video, mask, reference, *, seed, maximum_
         }
         if sample:
             arguments.update(temperature=1.0, top_k=0, top_p=1.0)
-        sequence = complete_candidate(student.language.generate(**arguments)[0])
+        emitted = bounded_candidate(student.language.generate(**arguments)[0], maximum_tokens)
+        sequence = emitted["tokens"]
         if sequence not in [row["tokens"] for row in candidates]:
             candidates.append(
                 {
-                    "tokens": sequence,
+                    **emitted,
                     "text": tokenizer.decode(
                         sequence, skip_special_tokens=True, clean_up_tokenization_spaces=False
                     ),
@@ -86,8 +107,14 @@ def candidate_pool(student, tokenizer, video, mask, reference, *, seed, maximum_
 def candidate_labels(video, candidates):
     labels = []
     for candidate in candidates:
-        if not candidate["tokens"] or candidate["tokens"][-1] != 1:
-            raise ValueError("likelihood requires complete candidate EOS")
+        values = candidate["tokens"]
+        truncated = candidate.get("truncated", False)
+        if (
+            not values
+            or (truncated and (len(values) != 512 or 1 in values))
+            or (not truncated and values[-1] != 1)
+        ):
+            raise ValueError("likelihood requires observed EOS or an explicitly bounded prefix")
         _, _, padded = winner_length_buckets(video, torch.tensor([candidate["tokens"]]))
         labels.append(padded)
     if not labels or len({tuple(row["tokens"]) for row in candidates}) != len(candidates):

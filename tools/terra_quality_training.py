@@ -143,7 +143,7 @@ def score_with_terra(rows, output: Path):
 
 
 def sequence_log_probability(logits, labels):
-    """Unnormalized sequence log probability, including EOS, ignoring padding only."""
+    """Log probability of observed tokens; keep real EOS, ignore target padding only."""
     import torch
 
     if logits.shape[:2] != labels.shape or labels.ndim != 2 or labels.shape[0] != 1:

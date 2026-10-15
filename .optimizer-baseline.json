@@ -1109,11 +1109,13 @@
     "next_combined_observation_at": null
   },
   "terra_visual_restart": {
-    "launched_at": "2026-10-15T01:59:37Z",
-    "owned_session": 24878,
-    "plan": "runs/terra-visual-training-v2-independent-load/plan.json",
-    "plan_sha256": "e3a1d4ce8891fb0af159d4c82263f93c400422f4e13668d9688c98962f6080aa",
-    "output": "checkpoints/terra-visual-training-v2-independent-load",
+    "launched_at": "2026-10-15T02:37:36Z",
+    "owned_session": 82656,
+    "current_phase": "bounded_real_Terra_gradient_qualification_only",
+    "plan": "runs/terra-visual-training-v3-bounded-rollouts/plan.json",
+    "plan_sha256": "244135dbd8aa40ee3916129f2182dd19848b9b7d39ccb90e52bcc466633b756b",
+    "output": "checkpoints/terra-visual-training-v3-qualification",
+    "planned_full_training_output": "checkpoints/terra-visual-training-v3-bounded-rollouts",
     "training_clips": 7523,
     "planned_training_examples": 30092,
     "model": "fresh17.53M small-input visual front-end with fixed complete C5 sequence/language backbone",
@@ -1125,7 +1127,7 @@
     "actual_terra_only_numerics_required_before_optimizer_updates": true,
     "all6_real_case_numerical_completion_observed": false,
     "optimizer_progress_observed": false,
-    "focused_tests_passed": 40,
+    "focused_tests_passed": 42,
     "first_attempt": {
       "owned_session": 42369,
       "terminal_exit_code": 1,
@@ -1135,6 +1137,18 @@
       "receipt": "checkpoints/terra-visual-training-v1/setup-failure.json"
     },
     "independent_policy_tensors_hash_checked_before_metal": true,
+    "second_attempt": {
+      "owned_session": 24878,
+      "terminal_exit_code": 1,
+      "independent_model_setup_passed": true,
+      "failure": "strict EOS-only parser rejected actual512-token fresh-model output",
+      "terra_requests": 0,
+      "optimizer_updates": 0,
+      "receipt": "checkpoints/terra-visual-training-v2-independent-load/setup-failure.json"
+    },
+    "unfinished_training_prefixes_explicitly_flagged_and_scored_as_emitted": true,
+    "synthetic_eos_inserted": false,
+    "verified_zero_update_qualification_can_be_reused_for_identical_fresh_model": true,
     "storage_physical_floor_gib": 60,
     "storage_maximum_run_output_gib": 2,
     "bulk_data_ingestion_storage_policy_changed": false,
@@ -1146,7 +1160,8 @@
     "quality_improvement_verified": false,
     "fixed_wer_gate_changed": false,
     "miner_modified": false,
-    "next_observation_at": "2026-10-15T02:29:37Z"
+    "next_observation_at": null,
+    "observation_policy": "collect bounded setup/qualification promptly; check long actualtraining no more often than30minutes"
   },
   "latest_student_numerical_qualification": {
     "observed_at": "2026-10-14T19:18:44Z",

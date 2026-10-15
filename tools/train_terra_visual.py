@@ -38,6 +38,7 @@ RECIPE = {
     "error": "10 minus Terra semantic quality",
     "augmentation": "none",
     "storage_policy": "60GiB physical floor plus128MiB headroom and remaining2GiB output reserve",
+    "training_rollouts": "EOS or explicit512-token horizon; no invented termination token",
 }
 
 
@@ -178,7 +179,69 @@ def score_pools(pairs, pools, output):
     return qualities, result
 
 
-def run(path, output):
+def checked_qualification(receipt, path, initial_visual, fixed, proof_cases):
+    from benchmark_fleurs_dev import sha256
+    from probe_jeff_terra_quality import terra_payload
+    from semantic_quality_judge import parse_terra_scores
+    from tiny_rgb_capacity_protocol import verified_comparison
+
+    result = json.loads(receipt.read_text())
+    if (
+        result.get("complete") is not True
+        or result.get("numerics_passed") is not True
+        or result.get("plan_sha256") != sha256(path)
+        or result.get("initial_visual_sha256") != initial_visual
+        or result.get("fixed_backbones") != fixed
+        or result.get("optimizer_updates") != 0
+        or result.get("caption_weight_during_proof") != 0
+    ):
+        raise ValueError("Terra qualification is incomplete or bound to different initial tensors")
+    comparisons_path = receipt.with_name("qualification-comparisons.jsonl")
+    inputs_path = receipt.with_name("qualification-inputs.jsonl")
+    response_path = receipt.parent / "qualification-terra/response.json"
+    if any(
+        sha256(file) != result[field]
+        for file, field in (
+            (comparisons_path, "comparisons_sha256"),
+            (inputs_path, "inputs_sha256"),
+            (response_path, "judge_response_sha256"),
+        )
+    ):
+        raise ValueError("Terra qualification evidence changed")
+    inputs = json.loads(inputs_path.read_text())
+    if inputs["pairs"] != proof_cases:
+        raise ValueError("Terra qualification used different training identities")
+    rows = [
+        {"reference": pair["raw"]["reference"], "candidate": candidate["text"]}
+        for pair, pool in zip(proof_cases, inputs["pools"], strict=True)
+        for candidate in pool
+    ]
+    if json.loads(
+        (receipt.parent / "qualification-terra/request.json").read_text()
+    ) != terra_payload(rows):
+        raise ValueError("Terra qualification request differs from its frozen training texts")
+    scores = parse_terra_scores(
+        json.loads(response_path.read_text()), [f"pair_{index:02d}" for index in range(len(rows))]
+    )
+    flattened = [score for group in inputs["quality"] for score in group]
+    if flattened != [scores[f"pair_{index:02d}"] for index in range(len(rows))]:
+        raise ValueError("Terra qualification gradients used different judge scores")
+    comparisons = [json.loads(line) for line in comparisons_path.read_text().splitlines()]
+    identities = [(pair["raw"]["source"], pair["raw"]["example_id"]) for pair in proof_cases]
+    if [(row["source"], row["example_id"]) for row in comparisons] != identities:
+        raise ValueError("Terra qualification gradient coverage differs")
+    for row, quality in zip(comparisons, inputs["quality"], strict=True):
+        if (
+            row["caption_weight"] != 0
+            or row["terra_gradient_coefficient_l1"] <= 0
+            or row["terra_quality"] != quality
+        ):
+            raise ValueError("Terra qualification lacks actual Terra-only gradients")
+        verified_comparison(row["comparison"], 90)
+    return result
+
+
+def run(path, output, *, qualification_only=False, qualification=None):
     import torch
     from benchmark_fleurs_dev import sha256
     from c5_certification_budget import CertificationComputeWindow, WinnerDutyCycle
@@ -266,95 +329,125 @@ def run(path, output):
         }:
             raise RuntimeError("Terra training changed fixed backbone values")
 
-    # Qualify the actual Terra-only gradient before admitting any optimizer update.
-    proof_pairs = plan["proof_cases"]
-    proof_data = [training_pixels(pair, RECIPE) for pair in proof_pairs]
-    pools = [
-        candidate_pool(
-            cpu, tokenizer, video, mask, pair["raw"]["reference"], seed=RECIPE["seed"] + index
-        )
-        for index, (pair, (video, mask)) in enumerate(zip(proof_pairs, proof_data, strict=True))
-    ]
-    qualities, judge = score_pools(proof_pairs, pools, output / "qualification-terra")
-    append(
-        output,
-        "qualification-inputs.jsonl",
-        {"pairs": proof_pairs, "pools": pools, "quality": qualities, "judge": judge},
-    )
-    comparisons = []
-    for pair, (video, mask), pool, quality in zip(
-        proof_pairs, proof_data, pools, qualities, strict=True
-    ):
-        labels = candidate_labels(video, pool)
-        cpu.zero_grad(set_to_none=True)
-        gpu.zero_grad(set_to_none=True)
-        before = backward_candidate_risk(
-            cpu, video, mask, labels, quality, alpha=RECIPE["risk_alpha"], caption_weight=0
-        )
-        cpu_gradients = gradients(cpu)
-        after = duty.run(
-            lambda video=video, mask=mask, labels=labels, quality=quality: backward_candidate_risk(
-                gpu, video, mask, labels, quality, alpha=RECIPE["risk_alpha"], caption_weight=0
-            )
-        )
-        metal_gradients = gradients(gpu)
-        measured = compare(
-            cpu_gradients,
-            metal_gradients,
-            before["loss"],
-            after["loss"],
-            before["gold_logits"],
-            after["gold_logits"],
-        )
-        record = {
-            "source": pair["raw"]["source"],
-            "example_id": pair["raw"]["example_id"],
-            "terra_quality": quality,
-            "caption_weight": 0,
-            "terra_gradient_coefficient_l1": before["terra_gradient_coefficient_l1"],
-            "comparison": measured,
-        }
-        append(output, "qualification-comparisons.jsonl", record)
-        verified_comparison(measured, 90)
-        if before["terra_gradient_coefficient_l1"] <= 0:
-            raise RuntimeError("Terra-only qualification has no actual semantic gradient")
-        comparisons.append({key: value for key, value in record.items() if key != "comparison"})
-        print(
+    if qualification is not None:
+        checked_qualification(qualification, path, initial_visual, fixed, plan["proof_cases"])
+        (output / "qualification-reuse.json").write_text(
             json.dumps(
                 {
-                    "stage": "terra_gradient_qualified",
-                    "example_id": record["example_id"],
-                    "worst_relative_gradient_error": max(
-                        row["relative_l2_error"] for row in measured["gradient_differences"]
-                    ),
-                }
-            ),
+                    "receipt": str(qualification),
+                    "receipt_sha256": sha256(qualification),
+                    "fresh_initial_visual_sha256": initial_visual,
+                    "optimizer_updates": 0,
+                },
+                indent=2,
+            )
+            + "\n"
+        )
+        print(
+            json.dumps({"stage": "verified_qualification_reused", "optimizer_updates": 0}),
             flush=True,
         )
-        del cpu_gradients, metal_gradients
-        cpu.zero_grad(set_to_none=True)
-        gpu.zero_grad(set_to_none=True)
-        torch.mps.empty_cache()
-    check_fixed_hashes(cpu)
-    check_fixed_hashes(gpu)
-    if state_digest(gpu.trainable_parameters()) != initial_visual:
-        raise RuntimeError("zero-update qualification changed the fresh visual model")
-    (output / "qualification.json").write_text(
-        json.dumps(
-            {
-                "complete": True,
-                "numerics_passed": True,
-                "plan_sha256": sha256(path),
-                "real_cases": comparisons,
-                "optimizer_updates": 0,
-                "caption_weight_during_proof": 0,
-                "actual_terra_scores_drive_all_90_gradient_tensors": True,
-                "resource_receipt": duty.receipt(),
-            },
-            indent=2,
+    else:
+        # Qualify the actual Terra-only gradient before admitting any optimizer update.
+        proof_pairs = plan["proof_cases"]
+        proof_data = [training_pixels(pair, RECIPE) for pair in proof_pairs]
+        pools = [
+            candidate_pool(
+                cpu, tokenizer, video, mask, pair["raw"]["reference"], seed=RECIPE["seed"] + index
+            )
+            for index, (pair, (video, mask)) in enumerate(zip(proof_pairs, proof_data, strict=True))
+        ]
+        qualities, judge = score_pools(proof_pairs, pools, output / "qualification-terra")
+        append(
+            output,
+            "qualification-inputs.jsonl",
+            {"pairs": proof_pairs, "pools": pools, "quality": qualities, "judge": judge},
         )
-        + "\n"
-    )
+        comparisons = []
+        for pair, (video, mask), pool, quality in zip(
+            proof_pairs, proof_data, pools, qualities, strict=True
+        ):
+            labels = candidate_labels(video, pool)
+            cpu.zero_grad(set_to_none=True)
+            gpu.zero_grad(set_to_none=True)
+            before = backward_candidate_risk(
+                cpu, video, mask, labels, quality, alpha=RECIPE["risk_alpha"], caption_weight=0
+            )
+            cpu_gradients = gradients(cpu)
+            after = duty.run(
+                lambda video=video,
+                mask=mask,
+                labels=labels,
+                quality=quality: backward_candidate_risk(
+                    gpu, video, mask, labels, quality, alpha=RECIPE["risk_alpha"], caption_weight=0
+                )
+            )
+            metal_gradients = gradients(gpu)
+            measured = compare(
+                cpu_gradients,
+                metal_gradients,
+                before["loss"],
+                after["loss"],
+                before["gold_logits"],
+                after["gold_logits"],
+            )
+            record = {
+                "source": pair["raw"]["source"],
+                "example_id": pair["raw"]["example_id"],
+                "terra_quality": quality,
+                "caption_weight": 0,
+                "terra_gradient_coefficient_l1": before["terra_gradient_coefficient_l1"],
+                "comparison": measured,
+            }
+            append(output, "qualification-comparisons.jsonl", record)
+            verified_comparison(measured, 90)
+            if before["terra_gradient_coefficient_l1"] <= 0:
+                raise RuntimeError("Terra-only qualification has no actual semantic gradient")
+            comparisons.append({key: value for key, value in record.items() if key != "comparison"})
+            print(
+                json.dumps(
+                    {
+                        "stage": "terra_gradient_qualified",
+                        "example_id": record["example_id"],
+                        "worst_relative_gradient_error": max(
+                            row["relative_l2_error"] for row in measured["gradient_differences"]
+                        ),
+                    }
+                ),
+                flush=True,
+            )
+            del cpu_gradients, metal_gradients
+            cpu.zero_grad(set_to_none=True)
+            gpu.zero_grad(set_to_none=True)
+            torch.mps.empty_cache()
+        check_fixed_hashes(cpu)
+        check_fixed_hashes(gpu)
+        if state_digest(gpu.trainable_parameters()) != initial_visual:
+            raise RuntimeError("zero-update qualification changed the fresh visual model")
+        (output / "qualification.json").write_text(
+            json.dumps(
+                {
+                    "complete": True,
+                    "numerics_passed": True,
+                    "plan_sha256": sha256(path),
+                    "initial_visual_sha256": initial_visual,
+                    "fixed_backbones": fixed,
+                    "comparisons_sha256": sha256(output / "qualification-comparisons.jsonl"),
+                    "inputs_sha256": sha256(output / "qualification-inputs.jsonl"),
+                    "judge_response_sha256": judge["response_sha256"],
+                    "real_cases": comparisons,
+                    "optimizer_updates": 0,
+                    "caption_weight_during_proof": 0,
+                    "actual_terra_scores_drive_all_90_gradient_tensors": True,
+                    "resource_receipt": duty.receipt(),
+                },
+                indent=2,
+            )
+            + "\n"
+        )
+    if qualification_only:
+        print(json.dumps({"stage": "qualification_complete", "optimizer_updates": 0}), flush=True)
+        return
     cpu.requires_grad_(False)
     optimizer = torch.optim.AdamW(
         gpu.trainable_parameters().values(),
@@ -596,10 +689,18 @@ if __name__ == "__main__":
     parser.add_argument("--freeze", type=Path)
     parser.add_argument("--plan", type=Path)
     parser.add_argument("--output-dir", type=Path)
+    stage = parser.add_mutually_exclusive_group()
+    stage.add_argument("--qualification-only", action="store_true")
+    stage.add_argument("--qualification", type=Path)
     args = parser.parse_args()
     if args.freeze:
         freeze(args.freeze)
     elif args.plan and args.output_dir:
-        run(args.plan, args.output_dir)
+        run(
+            args.plan,
+            args.output_dir,
+            qualification_only=args.qualification_only,
+            qualification=args.qualification,
+        )
     else:
         parser.error("provide --freeze or --plan with --output-dir")

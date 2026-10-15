@@ -13,7 +13,7 @@ from terra_quality_training import (
     safe_response,
     sequence_log_probability,
 )
-from terra_visual_learning import complete_candidate
+from terra_visual_learning import bounded_candidate, candidate_labels, complete_candidate
 
 
 def test_configured_gateway_is_used_instead_of_leaking_its_key_to_public_api():
@@ -97,6 +97,24 @@ def test_complete_rollouts_reject_truncation_and_content_after_eos():
     for values in ([0, 7, 8], [7, 1], [0, 7, 1, 8]):
         with pytest.raises(ValueError):
             complete_candidate(torch.tensor(values))
+
+
+def test_training_horizon_keeps_real_prefix_without_fabricating_eos():
+    sequence = torch.tensor([0] + [7] * 512)
+    result = bounded_candidate(sequence, 512)
+    assert result == {
+        "tokens": [7] * 512,
+        "truncated": True,
+        "termination": "training_token_horizon",
+    }
+    assert 1 not in result["tokens"]
+    video = torch.zeros(1, 2, 3, 16, 16)
+    labels = candidate_labels(video, [result])
+    assert labels[0].shape == (1, 512) and torch.equal(labels[0], sequence[None, 1:])
+    with pytest.raises(ValueError, match="complete EOS"):
+        bounded_candidate(torch.tensor([0, 7, 7]), 512)
+    with pytest.raises(ValueError, match="bounded prefix"):
+        candidate_labels(video, [{"tokens": [7, 7], "truncated": True}])
 
 
 @pytest.mark.parametrize("quality", [[-1], [11], [True], [1.1], []])
@@ -255,3 +273,29 @@ def test_training_storage_reserves_future_outputs_without_lowering_ingestion_gua
         storage(POLICY["output_budget_bytes"] + 1, root=tmp_path)
     with pytest.raises(ValueError, match="checkpoint subtree"):
         storage(output=tmp_path / "data", root=tmp_path)
+
+
+def test_qualification_reuse_rejects_different_fresh_model_before_any_training(tmp_path):
+    import json
+
+    from benchmark_fleurs_dev import sha256
+    from train_terra_visual import checked_qualification
+
+    plan = tmp_path / "plan.json"
+    plan.write_text("{}\n")
+    receipt = tmp_path / "qualification.json"
+    receipt.write_text(
+        json.dumps(
+            {
+                "complete": True,
+                "numerics_passed": True,
+                "plan_sha256": sha256(plan),
+                "initial_visual_sha256": "one-model",
+                "fixed_backbones": {},
+                "optimizer_updates": 0,
+                "caption_weight_during_proof": 0,
+            }
+        )
+    )
+    with pytest.raises(ValueError, match="different initial tensors"):
+        checked_qualification(receipt, plan, "another-model", {}, [])
