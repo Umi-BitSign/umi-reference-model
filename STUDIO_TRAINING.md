@@ -495,6 +495,15 @@ Scoring stays synchronous with at most one request in flight and no automatic re
 
 At the scheduled `2026-10-15T14:17:56Z` observation, session 79557 is confirmed live at 448 total training exposures / 56 optimizer updates. The continuation completed 40 contiguous new updates, including recomputation of the 24 previously unsaved examples. Every observed update has all 90 finite/nonzero gradient tensors; current source hashes match the frozen v4 plan. Forty scoring calls succeeded, using 74,406 input / 11,832 output tokens. Of 640 actual generated training candidates, Terra assigned 631 zeroes, eight ones and one two. This is an unpaired training diagnostic, not an improvement claim or a held-out evaluation. The 512-exposure quality check has not yet run; saved state remains the prior 128-exposure checkpoint. Observed GPU-active time since resume is 600.37 seconds, peak driver allocation 7,827,243,008 bytes. No new gateway failure is observed, no benchmark gates changed, and no serving/LB service was touched. Next long-job observation: `2026-10-15T14:47:56Z`.
 
+At `2026-10-15T14:48:09Z`, the scheduled observation confirms session 79557 live at 728 total exposures / 91 optimizer steps, 75 new steps since resume, all 90 gradients finite/nonzero. The 512-exposure visual and optimizer/RNG pair is saved and its evaluation rejected after 62 How2Sign clips, with zero FLEURS decoded. Even perfect remaining clips cannot meet the unchanged improvement gate. Compare only the same 62 identities:
+
+| Same 62 How2Sign clips, lower is better | C5 winner | Terra128 | Terra512 |
+| --- | ---: | ---: | ---: |
+| Mean WER | 79.30% | 97.03% | 165.96% |
+| Word-weighted WER | 78.08% | 95.86% | 139.40% |
+
+The 512 checkpoint is worse, with many long, generic filler outputs; 25 unique hypotheses across 62 clips versus 11 at128 and 62 for C5. The most frequent filler occurs nine times. This result cannot be called progress in quality. These partial-prefix results do not substitute for a complete benchmark, and no candidate is promoted. Visual SHA-256 `8f1281d1ee14c85f079415b7df58b0b1bca89a9da8ab8688b98b85342ed65f52`; optimizer SHA-256 `ce671f84216fdc94032cccecb674da438c03bd5c9b8324751a5edcf3d1c891fe`. Seventy-five synchronous scoring calls have completed since resume, using 139,865 input and22,151 output tokens. Training-candidate scores remain mostly zero: 1,185 zeroes,14 ones,1 two out of1,200 generated candidates. No new gateway failure or scoring-stop receipt is observed. The fixed 2,048-exposure test remains the next checkpoint; unchanged four-pass training continues while the failed512 candidate stays rejected. Next long-job observation: `2026-10-15T15:18:09Z`.
+
 ## Hard boundaries
 
 - The user requests commits and pushes for this work. Commit verified code, tests and research notes to `studio-competitive-training` and push that branch to `origin` at completed milestones. Keep datasets, transformed data, checkpoints, run logs and local artifacts out of Git; publish selected model weights through an explicit release workflow.
