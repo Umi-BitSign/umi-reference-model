@@ -586,6 +586,8 @@ That checkpoint fails the unchanged C5 gate after90 How2Sign clips, with no FLEU
 
 Of368 student training candidates,356 score0,11 score1 and1 scores2. Teacher candidates have a wider score range, including24 zeroes and6 tens among181 retained teacher candidates. These training scores show candidate diversity, not independent generated accuracy. Next observation: `2026-10-15T20:42:11Z`, with no intermediate training polls. Miner and LB remain untouched.
 
+At `2026-10-15T20:42:26Z`, the teacher arm is live at424 new-arm exposures /53 updates, all90 observed gradient tensors finite/nonzero and pinned sources unchanged. There are432 completed rollouts, no failure/stop receipts and a23,155,179,520-byte maximum process peak, below32GiB. The512 quality checkpoint is pending; no new quality result. Next observation `2026-10-15T21:12:26Z`.
+
 ## Hard boundaries
 
 - The user requests commits and pushes for this work. Commit verified code, tests and research notes to `studio-competitive-training` and push that branch to `origin` at completed milestones. Keep datasets, transformed data, checkpoints, run logs and local artifacts out of Git; publish selected model weights through an explicit release workflow.
