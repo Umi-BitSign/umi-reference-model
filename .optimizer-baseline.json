@@ -1070,7 +1070,9 @@
   },
   "semantic_error_judge_research": {
     "requested_by_owner": true,
-    "requested_metric": "model_assigned_semantic_error_percent",
+    "requested_metric": "model_assigned_semantic_quality_0_to_10",
+    "zero_meaning": "nonsense_or_unrelated",
+    "ten_meaning": "identical_semantic_meaning_including_faithful_paraphrases",
     "project": "https://github.com/firelex/jeff",
     "reviewed_commit": "3720e7c66d73b79a6e90189f3d5b0d6ecf03ddc0",
     "local_cpu_and_apple_runtime_documented": true,
@@ -1083,7 +1085,16 @@
     "semantic_reward_optimizer_updates": 0,
     "live_training_source_changed": false,
     "fixed_wer_gate_changed": false,
-    "quality_improvement_verified": false
+    "quality_improvement_verified": false,
+    "comparison_pilot_launched_at": "2026-10-15T00:47:37Z",
+    "comparison_pilot_output": "runs/jeff-terra-quality-pilot-v1",
+    "comparison_model": "gpt-5.6-terra",
+    "comparison_reasoning_effort": "medium",
+    "maximum_api_usd": 0.10,
+    "requested_development_examples_are_diagnostics_only": true,
+    "focused_tests_passed": 11,
+    "model_scoring_completion_observed": false,
+    "next_combined_observation_at": "2026-10-15T01:18:16Z"
   },
   "latest_student_numerical_qualification": {
     "observed_at": "2026-10-14T19:18:44Z",
