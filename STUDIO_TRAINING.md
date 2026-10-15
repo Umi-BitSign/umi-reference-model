@@ -618,6 +618,21 @@ Full detached recovery launched at `2026-10-15T22:19:03Z`, supervisor2453 /worke
 
 At `2026-10-15T22:49:39Z`, the exact detached worker2455 is live at768 new-arm exposures /96 updates,32 updates since restore, all90 gradients finite/nonzero. There are258 completed rollouts, no failure/exit receipts, unchanged pinned sources and a21,864,185,856-byte process peak. Actual runtime receipts verify the expired window now enforces50% GPU duty and2 CPU threads, with35.14 idle seconds already recorded. Of616 previously unsaved exposures,256 have been recomputed and360 remain before matching the old worker's last count. The2,048 quality check is pending; no new quality claim. Next observation `2026-10-15T23:19:39Z`.
 
+### Training-only input-dependence and matched grounding controls
+
+Two bounded CPU-only probes completed exit0 on the evaluated teacher-arm512 checkpoint, each using two threads, zero GPU work, zero optimizer updates and zero Terra calls. All model parameter/buffer hashes remain unchanged. Six identities are the frozen approved training proof cases, not development or confirmation data. The active training source and recipe are unchanged, and no extra training-status poll was made between scheduled observations.
+
+`runs/terra-input-dependence-probe-v1/` compares actual video, normalized-zero frames and temporal reversal with the same frame mask. Five of six greedy outputs are unchanged by reversal; two are unchanged by blanking. Real-vs-reversed memory relative differences range0.00114-0.04737. This alone cannot prove a temporal-architecture defect or total input blindness. Artifact source SHA-256 `d54b77bcdf92715bb84fbdf8357026f5cf16e670307fa331f991a437b5e69c3a`; peak process memory4,928,929,792 bytes. Decoding uses the training greedy512 policy, not benchmark generation.
+
+The matched follow-up `runs/terra-grounding-contrast-probe-v1/` evaluates all36 caption/video pairings for each of our small-input checkpoint and the fixed native C5 feature/sequence/language path. Within a row the human caption is identical, so changing videos leaves the text prior fixed. References condition the likelihood calculation only, never the visual encoder. All72 forward comparisons are finite; the student's diagonal matches its separate raw-video forward within0.0001 CE. Source SHA-256 `b1b94128eb7e120d1d0cb5a4ebdf37a8c036dbee09e09a19fe6826c3e043044a`; peak process memory4,573,462,528 bytes.
+
+| Six approved training captions | Native C5 | Small-input teacher512 |
+| --- | ---: | ---: |
+| Correct video ranked first | 5 / 6 | 2 / 6 |
+| Mean wrong-video CE minus correct-video CE | 1.18412 | 0.10272 |
+
+Both models have a positive correct-vs-average-wrong gap for all six captions, so the student is not entirely input-independent. Its weaker discrimination supports testing an explicit same-caption/different-video contrastive objective, which cancels the language prior, if the current arm remains poor at2,048 exposures. That alternative is not implemented or trained yet; neither probe is a held-out accuracy result or a C5 win. A read-only audit also flags28 of7,523 captions (under0.4%) for possible encoding artifacts:16 how2sign_new,7 how2sign_original,4 precut expansion,1 raw. No source text was repaired or silently substituted, and this small count does not explain the widespread collapse.
+
 ## Hard boundaries
 
 - The user requests commits and pushes for this work. Commit verified code, tests and research notes to `studio-competitive-training` and push that branch to `origin` at completed milestones. Keep datasets, transformed data, checkpoints, run logs and local artifacts out of Git; publish selected model weights through an explicit release workflow.
