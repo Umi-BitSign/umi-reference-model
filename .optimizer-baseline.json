@@ -1111,7 +1111,7 @@
   "terra_visual_restart": {
     "launched_at": "2026-10-15T02:40:36Z",
     "owned_session": 60535,
-    "current_phase": "C5_selected; ROI64_small_fit_passes_with_weak_two_signer_transfer; expanded88_short_STEM_clip_data_CPU_preparation_session59751_live_progress_unobserved; broader_fresh_eight_pass_profile_prepared_not_frozen_or_launched; next_observation2026-10-16T18:19:09Z",
+    "current_phase": "C5_selected; expanded90_ROI_caches_complete_native_parity_and_preview_reviewed; fresh_eight_pass_plan_frozen; zero_update_real_expanded_case_qualification_session73651_live; no_optimizer_job_launched",
     "ROI64_expanded_short_corpus": {
       "data_plan": "runs/roi-short-corpus-data-v1/plan.json",
       "data_plan_sha256": "6535799d114df64f5c9ec7a443e69fbd0244b32f0bc8b834fe1503b66d1645a8",
@@ -1135,12 +1135,26 @@
       "prepared_training_frame_exposures": 62920,
       "prepared_training_optimizer_updates": 7872,
       "fresh_visual_initialization_required": true,
-      "fit_plan_frozen": false,
+      "fit_plan_frozen": true,
+      "fit_plan": "runs/roi-short-corpus-training-v1/plan.json",
+      "fit_plan_sha256": "3693eebef1d3544cd2a135ce264e4fd5bc8832d27523f485d401b8f6761307fc",
+      "qualification_output": "checkpoints/roi-short-corpus-qualification-v1",
+      "qualification_session": 73651,
+      "qualification_launch_at": "2026-10-16T18:21:25Z",
+      "qualification_training_record_indices": [0, 44, 72],
+      "qualification_completion_unobserved_at_launch": true,
       "fit_launched": false,
       "translation_quality_evaluated": false,
       "promotion_authorized": false,
       "focused_tests_passed": 322,
-      "next_observation_at": "2026-10-16T18:19:09Z"
+      "next_observation_at": null,
+      "data_observed_complete_at": "2026-10-16T18:19:18Z",
+      "data_terminal_at": "2026-10-16T17:52:38.435783Z",
+      "data_terminal_exit_code": 0,
+      "data_sha256": "19b003f2816e23d6091d2bd00a2e20ac38ab8ad9036e6b1803a4545c65270f2d",
+      "all90_streamed_caches_equal_native_reference": true,
+      "preview_reviewed": true,
+      "cache_bytes": 331083456
     },
     "ROI64_appearance_feasibility": {
       "data_plan": "runs/roi-appearance-data-v1/plan.json",
