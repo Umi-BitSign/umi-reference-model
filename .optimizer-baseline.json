@@ -1111,7 +1111,7 @@
   "terra_visual_restart": {
     "launched_at": "2026-10-15T02:40:36Z",
     "owned_session": 60535,
-    "current_phase": "C5_selected; richer_pool_authentication_passed; conditional_actual_gradient_qualification_then_fresh_training_launched_session71133; phase_completion_updates_and_quality_unobserved; next_check14:54:14Z",
+    "current_phase": "C5_selected; richer_pool_qualification_exit0; fresh_training_live_at2776_exposures355_updates; first240_update_semantic_check_nonqualifying; next_observation15:24:26Z",
     "current_owner_semantic_primary_policy": {
       "date": "2026-10-16",
       "authority": "Owner: LLM scores decisive for training; WER side measurement; start with words/short phrases then expand",
@@ -1553,7 +1553,7 @@
       "diverse_short_training_trial": {
         "plan": "runs/terra-diverse-short-training-v1/plan.json",
         "plan_sha256": "e96a1046bfec45e5478c62d12ba8ed66f1db7bcbf6408bf2cce20a18393251be",
-        "status": "conditional_qualification_then_training_launched_phase_progress_unobserved",
+        "status": "qualification_exit0_training_live_first_semantic_check_nonqualifying",
         "session": 71133,
         "qualification_output": "checkpoints/terra-diverse-short-qualification-v1",
         "training_output": "checkpoints/terra-diverse-short-training-v1",
@@ -1581,7 +1581,34 @@
         "model_quality_improvement_claimed": false,
         "focused_tests_passed": 277,
         "new_profile_tests_passed": 3,
-        "next_observation_at": "2026-10-16T14:54:14Z"
+        "qualification_terminal_exit_code": 0,
+        "qualification_terminal_recorded_at": "2026-10-16T14:29:21.707430Z",
+        "qualification_receipt_sha256": "9572c300d381ad43aa02d874d13f32dca5e2e81c6b5e6239d617850b10522be3",
+        "qualification_actual_cases": 2,
+        "qualification_auxiliary_CE_weight": 0,
+        "qualification_optimizer_updates": 0,
+        "qualification_new_Terra_requests": 0,
+        "qualification_worst_CPU_Metal_relative_gradient_error": 0.0000011047587914339669,
+        "qualification_original_and_frozen_values_unchanged": true,
+        "training_worker_pid": 7077,
+        "observed_at": "2026-10-16T14:54:26Z",
+        "last_observed_actual_exposures": 2776,
+        "last_observed_optimizer_updates": 355,
+        "last_observed_finite_nonzero_gradients": 8,
+        "first_semantic_check": {
+          "optimizer_updates": 240,
+          "actual_exposures": 1856,
+          "C5_quality": 8.867647058823529,
+          "candidate_quality": 8.647058823529411,
+          "absolute_gain": -0.22058823529411775,
+          "paired_source_group_bootstrap95": [-0.8088235294117647, 0.3],
+          "calibration_passed": true,
+          "passes_semantic_research_gate": false,
+          "significant_semantic_decline_stop_met": false,
+          "candidate_WER_diagnostic": 0.20588235294117646,
+          "WER_veto_used": false
+        },
+        "next_observation_at": "2026-10-16T15:24:26Z"
       },
       "balanced_word_acquisition_floor_exception_requested": {
         "maximum_raw_video_budget_GiB": 2,
@@ -2446,7 +2473,7 @@
     "quality_improvement_verified": false,
     "fixed_wer_gate_changed": false,
     "miner_modified": false,
-    "next_observation_at": "2026-10-16T14:54:14Z",
+    "next_observation_at": "2026-10-16T15:24:26Z",
     "observation_policy": "collect bounded setup/qualification promptly; check long actualtraining no more often than30minutes"
   },
   "latest_student_numerical_qualification": {
