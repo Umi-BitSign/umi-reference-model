@@ -798,6 +798,30 @@ Under the owner's standing obsolete-model deletion permission, `runs/terra-word-
 
 Physical free space did not increase:82,889,105,408 bytes before and82,888,507,392 immediately after, still about77.2GiB. The checkpoints tree drops to8.4GiB, and read-only APFS metadata lists three local Time Machine snapshots, consistent with retained/shared blocks but not an independent attribution of every byte. No snapshots were deleted and no miner/LB state was inspected. The80GiB acquisition floor stays in force. The user has been asked whether to free disk space themselves or authorize deleting only the October14/15 local Time Machine restore points. Word acquisition waits for actual headroom; local metadata work and the already-launched low-I/O semantic audit remain possible. All118 focused semantic/native training tests pass after the cleanup.
 
+### Word-curriculum acquisition preflight (2026-10-16, 07:28Z)
+
+`tools/prepare_terra_word_data.py` now binds the provisional 60-label, 228-training/96-development selection to the exact publisher metadata, license, protected references and ZIP inventory. It preserves each complete original reference and source clip. Development participants remain reserved, and a raw-video receipt never authorizes training or claims that the English label denotes exactly one ASL sign. Semantic label review and feature preparation are separate pending steps.
+
+The fetcher downloads at most 16 clips per invocation, with a 2 GiB total raw-data budget, 32 MiB per-clip ceiling, two CPU threads and no GPU or scorer calls. Before network access and each payload it enforces the unchanged 80 GiB physical floor plus 128 MiB temporary headroom and a 215 MB checkpoint reserve. It verifies complete decoded frame counts, duration, dimensions and frame rate. Resume requires exact raw hashes and role/source receipts. Orphaned videos, partials and foreign files stop acquisition; the tool does not overwrite, adopt or delete them. No miner or codex-lb inspection is performed.
+
+All 22 new tests pass, along with all 140 focused semantic/native/training tests; Ruff passes. The decoded-video validator also passes on three existing approved training clips, with 198/146/181 decoded frames at 25 fps. Receipt: `runs/terra-word-fetcher-qualification-v1/receipt.json`; fetcher SHA-256 `1c68de6a392697f777c4b611650872ce9aa27f807edac967269a52fec439d295`.
+
+An actual-metadata preflight observes 82,866,970,624 free bytes (about 77.2 GiB). It stops at the disk guard with zero network calls and no plan directory created. No new video, prepared word pair, Terra request or optimizer update exists. No further model files or Time Machine snapshots were deleted. C5 remains selected, the latest native semantic comparison remains rejected, and the old 4,832-example training state is preserved without relaunch.
+
+Once actual storage headroom is restored, freeze the source index, then fetch and review a small batch:
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=2 \
+  artifacts/baseline-6fe8df59/.runtime/bin/python tools/prepare_terra_word_data.py \
+  --freeze runs/terra-word-data-v1/plan.json
+PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=2 \
+  artifacts/baseline-6fe8df59/.runtime/bin/python tools/prepare_terra_word_data.py \
+  --plan runs/terra-word-data-v1/plan.json --data data/terra-word-data-v1 \
+  --receipts runs/terra-word-data-v1/receipts --limit 8
+```
+
+These commands acquire raw data only. Do not bypass the disk guard, use the historically exposed research weights to claim signer-independent initialization, or launch training before label/integrity review and a new semantic-first curriculum plan. Word/phrase advancement and checkpoint selection use Terra quality; WER remains diagnostic. The unresolved storage choice is unchanged: the owner can free space or explicitly authorize removing only the previously identified October 14/15 local Time Machine restore points.
+
 ### Public visual-model research and publisher-split audit (2026-10-16)
 
 The [Uni-Sign repository](https://github.com/ZechengLi19/Uni-Sign) announces released How2Sign/OpenASL pose-only checkpoints. Its [publisher model card](https://huggingface.co/ZechengLi19/Uni-Sign) declares CC-BY-NC-4.0; the public file API reports `how2sign_pose_only_slt.pth` at1,186,925,007 bytes, LFS SHA-256 `1bfd5f3312f04e4736f0a52f4ef9535916e6de9676a2a0d00c708748683fb00d`. This is a candidate compact-input architecture, not verified better weights. The [paper](https://arxiv.org/html/2501.15187v3) uses69 selected pose points; its RGB variant processes112-pixel hand crops. Public source inspection finds CUDA-specific online inference and RTMPose133-point inputs. Existing MediaPipe coordinates are not a verified drop-in equivalent. No new weights, pose archives, dependencies or third-party source code were installed. Code-license and runtime-portability review remain separate from the model card's license.
