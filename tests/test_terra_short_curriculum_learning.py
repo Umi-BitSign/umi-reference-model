@@ -93,6 +93,15 @@ def test_failed_controls_stop_the_run_without_a_quality_win():
     assert not result["passes_semantic_research_gate"]
 
 
+def test_high_baseline_mastery_does_not_become_a_candidate_win():
+    rows, a, b = cases()
+    comparison = module.comparison_items(rows, a, b)
+    result = module.semantic_decision(comparison, scores(comparison, 10, 9), a, b)
+    assert result["control_stage_mastered"] and result["candidate_stage_mastered"]
+    assert not result["passes_semantic_research_gate"]
+    assert result["stop_for_semantic_decline"]
+
+
 def test_sampling_replays_each_training_identity_each_epoch_and_never_development():
     records = [
         {

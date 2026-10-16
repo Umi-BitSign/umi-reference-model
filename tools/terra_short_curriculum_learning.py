@@ -16,6 +16,8 @@ from terra_semantic_selection import decision
 RECIPE = {
     "seed": 20261016,
     "epochs": 4,
+    "epochs_are_maximum": True,
+    "semantic_stage_mastery_quality": 9.0,
     "batch_clips": 8,
     "learning_rate": 1e-5,
     "learning_rate_schedule": "32-example linear warmup times cosine decay over all exposures",
@@ -144,6 +146,10 @@ def semantic_decision(comparison, scores, baseline, predictions):
             and result["absolute_gain"] <= -0.1
             and interval[1] < 0,
             "stop_for_failed_calibration": not calibrated,
+            "control_stage_mastered": calibrated
+            and result["C5_mean_quality"] >= RECIPE["semantic_stage_mastery_quality"],
+            "candidate_stage_mastered": calibrated
+            and result["candidate_mean_quality"] >= RECIPE["semantic_stage_mastery_quality"],
         }
     )
     return result

@@ -327,6 +327,7 @@ def _fit(torch, path, output, plan, *, qualification_only=False):
         return
     examples = updates = 0
     decisions = []
+    stop_reason = "planned_endpoint"
 
     def save(recovery=False):
         return save_checkpoint(
@@ -505,6 +506,14 @@ def _fit(torch, path, output, plan, *, qualification_only=False):
             decisions.append(result)
             append(output, "semantic-decisions.jsonl", result)
             if result["stop_for_semantic_decline"] or result["stop_for_failed_calibration"]:
+                stop_reason = (
+                    "significant_semantic_decline"
+                    if result["stop_for_semantic_decline"]
+                    else "failed_semantic_calibration"
+                )
+                break
+            if result["control_stage_mastered"] or result["candidate_stage_mastered"]:
+                stop_reason = "semantic_stage_mastery"
                 break
     checked(path)
     if fixed_hashes(gpu, encoder) != fixed or fixed_hashes(cpu, encoder) != fixed:
@@ -516,7 +525,11 @@ def _fit(torch, path, output, plan, *, qualification_only=False):
             "training_examples": examples,
             "optimizer_updates": updates,
             "semantic_decisions": decisions,
-            "semantic_guard_stop": examples != len(ordered),
+            "semantic_guard_stop": stop_reason
+            in ("significant_semantic_decline", "failed_semantic_calibration"),
+            "stop_reason": stop_reason,
+            "stage_mastered": stop_reason == "semantic_stage_mastery",
+            "retain_original_C5_unless_semantic_research_gate_passes": True,
             "WER_veto_used": False,
             "full_composite_or_competitive_win_claimed": False,
             "promotion_authorized": False,
