@@ -978,6 +978,31 @@ The [original MRT paper](https://aclanthology.org/P16-1159.pdf) studies sampling
 
 The audit launched at observed `2026-10-16T12:33:30Z`, live session24138, output `checkpoints/terra-short-learning-audit-v1/`. Its results are unobserved at launch. It uses50% GPU duty, CPU2, the existing128-MiB native-memory cache bound and training-only storage guard, with zero optimizer updates or new Terra requests. Next observation `2026-10-16T13:03:30Z`, without intermediate job checks. All257 focused tests pass, including16 new gradient/conditioning tests; Ruff passes. C5 remains selected, the model-quality goal remains unmet, and miner/LB services are untouched.
 
+At the scheduled `2026-10-16T13:03:38Z` observation, audit session24138 is terminal exit0, worker6716 at `12:36:08.846302Z`. The actual diagnostic contradicts auxiliary-loss dominance and weakened training-video conditioning as explanations for this944-update result:
+
+| Training-only measurement | Original C5 | Rejected944 |
+| --- | ---: | ---: |
+| Norm of mean semantic gradient across116 | 0.0275764 | 0.0319465 |
+| Norm of mean0.1-weighted CE gradient across116 | 0.0137976 | 0.0058164 |
+| Norm ratio, semantic /weighted auxiliary | 1.9986 | 5.4925 |
+| Angle cosine between those mean gradients | 0.7253 | 0.1490 |
+| Median norm ratio on51 contrasting cases | 1.6774 | 6.4983 |
+| Mean human-caption CE across116 | 0.252069 | 0.093279 |
+| Mean historical candidate risk across116 | 1.189715 | 1.107974 |
+|12-case correct-video caption CE | 0.401631 | 0.137646 |
+|12-case other-video minus correct-video CE gap | 1.646090 | 1.904014 |
+| Strict correct-video retrieval |12/12 |12/12 |
+
+Both policies have exactly65 zero semantic-gradient cases. The four component-sum checks cover all eight tensors, with maximum relative error0.00000210033 against the0.005 limit. There are no parameter changes within either policy's measurements, no optimizer updates, no new scoring requests and no development input. Training-video conditioning improves in this selected whole-video test rather than collapsing. This does not rule out a different effect on other data or intermediate steps, and improved seen-set conditioning does not establish unseen-signing generalization.
+
+Receipt `checkpoints/terra-short-learning-audit-v1/receipt.json`, SHA-256 `d8fc9b6871e16e8c70340b476bf2f2ef5a222e9d1fcddea30617633d79fdf79f`. Per-clip gradient trace SHAs: C5 `6e87f97f0cdfdc047457b38d4b26137ce738bd50dcf08c5a7e42f6799cf9fa9f`, rejected944 `61fc6b6d35a58d7f3272f55955e2aad5666fff051465faf51ef191483876c334`. Active/idle Metal time36.473663 seconds each, maximum driver allocation1,221,705,728 bytes and CPU cache68,725,680 bytes. The audit code and tests were pushed as `39c0043`.
+
+The next controlled change is candidate diversity. Preserve every original pool and actual grade, then add four reference-blind sampled candidates from frozen original C5 per training clip. Use temperature0.8, top-p0.95, top-k0, one beam, four returned sequences and the existing512-token training horizon; deterministic seeds use source/example identity only. Evaluation remains the published beam5 baseline generation, never this sampling policy. Deduplicate token sequences, preserve any horizon-limited prefix as emitted, and leave new semantic scores absent until authenticated. Exact-text reuse may retain a prior grade, but case changes or normalization must not fabricate a match. This can let the semantic objective distinguish multiple alternatives and reward faithful paraphrases; it is not an established generalization fix.
+
+`tools/prepare_terra_diverse_short.py` implements that training-only generation stage with explicit roles/provenance, original-C5/frozen-value checks, CPU2 and50% GPU duty. It adds no training or scoring call and marks its pending pools ineligible for training. Four new tests cover reference-independent seeds, bounded sampling, original-label preservation, exact-token deduplication and refusal to normalize new text into a cached grade. The general80GiB new-video guard and pending single-word storage exception remain unchanged. C5 remains selected; the old944-update recipe will not be repeated unchanged.
+
+The new generation plan is `runs/terra-diverse-short-generation-v1/plan.json`, SHA-256 `2ebde6ff52dd8e2188e110c523e8896a1da8fd59876f6b218fb9fc8fa02c2001`. It launched at observed `2026-10-16T13:11:37Z`, live session75991, output `checkpoints/terra-diverse-short-generation-v1/`. Generation progress and any added training contrast remain unobserved at launch. Original C5 weights stay fixed, every original pool/grade is retained, and no model training or new grading occurs at this stage. Pending-pool output cannot be used for training until the added texts have authenticated scores and full role/token/coverage checks pass. All261 focused tests pass, including the four sampler/merge tests; no scientific core, primary semantic gate or held-out split changed. Next observation `2026-10-16T13:41:37Z`, without intermediate job checks.
+
 ### Public visual-model research and publisher-split audit (2026-10-16)
 
 The [Uni-Sign repository](https://github.com/ZechengLi19/Uni-Sign) announces released How2Sign/OpenASL pose-only checkpoints. Its [publisher model card](https://huggingface.co/ZechengLi19/Uni-Sign) declares CC-BY-NC-4.0; the public file API reports `how2sign_pose_only_slt.pth` at1,186,925,007 bytes, LFS SHA-256 `1bfd5f3312f04e4736f0a52f4ef9535916e6de9676a2a0d00c708748683fb00d`. This is a candidate compact-input architecture, not verified better weights. The [paper](https://arxiv.org/html/2501.15187v3) uses69 selected pose points; its RGB variant processes112-pixel hand crops. Public source inspection finds CUDA-specific online inference and RTMPose133-point inputs. Existing MediaPipe coordinates are not a verified drop-in equivalent. No new weights, pose archives, dependencies or third-party source code were installed. Code-license and runtime-portability review remain separate from the model card's license.
