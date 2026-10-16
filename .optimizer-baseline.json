@@ -1745,6 +1745,26 @@
       "miner_or_codex_lb_inspected_or_modified": false,
       "quality_improvement_verified": false
     },
+    "native_C5_tail_second_recovery": {
+      "phase": "local_restore_only_launched; completion_unobserved; full_continuation_not_launched",
+      "plan": "runs/terra-c5-tail-training-v3-recovery/plan.json",
+      "plan_sha256": "42d369cc0970b90f617e4156922e8faf1eb9029a59e2cb446c9c1d5ce7ca017b",
+      "resume_native_arm_examples": 4832,
+      "resume_native_arm_optimizer_updates": 604,
+      "unsaved_examples_to_recompute": 0,
+      "source_and_scientific_recipe_changed": false,
+      "restore_only_launched_at": "2026-10-16T06:24:02Z",
+      "restore_only_job": "runs/terra-c5-tail-v3-restore-job",
+      "restore_only_output": "checkpoints/terra-c5-tail-v3-restore-only",
+      "restore_only_supervisor_pid": 4407,
+      "restore_only_completion_observed": false,
+      "full_continuation_launched": false,
+      "no_new_scoring_before": "2026-10-16T06:41:07Z",
+      "minimum_overload_cooldown_seconds": 1800,
+      "automatic_HTTP_retries": 0,
+      "miner_or_codex_lb_inspected_or_modified": false,
+      "quality_improvement_verified": false
+    },
     "public_visual_model_research": {
       "date": "2026-10-16",
       "new_weights_or_dependencies_downloaded": false,
