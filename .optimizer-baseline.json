@@ -1111,7 +1111,7 @@
   "terra_visual_restart": {
     "launched_at": "2026-10-15T02:40:36Z",
     "owned_session": 60535,
-    "current_phase": "short_phrase_pilot_complete_exit0_464_examples59_updates; all3_semantic_checks_nonqualifying; C5_selected; authenticated_first_pool_training_data_ready_for_new_local_optimization_experiment; no_live_job",
+    "current_phase": "C5_selected; previous_short_trial_nonqualifying; frozen_reward_local_optimization_plan_frozen; actual_two_case_zero_update_integration_qualification_pending; optimizer_training_not_launched",
     "current_owner_semantic_primary_policy": {
       "date": "2026-10-16",
       "authority": "Owner: LLM scores decisive for training; WER side measurement; start with words/short phrases then expand",
@@ -1331,6 +1331,34 @@
         "next_experiment_must_keep_fresh_blinded_semantic_evaluation": true,
         "new_actor_should_start_from_original_C5": true,
         "historical_labels_are_not_fresh_grades_of_new_outputs": true
+      },
+      "frozen_short_local_optimization_trial": {
+        "plan": "runs/terra-frozen-short-training-v1/plan.json",
+        "plan_sha256": "a5005d916f563abe69f205aa4bb98cf2feb7811f3135f28dc435532ebcd56204",
+        "status": "bounded_zero_update_qualification_pending",
+        "qualification_session": 12053,
+        "qualification_output": "checkpoints/terra-frozen-short-qualification-v1",
+        "original_C5_initialization_required": true,
+        "rejected_previous_candidate_loaded": false,
+        "training_identities": 116,
+        "development_identities": 34,
+        "local_steps_per_outer_batch": 16,
+        "planned_outer_exposures": 464,
+        "planned_actual_clip_exposures": 7424,
+        "planned_optimizer_updates": 944,
+        "fresh_semantic_checks_after_actual_exposures": [1856, 3712, 7424],
+        "training_Terra_requests": 0,
+        "historical_labels_not_on_policy": true,
+        "development_rewards_used_for_training": false,
+        "WER_is_diagnostic_only": true,
+        "GPU_duty_fraction": 0.5,
+        "CPU_threads": 2,
+        "CPU_native_memory_cache_budget_bytes": 134217728,
+        "automatic_retries": 0,
+        "promotion_authorized": false,
+        "model_quality_gain_claimed": false,
+        "focused_tests_passed": 241,
+        "new_tests_passed": 24
       },
       "balanced_word_acquisition_floor_exception_requested": {
         "maximum_raw_video_budget_GiB": 2,
