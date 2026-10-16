@@ -1803,7 +1803,7 @@
       "quality_improvement_verified": false
     },
     "native_C5_tail_second_recovery": {
-      "phase": "local_restore_only_completed_exit0; full_continuation_held_pending_semantic_audit",
+      "phase": "complete4832_restoration_verified; old_recipe_not_relaunched_after_semantic_non_improvement_and_owner_curriculum_direction",
       "plan": "runs/terra-c5-tail-training-v3-recovery/plan.json",
       "plan_sha256": "42d369cc0970b90f617e4156922e8faf1eb9029a59e2cb446c9c1d5ce7ca017b",
       "resume_native_arm_examples": 4832,
