@@ -71,6 +71,7 @@ def specification(data_path, control_path):
                 "terra_short_curriculum_learning.py",
                 "audit_native_terra_semantics.py",
                 "terra_semantic_selection.py",
+                "terra_short_resume.py",
             )
         },
     }
@@ -106,6 +107,14 @@ def checked(path):
 
     plan = json.loads(path.read_text())
     expected = specification(ROOT / plan["data"]["path"], ROOT / plan["control"]["path"])
+    if "resume" in plan:
+        from terra_short_resume import make_resume
+
+        expected["resume"] = make_resume(
+            ROOT / plan["resume"]["source_plan"]["path"],
+            ROOT / plan["resume"]["visual"]["path"],
+            expected,
+        )
     if plan != expected:
         raise ValueError("short pilot source/data/recipe/control binding changed")
     for name, digest in plan["source_sha256"].items():
@@ -115,7 +124,7 @@ def checked(path):
     return plan
 
 
-def freeze(path, data, control):
+def freeze(path, data, control, *, resume_plan=None, resume_checkpoint=None):
     from c5_experiment_sources import archive_sources
     from terra_training_storage import storage
 
@@ -124,6 +133,12 @@ def freeze(path, data, control):
         raise ValueError("short pilot requires a fresh owned runs/ plan")
     storage()
     plan = specification(data, control)
+    if resume_plan is not None or resume_checkpoint is not None:
+        from terra_short_resume import make_resume
+
+        if resume_plan is None or resume_checkpoint is None:
+            raise ValueError("short recovery needs both the source plan and checkpoint")
+        plan["resume"] = make_resume(resume_plan, resume_checkpoint, plan)
     path.parent.mkdir(parents=True)
     write(path, plan)
     archive_sources(path, path.with_name("source-snapshot"))
@@ -202,12 +217,20 @@ def evaluate(cpu, encoder, tokenizer, reference, rows, baseline, output, pacer):
     return result
 
 
-def fit(path, output, *, qualification_only=False):
+def fit(path, output, *, qualification_only=False, restore_only=False):
     import torch
     from terra_training_storage import storage
     from train_terra_c5_tail import gpu_lease
 
     plan = checked(path)
+    if (restore_only and "resume" not in plan) or (qualification_only and "resume" in plan):
+        raise ValueError(
+            "short recovery uses restore-only, initial training uses qualification-only"
+        )
+    if not restore_only and "resume" in plan:
+        from terra_short_resume import check_cooldown
+
+        check_cooldown(plan)
     output = output.resolve()
     if output.exists() or not output.is_relative_to(ROOT / "checkpoints"):
         raise ValueError("short pilot requires a fresh owned checkpoint directory")
@@ -217,13 +240,20 @@ def fit(path, output, *, qualification_only=False):
     code = 1
     try:
         with gpu_lease():
-            _fit(torch, path, output, plan, qualification_only=qualification_only)
+            _fit(
+                torch,
+                path,
+                output,
+                plan,
+                qualification_only=qualification_only,
+                restore_only=restore_only,
+            )
         code = 0
     finally:
         write(output / "exit.json", {"pid": os.getpid(), "exit_code": code, "observed_at": now()})
 
 
-def _fit(torch, path, output, plan, *, qualification_only=False):
+def _fit(torch, path, output, plan, *, qualification_only=False, restore_only=False):
     from c5_certification_budget import CertificationComputeWindow, WinnerDutyCycle
     from c5_terra_tail import (
         candidate_labels,
@@ -235,7 +265,12 @@ def _fit(torch, path, output, plan, *, qualification_only=False):
         synchronize_policy,
     )
     from probe_tiny_rgb_capacity import state_digest
-    from terra_training_recovery import CheckpointRequest, record_preupdate_failure, save_checkpoint
+    from terra_training_recovery import (
+        CheckpointRequest,
+        record_preupdate_failure,
+        restore_checkpoint,
+        save_checkpoint,
+    )
     from terra_training_storage import storage
     from terra_visual_learning import backward_candidate_risk
     from tiny_rgb_winner_student import load_frozen_winner_encoder
@@ -255,6 +290,10 @@ def _fit(torch, path, output, plan, *, qualification_only=False):
     torch.set_num_interop_threads(1)
     torch.manual_seed(RECIPE["seed"])
     stop, pacer = CheckpointRequest(), JudgePacer()
+    if "resume" in plan:
+        from terra_short_resume import RecoveryPacer
+
+        pacer = RecoveryPacer()
     duty = WinnerDutyCycle(torch, budget)
     cpu, reference = load_model()
     encoder = load_frozen_winner_encoder(reference).requires_grad_(False).eval()
@@ -302,7 +341,8 @@ def _fit(torch, path, output, plan, *, qualification_only=False):
             "initial_full_C5_hashes": actual,
             "qualification_reused": plan["qualified_component_proof"],
             "qualification_scope": plan["qualification_scope"],
-            "resume": None,
+            "resume": plan.get("resume"),
+            "effective_minimum_request_gap_seconds": 60 if "resume" in plan else 30,
             "legacy_visual_fields_contain_eight_decoder_tail_tensors": True,
             "new_word_videos_downloaded": 0,
             "promotion_authorized": False,
@@ -328,6 +368,66 @@ def _fit(torch, path, output, plan, *, qualification_only=False):
     examples = updates = 0
     decisions = []
     stop_reason = "planned_endpoint"
+    if "resume" in plan:
+        from safetensors.torch import load_file
+        from terra_short_resume import paths
+
+        restored = paths(plan)
+
+        def restore_rng(a, b):
+            torch.set_rng_state(a)
+            torch.mps.set_rng_state(b)
+
+        examples, updates = duty.run(
+            lambda: restore_checkpoint(
+                plan,
+                restored,
+                gpu.trainable_parameters(),
+                optimizer,
+                initial_visual=initial,
+                fixed=fixed,
+                restore_rng=restore_rng,
+            )
+        )
+        expected_policy = load_file(str(restored["visual"]), device="cpu")
+        saved_state = load_file(str(restored["optimizer"]), device="cpu")
+        if (
+            state_digest(gpu.policy_parameters()) != state_digest(expected_policy)
+            or fixed_hashes(gpu, encoder) != fixed
+            or not torch.equal(torch.get_rng_state(), saved_state["rng.cpu"])
+            or not torch.equal(torch.mps.get_rng_state().cpu(), saved_state["rng.mps"])
+            or any(
+                not torch.equal(
+                    optimizer.state[p][field].detach().cpu(), saved_state[f"{name}.{field}"]
+                )
+                for name, p in gpu.trainable_parameters().items()
+                for field in ("exp_avg", "exp_avg_sq")
+            )
+        ):
+            raise RuntimeError("short recovery policy, moments, RNG or frozen values differ")
+        del expected_policy, saved_state
+        if "source_decisions" in restored:
+            decisions = [
+                json.loads(s) for s in restored["source_decisions"].read_text().splitlines()
+            ]
+            for previous_decision in decisions:
+                append(output, "semantic-decisions.jsonl", previous_decision)
+        write(
+            output / "resume-restored.json",
+            {
+                "training_examples": examples,
+                "optimizer_updates": updates,
+                "new_optimizer_updates": 0,
+                "new_Terra_requests": 0,
+                "policy_digest": state_digest(gpu.policy_parameters()),
+                "restore_only": restore_only,
+            },
+        )
+        if restore_only:
+            return
+
+    (output / "steps.jsonl").touch(exist_ok=False)
+    (output / "candidate-pools.jsonl").touch(exist_ok=False)
 
     def save(recovery=False):
         return save_checkpoint(
@@ -371,6 +471,15 @@ def _fit(torch, path, output, plan, *, qualification_only=False):
                 for pair, pool in zip(batch, pools, strict=True)
                 for candidate in pool
             ]
+            if "resume" in plan and updates == plan["resume"]["optimizer_updates"]:
+                from probe_jeff_terra_quality import terra_payload
+
+                if terra_payload(request) != json.loads(
+                    restored["source_failed_request"].read_text()
+                ):
+                    raise RuntimeError(
+                        "restored short rollout differs from the unapplied failed request"
+                    )
             judge = pacer.score(request, output / "terra" / f"batch-{updates + 1:06d}")
             qualities, offset = [], 0
             for pool in pools:
@@ -556,11 +665,25 @@ def main():
     parser.add_argument("--plan", type=Path)
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--qualification-only", action="store_true")
+    parser.add_argument("--restore-only", action="store_true")
+    parser.add_argument("--resume-plan", type=Path)
+    parser.add_argument("--resume-checkpoint", type=Path)
     args = parser.parse_args()
     if args.freeze and args.data and args.control and not args.plan:
-        freeze(args.freeze, args.data, args.control)
+        freeze(
+            args.freeze,
+            args.data,
+            args.control,
+            resume_plan=args.resume_plan,
+            resume_checkpoint=args.resume_checkpoint,
+        )
     elif args.plan and args.output_dir and not args.freeze:
-        fit(args.plan, args.output_dir, qualification_only=args.qualification_only)
+        fit(
+            args.plan,
+            args.output_dir,
+            qualification_only=args.qualification_only,
+            restore_only=args.restore_only,
+        )
     else:
         parser.error("provide --freeze with --data/--control OR --plan with --output-dir")
 
