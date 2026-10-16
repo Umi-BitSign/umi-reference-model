@@ -689,6 +689,21 @@ Full native C5-tail training launched detached at `2026-10-16T02:41:21Z`, superv
 
 The old visual arm is terminal with its complete2,184 checkpoint retained; there is no concurrent owned GPU trainer. Native training keeps50% GPU pacing,2 CPU threads, one scoring request at a time, at most16 text pairs per request and no automatic retries. Next observation `2026-10-16T03:11:21Z`, without intermediate training polls. C5 remains unbeaten; model promotion, miner changes and protected confirmation remain unauthorized/unperformed.
 
+### First native C5-tail checkpoints: near baseline, no qualifying win
+
+At `2026-10-16T03:11:37Z`, exact detached worker3659 is live at568 native-arm exposures /71 optimizer updates. All8 gradient tensors are finite/nonzero, no stop/scoring failure is recorded, and all pinned sources match. Actual runtime keeps50% GPU duty and2 CPU threads; cumulative active/idle GPU time is59.417 seconds each, maximum driver allocation1,216,299,008 bytes. Complete native policy/optimizer checkpoints exist at128 and512 exposures.
+
+Both early checkpoints fail the unchanged5% C5-improvement target. The128 evaluation stops after130 How2Sign clips and512 after129; neither decodes FLEURS or produces a complete benchmark score. Restrict comparisons to the same129 identities:
+
+| Same129 How2Sign clips, lower is better | C5 control | Native Terra128 | Native Terra512 |
+| --- | ---: | ---: | ---: |
+| Mean WER | 79.47% | 78.99% | 79.45% |
+| Word-weighted WER | 78.33% | 78.12% | 78.33% |
+
+The128 mean gain is about0.60% relative, below the5% requirement;512 is essentially tied, not a model-quality win. At512,8 clips improve,11 regress and110 tie in word edits. These are partial already-open translator controls, not a full native composite/official result. This route starts from C5, so its stronger output than the custom visual arm is not a training improvement over C5. Continue the frozen one-pass recipe toward2,048 native exposures.
+
+The512 tail policy SHA-256 is `37a58b0d013cf3014b0ccca58dd1f5d9f8a72e5a3fddfa911b581516f851f862`, optimizer `1556eaf86fab0fb2f403d700b68952efe18b01ead4afc19f8cf08702e4ecebe8`; legacy `visual` filenames contain only decoder-tail tensors. Next observation `2026-10-16T03:41:37Z`, with no intermediate training polls. No promotion or service mutation; C5 remains unbeaten.
+
 ## Hard boundaries
 
 - Current owner direction: another chat owns miner and codex-lb maintenance. Do not inspect, restart, reconfigure or load-test either service, and do not query port8787 from this training work. Historical health-guarded extraction procedures below do not authorize service checks for the current runs. The approved v2 compute window expired at `2026-10-15T22:47:28Z`; current training uses50% GPU duty and2 CPU threads. Do not extend the temporary unthrottled window without new owner direction.
