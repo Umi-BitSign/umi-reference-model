@@ -663,6 +663,32 @@ At `2026-10-16T01:29:17Z`, exact worker2455 is live at1,824 new-arm exposures /2
 
 At `2026-10-16T01:59:28Z`, exact worker2455 is live at2,016 new-arm exposures /252 updates, all90 gradients finite/nonzero,1,506 completed rollouts since resume and no failure/exit receipts. Pinned sources match; process peak26,997,243,904 bytes, GPU duty50%, CPU threads2. The2,048 quality checkpoint is imminent but unobserved. A separate source-map check confirms that adding the native C5 modules did not change the active visual plan's full source map. Next observation `2026-10-16T02:29:28Z`.
 
+### Teacher-assisted visual arm rejected at2,048; clean transition to C5-tail qualification
+
+The `2026-10-16T02:29:41Z` observation finds the teacher arm live at2,160 new-arm exposures /270 updates, but its2,048 checkpoint fails the frozen C5 gate after91 How2Sign clips. Mean/weighted WER over that prefix is112.67% /104.24%; no FLEURS or full benchmark score is claimed. Compare the same90 identities across initialization and checkpoints:
+
+| Same90 How2Sign clips, lower is better | C5 control | Terra2048 initialization | Teacher +512 | Teacher +2048 |
+| --- | ---: | ---: | ---: | ---: |
+| Mean WER | 79.15% | 114.22% | 99.34% | 112.81% |
+| Word-weighted WER | 77.94% | 104.88% | 96.81% | 104.29% |
+| Unique hypotheses | 90 | 15 | 16 | 21 |
+
+The new checkpoint regresses512 and remains far below C5. Generic phrases still dominate; its first three outputs are “One thing you can do is you can do the other thing,” “That's what you don't think you're going to want to do in the middle,” and “That's what you want to do.” This rejects the current checkpoints, not every possible small-input architecture or a completed four-pass schedule. Checkpoint SHA-256 `3a4093b50c2deffef5bf0fb3d8688dbae5297188b38dac87c1a5dfecfe093947`; optimizer `bb379385572b6f5d0372c90bf832a44c8a807d6802a04e6c31f6faad47015366`.
+
+After verifying PID2455's UID, start time, complete argv and SIGUSR1 support, the agent requested a batch-boundary checkpoint/stop at `2026-10-16T02:31:44Z`. Its supervisor confirms terminal exit0 at `02:32:45Z`. All2,184 completed exposures /273 optimizer updates are saved, zero completed updates lost, no unresolved scoring requests, all90 gradients finite/nonzero throughout. Recovery visual SHA-256 `62ca141c42caf92dbb0c0a6d299d8ea450d6dfba3a67fb64030fcfbde6d953a9`, optimizer `45757291249316bc74a075894b36b58a63afe4d336309e318ea6ce72ba2f4428`. This arm is early-stopped for quality; its planned30,092 exposures are not complete. All data, old checkpoints, logs and decisions remain.
+
+The direct C5-tail plan froze successfully after validating that terminal predecessor: `runs/terra-c5-tail-training-v1/plan.json`, SHA-256 `4665c7331a62499e0b5992d1e390493a25da46390456824cc4393753448359f1`. Its separate bounded Metal qualification launched at `2026-10-16T02:36:48Z`, owned session40383, output `checkpoints/terra-c5-tail-qualification-v1/`. It must verify new actual gradients for all8 selected tensors on the six approved cases, with CE disabled, at the unchanged numerical thresholds. Authenticated identical C5 text judgments are reused; the old visual gradient proof is not reused. No new scoring call, optimizer update or quality improvement is claimed at launch. GPU duty remains50%, CPU threads2, and there is no concurrent owned GPU trainer. C5 remains unbeaten; miner/LB services are untouched.
+
+### C5-tail actual Metal qualification passed; full native training launched
+
+Qualification session40383 completed exit0. All six approved cases pass the new8-tensor CPU/Metal gradient proof,48 comparisons total, worst relative discrepancy0.00000163138 against the unchanged0.005 limit. Caption loss was disabled, actual authenticated Terra errors generated every compared gradient, and no optimizer step occurred. The GPU initial policy and all frozen-value hashes remain unchanged. Receipt SHA-256 `b09614a0561cea598bd579d9874612ac6641556002c55520cb551dd468830891`; initial tail tensor digest `3484c3241da992e2781db7b1629c9111fd91cb4d558320bd32ce20cceded2ad4`. The language hash for the frozen subset is `eda9fe753bbed66cdff130283983c464ee7e4fb4ea9c2ff7e63bb31aeb4eeab0`; the complete fixed encoder remains `4e00344057824d7ca5fcd9f9f061896d413079c29c04b92349383f3650e96135`.
+
+Measured qualification resource use is2.1443 GPU-active seconds and equal idle time,1,211,318,272-byte maximum driver allocation,50% allowed duty and2 CPU threads. This is bounded qualification memory/time, not end-to-end training or inference performance. No new scoring requests were sent; exact native C5 outputs were rechecked against the previously judged texts. This proves the semantic-gradient implementation, not a model-quality improvement.
+
+Full native C5-tail training launched detached at `2026-10-16T02:41:21Z`, supervisor3657 /worker3659, output `checkpoints/terra-c5-tail-training-v1/`, receipts/log `runs/terra-c5-tail-training-v1-job/`. The exact worker UID/start/argv, separate process group and absence of a terminal were verified after the launch command exited. It starts from the unchanged winning C5 baseline with its own verified new qualification, zero new-arm exposures, and no old custom-visual weights. It schedules one pass over all7,523 approved training pairs. Only9.44M existing cross-attention parameters train; the total C5 model is not a9.44M model. The first quality check is128 native-arm exposures, using the original fixed C5 generation and gates. Actual new optimizer progress is unobserved at launch.
+
+The old visual arm is terminal with its complete2,184 checkpoint retained; there is no concurrent owned GPU trainer. Native training keeps50% GPU pacing,2 CPU threads, one scoring request at a time, at most16 text pairs per request and no automatic retries. Next observation `2026-10-16T03:11:21Z`, without intermediate training polls. C5 remains unbeaten; model promotion, miner changes and protected confirmation remain unauthorized/unperformed.
+
 ## Hard boundaries
 
 - Current owner direction: another chat owns miner and codex-lb maintenance. Do not inspect, restart, reconfigure or load-test either service, and do not query port8787 from this training work. Historical health-guarded extraction procedures below do not authorize service checks for the current runs. The approved v2 compute window expired at `2026-10-15T22:47:28Z`; current training uses50% GPU duty and2 CPU threads. Do not extend the temporary unthrottled window without new owner direction.
