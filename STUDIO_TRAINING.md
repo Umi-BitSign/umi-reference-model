@@ -929,6 +929,19 @@ Qualification completed exit0, worker6303 at `2026-10-16T11:21:26.310222Z`, obse
 
 Full training launched at observed `2026-10-16T11:22:50Z`, live session95552, output `checkpoints/terra-frozen-short-training-v1/`. Initial optimizer progress and semantic quality are unobserved at launch. The full process must revalidate the plan, dependencies, original C5 values and completed proof before its first optimizer step. Next observation `2026-10-16T11:52:50Z`; no intermediate training polls. Code/tests and frozen-plan controller are pushed as `2c67ee3`. C5 remains selected. The balanced-word acquisition exception still has no approval, and no videos, snapshots or services were changed.
 
+At the scheduled `2026-10-16T11:53:00Z` observation, session95552 remains live at4,320 actual clip-exposures /556 updates. The completed semantic checks cover the same34 reserved phrases, pass calibration twice, and neither qualifies:
+
+| Actual exposures /updates | C5 quality /10 | Candidate /10 | Mean gain | Paired source-bootstrap95% interval |
+| --- | ---: | ---: | ---: | --- |
+| 1,856 /240 | 8.6471 | 8.4853 | -0.1618 | [-0.69697, 0.12857] |
+| 3,712 /480 | 8.8529 | 8.8971 | +0.0441 | [-0.54688, 0.59091] |
+
+Neither reaches the9/10 stage-mastery threshold or a significant-decline stop, so the frozen run continues toward7,424 exposures /944 updates. WER changes from C5's22.55% to candidate23.53% at240 updates and20.59% at480, but plays no role in continuing or rejecting a checkpoint. C5 is still selected. Next observation `2026-10-16T12:23:00Z`, without intermediate training checks or source/recipe changes.
+
+Read-only inspection of the completed evaluations finds6/34 texts changed from C5 at240 updates and9/34 at480, including capitalization-only changes. At480, “Solid acid catalysts” improves from C5's “Wild acid conduct” to “Acid catalysts”, while “Fortified table salt” worsens from “Fortified tablesalt” to “Fortified tablespoon”. “Communication and vocalization” becomes “Communication and voice”. More update work is changing behavior, but the paired semantic evaluation shows no reliable net gain.
+
+The1,856 policy SHA-256 is `8b6e5c9a473d8a5a77f69898d8fcfabe0c79de0e1d71840b292bf3a919d64c27`, optimizer `d08bee4bcb9fdacc1044625d256fb00b478f0ab2a9cd496ba518f41b5cab365f`. The3,712 policy is `0b8f34a96e7c697683eb885cf41aab4739cbefa5c96c3b54bd54208ad9dff04f`, optimizer `9ba19745521dc8e7b181116a8152a9e442cff6e99ae29adbf0b64354c773be3c`. Complete checkpoint pairs and sampler offsets are saved. The last observed update has all eight gradients finite/nonzero. No failed-stop or terminal receipt is observed at this check. No live miner/LB service was inspected.
+
 ### Public visual-model research and publisher-split audit (2026-10-16)
 
 The [Uni-Sign repository](https://github.com/ZechengLi19/Uni-Sign) announces released How2Sign/OpenASL pose-only checkpoints. Its [publisher model card](https://huggingface.co/ZechengLi19/Uni-Sign) declares CC-BY-NC-4.0; the public file API reports `how2sign_pose_only_slt.pth` at1,186,925,007 bytes, LFS SHA-256 `1bfd5f3312f04e4736f0a52f4ef9535916e6de9676a2a0d00c708748683fb00d`. This is a candidate compact-input architecture, not verified better weights. The [paper](https://arxiv.org/html/2501.15187v3) uses69 selected pose points; its RGB variant processes112-pixel hand crops. Public source inspection finds CUDA-specific online inference and RTMPose133-point inputs. Existing MediaPipe coordinates are not a verified drop-in equivalent. No new weights, pose archives, dependencies or third-party source code were installed. Code-license and runtime-portability review remain separate from the model card's license.
