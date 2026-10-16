@@ -1111,7 +1111,7 @@
   "terra_visual_restart": {
     "launched_at": "2026-10-15T02:40:36Z",
     "owned_session": 60535,
-    "current_phase": "C5_selected; previous_short_trial_nonqualifying; frozen_reward_local_optimization_plan_frozen; actual_two_case_zero_update_integration_qualification_pending; optimizer_training_not_launched",
+    "current_phase": "C5_selected; previous_short_trial_nonqualifying; frozen_reward_local_optimization_actual_qualification_exit0; full_new_training_launched_session95552; optimizer_progress_and_semantic_quality_unobserved_until11:52:50Z",
     "current_owner_semantic_primary_policy": {
       "date": "2026-10-16",
       "authority": "Owner: LLM scores decisive for training; WER side measurement; start with words/short phrases then expand",
@@ -1335,9 +1335,22 @@
       "frozen_short_local_optimization_trial": {
         "plan": "runs/terra-frozen-short-training-v1/plan.json",
         "plan_sha256": "a5005d916f563abe69f205aa4bb98cf2feb7811f3135f28dc435532ebcd56204",
-        "status": "bounded_zero_update_qualification_pending",
+        "status": "full_training_launched_awaiting_first_30minute_observation",
         "qualification_session": 12053,
         "qualification_output": "checkpoints/terra-frozen-short-qualification-v1",
+        "qualification_terminal_exit_code": 0,
+        "qualification_receipt_sha256": "5885875cc50ae0e7268020cc2aa1cc84925430c5124eff11aa01a33ce077668f",
+        "actual_qualification_cases": 2,
+        "qualification_auxiliary_CE_weight": 0,
+        "qualification_optimizer_updates": 0,
+        "qualification_new_Terra_requests": 0,
+        "worst_relative_CPU_Metal_gradient_difference": 0.0000030975976262198506,
+        "qualification_original_and_frozen_values_unchanged": true,
+        "training_session": 95552,
+        "training_output": "checkpoints/terra-frozen-short-training-v1",
+        "training_launch_observed_at": "2026-10-16T11:22:50Z",
+        "training_progress_unobserved_at_launch": true,
+        "next_observation_at": "2026-10-16T11:52:50Z",
         "original_C5_initialization_required": true,
         "rejected_previous_candidate_loaded": false,
         "training_identities": 116,
@@ -2223,7 +2236,7 @@
     "quality_improvement_verified": false,
     "fixed_wer_gate_changed": false,
     "miner_modified": false,
-    "next_observation_at": null,
+    "next_observation_at": "2026-10-16T11:52:50Z",
     "observation_policy": "collect bounded setup/qualification promptly; check long actualtraining no more often than30minutes"
   },
   "latest_student_numerical_qualification": {
