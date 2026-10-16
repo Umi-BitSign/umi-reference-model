@@ -1111,7 +1111,7 @@
   "terra_visual_restart": {
     "launched_at": "2026-10-15T02:40:36Z",
     "owned_session": 60535,
-    "current_phase": "C5_selected; seen_six_clip_decode_complete_exit0_oldROI_matches_C5_6of6_expanded5of6; fixed_weights_unchanged_training_roles_preserved; seen_Terra_diagnostic_session81686_launched_grades_unobserved; reserved_semantic_rejection_unchanged; next_observation2026-10-16T22:55:26Z",
+    "current_phase": "C5_selected; seen_six_clip_Terra_complete_C5_and_oldROI9.8333_expanded9.1667; reserved_ROI0.6471_vs_C58.8971_rejection_unchanged; direct_ROI_semantic_gradient_path_implemented_numerical_proof_not_launched; no_live_job",
     "ROI64_seen_translation_diagnostic": {
       "plan": "runs/roi-seen-translation-probe-v1/plan.json",
       "plan_sha256": "9c54b9154d435c507bee811bc7dbc3dd8093c14ca4abd457e19280396e479d65",
@@ -1152,7 +1152,19 @@
       "semantic_unique_items_including_controls": 11,
       "semantic_planned_requests": 2,
       "semantic_grade_and_completion_unobserved_at_launch": true,
-      "semantic_next_observation_at": "2026-10-16T22:55:26Z"
+      "semantic_next_observation_at": null,
+      "semantic_terminal_at": "2026-10-16T22:28:21.419586+00:00",
+      "semantic_terminal_exit_code": 0,
+      "semantic_worker_pid": 9242,
+      "semantic_diagnosis_sha256": "3ee34515efb7bd866688f244361f70d60a165091237b49c3f24a29473ee1e112",
+      "actual_new_Terra_requests": 2,
+      "calibration_passed_both_passes": true,
+      "actual_training_mean_quality": {
+        "C5": 9.833333333333334,
+        "ROI_six_clip_fit": 9.833333333333334,
+        "ROI_expanded_fit": 9.166666666666666
+      },
+      "next_action": "qualify_then_test_actual_Terra_weighted_gradients_through_ROI_vision; no_augmentation_in_first_semantic_run; preserve_reserved34_gate"
     },
     "ROI64_actual_translation_evaluation": {
       "plan": "runs/roi-short-translation-evaluation-v1/plan.json",
