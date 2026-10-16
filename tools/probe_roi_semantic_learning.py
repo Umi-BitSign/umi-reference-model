@@ -6,6 +6,7 @@ import argparse
 import gc
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -37,6 +38,7 @@ POLICY = {
     "trainable_parameters": 32826496,
     "trainable_tensors": 116,
     "candidate_generation": "human anchor, reference-blind greedy/sample and native C5 teacher",
+    "additional_candidate": "next training clip caption; actual Terra grade, not assumed0",
     "candidate_horizon": 512,
     "teacher_scores": "actual Terra scores, including zero, never assumed correct",
     "judge": "gpt-5.6-terra",
@@ -242,6 +244,37 @@ def qualities(paired, scores):
     return result
 
 
+def training_negative(record, donor, tokenizer):
+    """An explicit contrastive training caption, never described as sampled output."""
+    for row in (record, donor):
+        source = row["original_row"]
+        if (
+            row["roi_role"] != "training"
+            or row["roi_training_allowed"] is not True
+            or source["role"] != "training"
+            or source["training_allowed"] is not True
+        ):
+            raise ValueError("ROI contrastive captions require two approved training clips")
+    if (
+        record["cache"] == donor["cache"]
+        or record["original_row"]["reference"] == donor["original_row"]["reference"]
+    ):
+        raise ValueError(
+            "ROI contrastive caption must come from a different training identity/text"
+        )
+    tokens = tokenizer(donor["original_row"]["reference"], truncation=False).input_ids
+    if not tokens or len(tokens) > 512 or tokens[-1] != 1:
+        raise ValueError("ROI contrastive caption cannot truncate a training reference")
+    return {
+        "tokens": tokens,
+        "text": donor["original_row"]["reference"],
+        "kind": "other_training_caption",
+        "truncated": False,
+        "termination": "eos",
+        "donor_record": donor,
+    }
+
+
 def prepare(path, output, plan):
     from terra_teacher_candidates import TeacherTextCache, teacher_augmented_pool
 
@@ -263,6 +296,11 @@ def prepare(path, output, plan):
             checkpoint_sha=plan["reference"]["translator_checkpoint_sha256"],
             cache=cache,
         )
+        donor = plan["records"][(index + 1) % len(plan["records"])]
+        negative = training_negative(record, donor, tokenizer)
+        if negative["tokens"] in [candidate["tokens"] for candidate in pool]:
+            raise ValueError("predeclared training negative duplicates an existing candidate")
+        pool.append(negative)
         pools.append(pool)
         write(output / f"pool-{index:02d}.json", {"record": record, "candidates": pool})
         print(
@@ -335,7 +373,12 @@ def checked_candidates(path, plan_path, plan, tokenizer):
     paired = comparison(plan["records"], result["pools"])
     if paired != result["comparison"]:
         raise ValueError("ROI risk changed candidate-to-identity mapping")
-    for pool in result["pools"]:
+    for index, pool in enumerate(result["pools"]):
+        expected = training_negative(
+            plan["records"][index], plan["records"][(index + 1) % len(plan["records"])], tokenizer
+        )
+        if pool[-1] != expected or any(c["kind"] == "other_training_caption" for c in pool[:-1]):
+            raise ValueError("ROI risk changed its predeclared training-negative donor/tokens")
         for candidate in pool:
             text = tokenizer.decode(
                 candidate["tokens"], skip_special_tokens=True, clean_up_tokenization_spaces=False
@@ -507,15 +550,71 @@ def main():
     parser.add_argument("--freeze", type=Path)
     parser.add_argument("--plan", type=Path)
     parser.add_argument("--output", type=Path)
-    parser.add_argument("--mode", choices=("candidates", "qualify"))
+    parser.add_argument("--mode", choices=("candidates", "qualify", "pipeline"))
     parser.add_argument("--candidates", type=Path)
     args = parser.parse_args()
     if args.freeze:
         freeze(args.freeze)
+        if args.output and args.mode == "pipeline":
+            pipeline(args.freeze, args.output)
+    elif args.plan and args.output and args.mode == "pipeline":
+        pipeline(args.plan, args.output)
     elif args.plan and args.output and args.mode:
         run(args.plan, args.output, args.mode, args.candidates)
     else:
         parser.error("choose --freeze, or --plan --output --mode")
+
+
+def pipeline(path, output):
+    """Run each phase once; qualify only after authoritative scoring exit0.
+
+    The parent blocks on its own children instead of polling. No optimizer or
+    automatic retry is provided. Each child writes its own complete exit receipt.
+    """
+    path, output = path.resolve(), output.resolve()
+    if output.exists() or not output.is_relative_to(ROOT / "checkpoints"):
+        raise ValueError("ROI pipeline requires a fresh owned output")
+    plan = json.loads(path.read_text())
+    verify_snapshot(path, plan)
+    if plan["source_sha256"]["tools/probe_roi_semantic_learning.py"] != sha256(Path(__file__)):
+        raise ValueError("ROI pipeline source differs from its frozen plan")
+    storage()
+    output.mkdir(parents=True)
+    write(output / "worker.json", identity(os.getpid(), [sys.executable, *sys.argv]))
+    code = 1
+    try:
+        for mode in ("candidates", "qualify"):
+            command = [
+                sys.executable,
+                str(Path(__file__).resolve()),
+                "--plan",
+                str(path),
+                "--output",
+                str(output / mode),
+                "--mode",
+                mode,
+            ]
+            if mode == "qualify":
+                command.extend(["--candidates", str(output / "candidates/candidates.json")])
+            print(json.dumps({"stage": "pipeline_child_start", "mode": mode}), flush=True)
+            result = subprocess.run(command, check=False)
+            if result.returncode != 0:
+                raise RuntimeError(
+                    f"ROI pipeline phase {mode} stopped with exit{result.returncode}; no retry"
+                )
+        write(
+            output / "complete.json",
+            {
+                "complete": True,
+                "plan_sha256": sha256(path),
+                "qualification": artifact(output / "qualify/qualification.json"),
+                "optimizer_updates": 0,
+                "automatic_retries": 0,
+            },
+        )
+        code = 0
+    finally:
+        write(output / "exit.json", {"pid": os.getpid(), "exit_code": code, "observed_at": now()})
 
 
 if __name__ == "__main__":

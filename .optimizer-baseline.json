@@ -1111,7 +1111,7 @@
   "terra_visual_restart": {
     "launched_at": "2026-10-15T02:40:36Z",
     "owned_session": 60535,
-    "current_phase": "C5_selected; direct_ROI_semantic_plan_frozen; training_candidate_generation_and_actual_Terra_rewards_session46117_live_at_launch; zero_optimizer_updates; numerical_qualification_not_yet_launched; next_observation2026-10-16T23:37:24Z",
+    "current_phase": "C5_selected; v1_reward_preparation_stopped_exit1_all_training_proposals_Terra10_no_contrast_zero_updates; v2_freeze_then_reward_and_numerical_pipeline_session22348_live_at_launch; explicit_cross_video_training_negatives; next_observation2026-10-17T00:09:44Z",
     "ROI64_direct_semantic_gradient": {
       "plan": "runs/roi-semantic-gradient-v1/plan.json",
       "plan_sha256": "1a55b775aee4f28de2f85ac47da42db8a51c09f69017a86805fa438170aed7da",
@@ -1130,7 +1130,23 @@
       "heldout_or_feature_diagnostic_inputs_used": false,
       "promotion_authorized": false,
       "targeted_tests_passed": 112,
-      "next_observation_at": "2026-10-16T23:37:24Z"
+      "next_observation_at": "2026-10-17T00:09:44Z",
+      "candidate_terminal_at": "2026-10-16T23:08:46.003148+00:00",
+      "candidate_terminal_exit_code": 1,
+      "candidate_actual_Terra_requests": 1,
+      "candidate_original_controls_passed": true,
+      "candidate_training_distinct_text_pairs": 6,
+      "candidate_training_scores_all10": true,
+      "candidate_stop_reason": "no contrast in actual training rewards; guard before backward; no transport failure",
+      "v2_plan": "runs/roi-semantic-gradient-v2/plan.json",
+      "v2_session": 22348,
+      "v2_output": "checkpoints/roi-semantic-gradient-v2",
+      "v2_freeze_and_pipeline_launch_at": "2026-10-16T23:39:44Z",
+      "v2_plan_hash_rewards_numerical_results_unobserved_at_launch": true,
+      "v2_candidate_change": "add next predeclared training identity caption with exact donor/tokens and actual Terra reward; no assumed0",
+      "v2_automatic_retries": 0,
+      "v2_optimizer_updates": 0,
+      "v2_targeted_tests_passed": 115
     },
     "ROI64_seen_translation_diagnostic": {
       "plan": "runs/roi-seen-translation-probe-v1/plan.json",

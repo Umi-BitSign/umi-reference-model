@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import copy
+import json
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -119,3 +121,59 @@ def test_proof_policy_cannot_claim_training_or_promotion():
     assert probe.POLICY["optimizer_updates"] == 0
     assert probe.POLICY["model_win_claimed"] is False
     assert probe.POLICY["promotion_authorized"] is False
+
+
+def test_contrastive_caption_is_explicit_and_has_an_approved_distinct_donor():
+    class Tokenizer:
+        def __call__(self, reference, truncation):
+            assert truncation is False
+            return SimpleNamespace(input_ids=[10, 11, 1])
+
+    rows = records()
+    candidate = probe.training_negative(rows[0], rows[1], Tokenizer())
+    assert candidate["kind"] == "other_training_caption"
+    assert candidate["donor_record"] == rows[1]
+    assert candidate["text"] == rows[1]["original_row"]["reference"]
+    assert "quality" not in candidate
+    with pytest.raises(ValueError):
+        probe.training_negative(rows[0], rows[0], Tokenizer())
+    rows[1]["roi_training_allowed"] = False
+    with pytest.raises(ValueError):
+        probe.training_negative(rows[0], rows[1], Tokenizer())
+
+
+@pytest.mark.parametrize("first_exit", (0, 1))
+def test_pipeline_waits_for_scoring_exit_and_never_retries(tmp_path, monkeypatch, first_exit):
+    path = tmp_path / "runs/plan.json"
+    path.parent.mkdir()
+    path.write_text(
+        json.dumps({"source_sha256": {"tools/probe_roi_semantic_learning.py": "bound"}})
+    )
+    monkeypatch.setattr(probe, "ROOT", tmp_path)
+    monkeypatch.setattr(probe, "verify_snapshot", lambda *args: None)
+    monkeypatch.setattr(probe, "storage", lambda: None)
+    monkeypatch.setattr(probe, "sha256", lambda *args: "bound")
+    monkeypatch.setattr(probe, "identity", lambda *args: {"pid": 1})
+    monkeypatch.setattr(probe, "artifact", lambda path: {"path": str(path), "sha256": "bound"})
+    calls = []
+
+    def child(command, check):
+        assert check is False
+        calls.append(command)
+        return SimpleNamespace(returncode=first_exit if len(calls) == 1 else 0)
+
+    monkeypatch.setattr(probe.subprocess, "run", child)
+    output = tmp_path / "checkpoints/pipeline"
+    if first_exit:
+        with pytest.raises(RuntimeError, match="no retry"):
+            probe.pipeline(path, output)
+        assert len(calls) == 1
+        assert not (output / "complete.json").exists()
+    else:
+        probe.pipeline(path, output)
+        assert len(calls) == 2
+        assert calls[0][calls[0].index("--mode") + 1] == "candidates"
+        assert calls[1][calls[1].index("--mode") + 1] == "qualify"
+        assert "--candidates" in calls[1]
+        assert json.loads((output / "complete.json").read_text())["optimizer_updates"] == 0
+    assert json.loads((output / "exit.json").read_text())["exit_code"] == first_exit
