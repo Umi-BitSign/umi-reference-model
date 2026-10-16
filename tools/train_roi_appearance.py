@@ -18,7 +18,6 @@ from probe_tiny_rgb_capacity import compare, gradients, state_digest
 from roi_appearance_model import STREAMS, RoiAppearance, feature_loss, pixel_tensor, temporal_gap
 from roi_appearance_protocol import (
     DATA,
-    RECIPE,
     ROOT,
     checked,
     checked_data,
@@ -38,7 +37,7 @@ def targets(values, indices=None):
     return {name: torch.from_numpy(values[name][indices].copy()) for name in STREAMS}
 
 
-def qualify(path, output, plan, data, arrays, duty):
+def qualify(path, output, plan, data, arrays, duty, *, validate=checked):
     cpu, gpu = RoiAppearance().eval(), RoiAppearance().eval()
     initial = plan["initialization_sha256"]
     if any(state_digest(m.state_dict()) != initial for m in (cpu, gpu)):
@@ -96,7 +95,7 @@ def qualify(path, output, plan, data, arrays, duty):
         gc.collect()
     if any(state_digest(m.state_dict()) != initial for m in (cpu, gpu)):
         raise ValueError("zero-update ROI proof changed weights")
-    checked(path)
+    validate(path)
     write(
         output / "qualification.json",
         {
@@ -124,7 +123,7 @@ def qualify(path, output, plan, data, arrays, duty):
     )
 
 
-def checked_proof(receipt, plan_path, plan):
+def checked_proof(receipt, plan_path, plan, *, data_path=None):
     result = json.loads(receipt.read_text())
     terminal = json.loads(receipt.with_name("exit.json").read_text())
     worker = json.loads(receipt.with_name("worker.json").read_text())
@@ -143,7 +142,7 @@ def checked_proof(receipt, plan_path, plan):
         or [r["record_index"] for r in rows] != plan["proof_training_record_indices"]
     ):
         raise ValueError("ROI training requires a complete bound terminal zero-update proof")
-    data = json.loads(DATA.read_text())
+    data = json.loads((data_path or DATA).read_text())
     for row in rows:
         cache = data["records"][row["record_index"]]
         if row["cache"] != cache["cache"] or row["sampled_positions"] != [0, cache["frames"] - 1]:
@@ -152,14 +151,14 @@ def checked_proof(receipt, plan_path, plan):
     return artifact(receipt)
 
 
-def evaluate(model, data, arrays, duty, epoch):
+def evaluate(model, data, arrays, duty, epoch, *, batch_frames=8):
     records = []
     model.eval()
     with torch.no_grad():
         for row, values in zip(data["records"], arrays, strict=True):
             parts = {n: [] for n in STREAMS}
-            for start in range(0, len(values["pixels"]), RECIPE["batch_frames"]):
-                pixels = pixel_tensor(values["pixels"][start : start + RECIPE["batch_frames"]])
+            for start in range(0, len(values["pixels"]), batch_frames):
+                pixels = pixel_tensor(values["pixels"][start : start + batch_frames])
 
                 def forward(pixels=pixels):
                     return {n: v.cpu() for n, v in model(pixels.to("mps")).items()}
@@ -191,18 +190,19 @@ def evaluate(model, data, arrays, duty, epoch):
     return result
 
 
-def fit(path, output, plan, data, arrays, duty, qualification):
-    proof = checked_proof(qualification, path, plan)
+def fit(path, output, plan, data, arrays, duty, qualification, *, validate=checked):
+    recipe = plan["recipe"]
+    proof = checked_proof(qualification, path, plan, data_path=ROOT / plan["data"]["path"])
     model = RoiAppearance()
     if state_digest(model.state_dict()) != plan["initialization_sha256"]:
         raise ValueError("ROI training did not start fresh")
     model = duty.run(lambda: model.to("mps"))
     if state_digest(model.state_dict()) != plan["initialization_sha256"]:
         raise ValueError("ROI training transfer changed initialization")
-    torch.manual_seed(RECIPE["seed"])
-    torch.mps.manual_seed(RECIPE["seed"])
+    torch.manual_seed(recipe["seed"])
+    torch.mps.manual_seed(recipe["seed"])
     optimizer = torch.optim.AdamW(
-        model.parameters(), lr=RECIPE["learning_rate"], weight_decay=RECIPE["weight_decay"]
+        model.parameters(), lr=recipe["learning_rate"], weight_decay=recipe["weight_decay"]
     )
     stop = CheckpointRequest()
     train = [v for v, r in zip(arrays, data["records"], strict=True) if r["roi_training_allowed"]]
@@ -219,7 +219,7 @@ def fit(path, output, plan, data, arrays, duty, qualification):
             "frame_exposures_not_clip_exposures": True,
         },
     )
-    initial = evaluate(model, data, arrays, duty, 0)
+    initial = evaluate(model, data, arrays, duty, 0, batch_frames=recipe["batch_frames"])
     append(output, "evaluations.jsonl", initial)
     if initial["training"]["teacher_temporal_gap"] <= 0:
         raise ValueError("ROI teacher lacks positive within-clip hand-motion signal")
@@ -246,16 +246,16 @@ def fit(path, output, plan, data, arrays, duty, qualification):
                 **cursor,
                 "frame_exposures": exposures,
                 "optimizer_updates": updates,
-                "recipe": RECIPE,
+                "recipe": recipe,
                 "training_frame_count": len(pixels),
             },
         )
         return artifact(checkpoint)
 
     try:
-        for epoch in range(RECIPE["epochs"]):
+        for epoch in range(recipe["epochs"]):
             order = permutation(len(pixels), epoch)
-            for offset in range(0, len(order), RECIPE["batch_frames"]):
+            for offset in range(0, len(order), recipe["batch_frames"]):
                 cursor = {"epoch": epoch, "next_frame_offset": offset}
                 if stop.requested:
                     checkpoint = save(True) if updates else None
@@ -269,7 +269,7 @@ def fit(path, output, plan, data, arrays, duty, qualification):
                     )
                     return
                 storage(output=output)
-                indices = order[offset : offset + RECIPE["batch_frames"]]
+                indices = order[offset : offset + recipe["batch_frames"]]
                 batch = pixel_tensor(pixels[indices])
                 target = {n: torch.from_numpy(v[indices].copy()) for n, v in labels.items()}
                 safe_to_save = False
@@ -285,7 +285,7 @@ def fit(path, output, plan, data, arrays, duty, qualification):
                     ):
                         raise RuntimeError("ROI update lacks complete finite visual gradients")
                     norm = torch.nn.utils.clip_grad_norm_(
-                        model.parameters(), RECIPE["clip_gradient_norm"], error_if_nonfinite=True
+                        model.parameters(), recipe["clip_gradient_norm"], error_if_nonfinite=True
                     )
                     optimizer.step()
                     torch.mps.synchronize()
@@ -311,8 +311,10 @@ def fit(path, output, plan, data, arrays, duty, qualification):
                         "finite_gradient_tensors": plan["parameter_tensors"],
                     },
                 )
-            if epoch + 1 in RECIPE["evaluation_epochs"]:
-                measured = evaluate(model, data, arrays, duty, epoch + 1)
+            if epoch + 1 in recipe["evaluation_epochs"]:
+                measured = evaluate(
+                    model, data, arrays, duty, epoch + 1, batch_frames=recipe["batch_frames"]
+                )
                 append(output, "evaluations.jsonl", measured)
                 print(
                     json.dumps(
@@ -332,7 +334,7 @@ def fit(path, output, plan, data, arrays, duty, qualification):
             or exposures != plan["planned_frame_exposures"]
         ):
             raise ValueError("ROI final coverage differs from fixed complete-frame recipe")
-        checked(path)
+        validate(path)
         checkpoint = save(False)
         write(
             output / "decision.json",
@@ -366,13 +368,15 @@ def fit(path, output, plan, data, arrays, duty, qualification):
         raise
 
 
-def run(path, output, *, qualification_only=False, qualification=None):
+def run(path, output, *, qualification_only=False, qualification=None, protocol=None):
     if qualification_only == (qualification is not None):
         raise ValueError("choose zero-update qualification or supply completed qualification")
     torch.set_num_threads(2)
     torch.set_num_interop_threads(1)
-    plan = checked(path)
-    _, data, arrays = checked_data()
+    validate = checked if protocol is None else protocol.checked
+    load_data = checked_data if protocol is None else protocol.checked_data
+    plan = validate(path)
+    _, data, arrays = load_data()
     budget = CertificationComputeWindow(ROOT / plan["resource_policy"])
     if (
         budget.duty_fraction() != 0.5
@@ -391,9 +395,9 @@ def run(path, output, *, qualification_only=False, qualification=None):
         with gpu_lease():
             duty = WinnerDutyCycle(torch, budget)
             if qualification_only:
-                qualify(path, output, plan, data, arrays, duty)
+                qualify(path, output, plan, data, arrays, duty, validate=validate)
             else:
-                fit(path, output, plan, data, arrays, duty, qualification)
+                fit(path, output, plan, data, arrays, duty, qualification, validate=validate)
         code = 0
     finally:
         write(output / "exit.json", {"pid": os.getpid(), "exit_code": code, "observed_at": now()})

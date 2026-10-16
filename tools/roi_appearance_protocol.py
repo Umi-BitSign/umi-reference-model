@@ -45,17 +45,23 @@ GATE = {
 
 
 def checked_data():
-    plan = checked_data_plan(DATA_PLAN)
-    data = json.loads(DATA.read_text())
-    terminal = json.loads(DATA.with_name("exit.json").read_text())
-    worker = json.loads(DATA.with_name("worker.json").read_text())
+    return checked_cache(DATA_PLAN, DATA, validate_plan=checked_data_plan)
+
+
+def checked_cache(data_plan_path, data_path, *, validate_plan, expected_clips=8, cache_limit=None):
+    if cache_limit is None:
+        cache_limit = POLICY["maximum_ROI_cache_bytes"]
+    plan = validate_plan(data_plan_path)
+    data = json.loads(data_path.read_text())
+    terminal = json.loads(data_path.with_name("exit.json").read_text())
+    worker = json.loads(data_path.with_name("worker.json").read_text())
     if (
         not data.get("complete")
-        or data.get("plan_sha256") != sha256(DATA_PLAN)
+        or data.get("plan_sha256") != sha256(data_plan_path)
         or data.get("all_streamed_pixels_equal_native_reference") is not True
         or terminal.get("exit_code") != 0
         or terminal.get("pid") != worker.get("pid")
-        or len(data["records"]) != 8
+        or len(data["records"]) != expected_clips
         or data.get("primary_translation_development_used") is not False
         or data.get("translation_promotion_authorized") is not False
     ):
@@ -66,7 +72,7 @@ def checked_data():
         if any(row.get(k) != v for k, v in expected.items()):
             raise ValueError("ROI cache changed an original role or source binding")
         cache = ROOT / row["cache"]["path"]
-        if not cache.resolve().is_relative_to(DATA.parent) or artifact(cache) != row["cache"]:
+        if not cache.resolve().is_relative_to(data_path.parent) or artifact(cache) != row["cache"]:
             raise ValueError("ROI cache path/hash changed")
         pair = row["original_row"]["original_pair"]
         count = pair["header"]["sampled_frames"]
@@ -89,7 +95,7 @@ def checked_data():
                 raise ValueError("ROI target is not the original complete native stream")
         total += sum(v.nbytes for v in values.values())
         arrays.append(values)
-    if total != data["cache_bytes"] or total > POLICY["maximum_ROI_cache_bytes"]:
+    if total != data["cache_bytes"] or total > cache_limit:
         raise ValueError("ROI cache RAM accounting differs")
     if artifact(ROOT / data["preview"]["path"]) != data["preview"]:
         raise ValueError("ROI preview changed")
@@ -121,6 +127,10 @@ def decision(initial, final):
 
 def specification():
     data_plan, data, arrays = checked_data()
+    return model_specification(data_plan, data, arrays, DATA_PLAN, DATA, RECIPE)
+
+
+def model_specification(data_plan, data, arrays, data_plan_path, data_path, recipe):
     model = RoiAppearance()
     train_frames = sum(
         len(a["pixels"])
@@ -147,9 +157,9 @@ def specification():
         source[f"tools/{name}"] = sha256(ROOT / "tools" / name)
     return {
         "schema": "umi-studio-roi-appearance-feasibility/1",
-        "data_plan": artifact(DATA_PLAN),
-        "data": artifact(DATA),
-        "recipe": RECIPE,
+        "data_plan": artifact(data_plan_path),
+        "data": artifact(data_path),
+        "recipe": recipe,
         "feature_gate": GATE,
         "source_sha256": source,
         "runtime_binding": runtime_binding(),
@@ -162,11 +172,11 @@ def specification():
         "visual_parameters": sum(p.numel() for p in model.parameters()),
         "parameter_tensors": len(list(model.parameters())),
         "training_frames_per_epoch": train_frames,
-        "planned_frame_exposures": train_frames * RECIPE["epochs"],
+        "planned_frame_exposures": train_frames * recipe["epochs"],
         "planned_optimizer_updates": (
-            (train_frames + RECIPE["batch_frames"] - 1) // RECIPE["batch_frames"]
+            (train_frames + recipe["batch_frames"] - 1) // recipe["batch_frames"]
         )
-        * RECIPE["epochs"],
+        * recipe["epochs"],
         "resource_policy": data_plan["resource_policy"],
         "resource_policy_sha256": data_plan["resource_policy_sha256"],
         "proof_training_record_indices": [0, 1],
