@@ -655,6 +655,8 @@ The separate C5-tail implementation is now in `tools/c5_terra_tail.py`, `tools/t
 
 No new C5-tail plan is frozen and no Metal qualification or training has started. The new driver requires the current owned trainer's terminal receipt and uses an OS GPU lease before any Metal work. The custom-vision arm continues unchanged toward its2,048 check. Next combined observation `2026-10-16T00:28:52Z`. C5 remains unbeaten; all historical/quality gates and service boundaries remain.
 
+At `2026-10-16T00:28:59Z`, exact custom-vision worker2455 is live at1,448 new-arm exposures /181 updates, all90 gradients finite/nonzero. There are944 completed rollouts since resume, no failure/exit receipts, unchanged pinned sources and a25,317,081,088-byte process peak. GPU duty remains50% with2 CPU threads. No new quality result; the2,048 check is pending. C5-tail code is committed but has not begun Metal qualification or training. Next observation `2026-10-16T00:58:59Z`.
+
 ## Hard boundaries
 
 - The user requests commits and pushes for this work. Commit verified code, tests and research notes to `studio-competitive-training` and push that branch to `origin` at completed milestones. Keep datasets, transformed data, checkpoints, run logs and local artifacts out of Git; publish selected model weights through an explicit release workflow.
