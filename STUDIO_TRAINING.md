@@ -718,6 +718,19 @@ After the explicit30-minute cooldown, the single recorded full continuation laun
 
 At `2026-10-16T04:21:23Z`, exact continuation worker3863 is live at1,736 total native exposures /217 updates,880 examples /110 updates since restore. All8 gradients are finite/nonzero, pinned sources match and no new scoring/stop failure is recorded. GPU duty remains50%, CPU threads2; active/idle GPU time since resume is89.926 seconds each, maximum driver allocation1,216,167,936 bytes. The2,048 quality check is pending and the prior partial128/512 results remain unchanged. Next observation `2026-10-16T04:51:23Z`.
 
+### Native C5-tail2,048 regresses the matched C5 control
+
+At the scheduled `2026-10-16T04:51:35Z` observation, exact continuation worker3863 is live at2,568 total native exposures /321 updates,1,712 examples /214 updates since recovery. All8 gradients are finite/nonzero, pinned sources match and no new scoring/stop failure is recorded. GPU duty remains50%, CPU threads2; active/idle GPU time since resume is171.997 seconds each, maximum driver allocation1,216,757,760 bytes.
+
+The2,048 checkpoint fails the unchanged5% improvement gate after126 How2Sign clips. No FLEURS or full benchmark result is available. Compare exactly those126 identities:
+
+| Same126 How2Sign clips, lower is better | C5 control | Native Terra2,048 |
+| --- | ---: | ---: |
+| Mean WER | 79.50% | 81.37% |
+| Word-weighted WER | 78.35% | 79.98% |
+
+This is about2.35% relative mean-WER regression, not an improvement. The complete tail checkpoint SHA-256 is `2f1184688b4006f0a6fc61e5f53b2a106dcfa3fe7e04581ef9edc16d7bd99256`, optimizer `9bd51079217e53a0070c0ecbadc42306e119c196bdbdd543057deea7c5c7937a`. C5 remains selected and unbeaten. Leave the frozen one-pass recipe running toward4,096 and7,523 checks while researching stronger visual starting points; do not change sources, data, recipe, generation or gates under the live plan. Any new pretrained checkpoint needs a license and training/evaluation-overlap audit first. Next training observation `2026-10-16T05:21:35Z`, with no intermediate polls. Miner and scoring services remain untouched.
+
 ## Hard boundaries
 
 - Current owner direction: another chat owns miner and codex-lb maintenance. Do not inspect, restart, reconfigure or load-test either service, and do not query port8787 from this training work. Historical health-guarded extraction procedures below do not authorize service checks for the current runs. The approved v2 compute window expired at `2026-10-15T22:47:28Z`; current training uses50% GPU duty and2 CPU threads. Do not extend the temporary unthrottled window without new owner direction.
