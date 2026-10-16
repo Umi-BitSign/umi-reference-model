@@ -942,6 +942,28 @@ Read-only inspection of the completed evaluations finds6/34 texts changed from C
 
 The1,856 policy SHA-256 is `8b6e5c9a473d8a5a77f69898d8fcfabe0c79de0e1d71840b292bf3a919d64c27`, optimizer `d08bee4bcb9fdacc1044625d256fb00b478f0ab2a9cd496ba518f41b5cab365f`. The3,712 policy is `0b8f34a96e7c697683eb885cf41aab4739cbefa5c96c3b54bd54208ad9dff04f`, optimizer `9ba19745521dc8e7b181116a8152a9e442cff6e99ae29adbf0b64354c773be3c`. Complete checkpoint pairs and sampler offsets are saved. The last observed update has all eight gradients finite/nonzero. No failed-stop or terminal receipt is observed at this check. No live miner/LB service was inspected.
 
+### Completed frozen-reward short trial: lower WER, no semantic win
+
+The scheduled `2026-10-16T12:23:07Z` observation finds session95552 terminal exit0, worker6336 at `12:12:03.058770Z`. All7,424 actual clip-exposures /944 updates finished, using464 outer exposures and16 local steps per batch. The944 step records have consecutive update numbers, sum to7,424 clip-exposures and show all eight gradients finite/nonzero at every update. All final source/data and frozen-backbone checks passed. No overload, retry or service inspection occurred.
+
+| Same34 reserved short phrases | C5 quality /10 | Candidate quality /10 | Semantic gate | Candidate WER, diagnostic |
+| --- | ---: | ---: | --- | ---: |
+| 240 updates | 8.6471 | 8.4853 | Fail | 23.53% |
+| 480 updates | 8.8529 | 8.8971 | Fail | 20.59% |
+| 944 updates | 8.8382 | 8.7941 | Fail | 19.61% |
+
+All checks pass their calibration controls in both shuffled passes. The final semantic difference is-0.04411765/10, paired source-bootstrap95% interval[-0.72727273,0.54166667], below the required+0.44191176 gain with a positive lower bound. This is no demonstrated improvement, not a statistically established degradation. No checkpoint reaches9/10 stage mastery. C5 control texts are unchanged across these checks; changes in their mean grades reflect fresh judging variability.
+
+C5 WER is22.55% on these same34 clips. The final candidate's19.61% WER is2.94 percentage points lower, but the owner explicitly made semantic quality decisive. WER neither selects this checkpoint nor overrides the failed semantic comparison. C5 remains selected; no candidate was installed or promoted. These findings cover this small short-STEM curriculum only, not the older How2Sign comparison, full native composite or general competitive performance.
+
+The final model changes11/34 texts from C5, including capitalization-only changes. It corrects “Geography” to the full reference “Geology and geography”, while turning the correct “Estimates vary widely.” into “Estimates vary.” and retaining the new “Fortified tablespoon” error for “Fortified table salt”. More local updates change behavior and improve literal edits, but do not establish better meaning preservation. This experiment does not disprove semantic rewards or word-first curricula, and does not test a newly trained visual encoder.
+
+Final policy `checkpoints/terra-frozen-short-training-v1/visual-after-007424.safetensors`, SHA-256 `e1c06e5705640beb98854837dc2722a31ea8c6d5826644eb3d03a519cdc03156`; optimizer `4b3963923e2cf3610cda8f9690162a317ce00e5bd84b0f07a95d5a9448b05f45`; sampler receipt `74096f725c7be7b50ff13707ac895faadc2d5b6d90e3eef39d7d64639f2235bd`. Completion receipt SHA-256 `26ef1381969f711ba5ac2084cd6f9fe2eb9efc9ec9823e543803ec2fe7f87cd2`; final semantic decision `6c35619499932aec63c59055e21c3fa3bc8f176a0cd75263e7e5a12d764a6a6d`. The full checkpoint pairs remain preserved, without a continuation scheduled.
+
+The run used zero new training-score requests and18 fresh evaluation requests. Active Metal time881.474968 seconds has equal idle time at50% duty; CPU2, max driver allocation1,205,977,088 bytes, bounded CPU memory cache68,725,680 bytes. The temporary unthrottled window was not extended. Original/current baseline records and their commit/fingerprint fields remain unchanged from `add77ba`. All241 focused tests remain passing with unchanged training code.
+
+Next work should inspect visual conditioning and the relative semantic/auxiliary gradient signal before another long run, rather than repeat this rejected fixed-pool tail recipe. The balanced60-word pilot remains metadata-only pending storage permission or sufficient physical free space. Do not infer word-stage learning from this2-/3-word trial, advance based on WER, lower the80GiB acquisition guard, delete snapshots or claim a competitive win. No trainer or scorer is currently live. The global model-quality goal remains active and unmet.
+
 ### Public visual-model research and publisher-split audit (2026-10-16)
 
 The [Uni-Sign repository](https://github.com/ZechengLi19/Uni-Sign) announces released How2Sign/OpenASL pose-only checkpoints. Its [publisher model card](https://huggingface.co/ZechengLi19/Uni-Sign) declares CC-BY-NC-4.0; the public file API reports `how2sign_pose_only_slt.pth` at1,186,925,007 bytes, LFS SHA-256 `1bfd5f3312f04e4736f0a52f4ef9535916e6de9676a2a0d00c708748683fb00d`. This is a candidate compact-input architecture, not verified better weights. The [paper](https://arxiv.org/html/2501.15187v3) uses69 selected pose points; its RGB variant processes112-pixel hand crops. Public source inspection finds CUDA-specific online inference and RTMPose133-point inputs. Existing MediaPipe coordinates are not a verified drop-in equivalent. No new weights, pose archives, dependencies or third-party source code were installed. Code-license and runtime-portability review remain separate from the model card's license.
