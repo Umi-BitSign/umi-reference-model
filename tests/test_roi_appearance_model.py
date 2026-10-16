@@ -76,3 +76,19 @@ def test_zero_absent_target_is_not_used_as_a_label():
     target = {name: torch.zeros(1, 384) for name in STREAMS}
     with pytest.raises(ValueError, match="no usable"):
         feature_loss(target, target)
+
+
+def test_input_validity_uses_metal_supported_flat_reduction(model, monkeypatch):
+    actual = torch.isfinite
+    dimensions = []
+
+    def checked(value):
+        dimensions.append(value.ndim)
+        return actual(value)
+
+    monkeypatch.setattr(torch, "isfinite", checked)
+    pixels = torch.zeros(1, 3, 3, 64, 64)
+    pixels[0, 2, 0, 63, 63] = float("nan")
+    with pytest.raises(ValueError, match="finite real image"):
+        model(pixels)
+    assert dimensions == [1]

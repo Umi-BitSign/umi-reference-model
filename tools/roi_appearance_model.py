@@ -74,7 +74,9 @@ class RoiAppearance(nn.Module):
                 "fresh ROI network requires normalized FP32 face/left/right64px patches"
             )
         count = len(pixels)
-        if count < 1 or not torch.isfinite(pixels).all():
+        # The pinned Metal reduction kernel aborts on axis4 of a five-dimensional
+        # all(); flattening preserves this elementwise validity check exactly.
+        if count < 1 or not torch.isfinite(pixels.reshape(-1)).all():
             raise ValueError("fresh ROI network needs finite real image inputs")
         hands = self.hands(torch.cat([pixels[:, 1], pixels[:, 2]], dim=0))
         return {

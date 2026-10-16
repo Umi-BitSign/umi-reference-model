@@ -1111,7 +1111,7 @@
   "terra_visual_restart": {
     "launched_at": "2026-10-15T02:40:36Z",
     "owned_session": 60535,
-    "current_phase": "C5_selected; fixed_pool_short_tail_branch_closed; ROI64_native_crop_data_complete_exit0_and_preview_reviewed; fresh_32826496_parameter_appearance_qualification_then_conditional_fit_session53067_launched; progress_unobserved; next_observation2026-10-16T17:08:14Z",
+    "current_phase": "C5_selected; ROI64_data_ready; first_qualification_native_Metal_rank5_reduction_abort_exit134_zero_updates; equivalent_flat_validity_check_new_frozen_v2_plan; bounded_zero_update_qualification_session15752_live; no_optimizer_job_launched",
     "ROI64_appearance_feasibility": {
       "data_plan": "runs/roi-appearance-data-v1/plan.json",
       "data_plan_sha256": "13811ef0a36c5d31ad54a5b639e5e64a40fcedbf7de08bbf91ac3f3c81583f32",
@@ -1150,7 +1150,23 @@
       "GPU_duty_fraction": 0.5,
       "CPU_threads": 2,
       "focused_tests_passed": 309,
-      "next_observation_at": "2026-10-16T17:08:14Z"
+      "next_observation_at": null,
+      "first_attempt_observed_at": "2026-10-16T17:08:21Z",
+      "first_attempt_terminal_exit_code": 134,
+      "first_attempt_optimizer_updates": 0,
+      "first_attempt_training_output_created": false,
+      "first_attempt_failure": "native Metal rank5 finite-input reduction abort, isolated reproduction confirms flat reduction passes",
+      "first_attempt_authoritative_observation": "runs/roi-appearance-fit-v1/terminal-observation.json",
+      "replacement_plan": "runs/roi-appearance-fit-v2/plan.json",
+      "replacement_plan_sha256": "e641cdc80be7431424cd655462f2ecaf5b9e45da0dca8f75f3d285b3c08ef4fd",
+      "replacement_only_change": "equivalent flat reduction for input finite-value validation, unchanged architecture/initialization/recipe/gates",
+      "replacement_qualification_output": "checkpoints/roi-appearance-qualification-v2",
+      "replacement_qualification_session": 15752,
+      "replacement_qualification_launch_at": "2026-10-16T17:09:46Z",
+      "replacement_qualification_completion_unobserved_at_launch": true,
+      "replacement_training_launched": false,
+      "replacement_focused_tests_passed": 310,
+      "replacement_non_source_plan_fields_identical": true
     },
     "current_owner_semantic_primary_policy": {
       "date": "2026-10-16",
