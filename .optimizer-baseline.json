@@ -1111,7 +1111,7 @@
   "terra_visual_restart": {
     "launched_at": "2026-10-15T02:40:36Z",
     "owned_session": 60535,
-    "current_phase": "C5_selected; richer_pool_training_live_at6904_exposures879_updates; both240_and480_semantic_checks_nonqualifying; final_check_pending; next_observation15:54:38Z",
+    "current_phase": "C5_selected; richer_pool_trial_complete_exit0_944_updates7424_exposures_all3_semantic_gates_fail; fixed_pool_short_tail_branch_closed; no_live_job; next_inspect_small_hand_face_crops_with_fresh_vision_and_pretrained_language",
     "current_owner_semantic_primary_policy": {
       "date": "2026-10-16",
       "authority": "Owner: LLM scores decisive for training; WER side measurement; start with words/short phrases then expand",
@@ -1553,7 +1553,7 @@
       "diverse_short_training_trial": {
         "plan": "runs/terra-diverse-short-training-v1/plan.json",
         "plan_sha256": "e96a1046bfec45e5478c62d12ba8ed66f1db7bcbf6408bf2cce20a18393251be",
-        "status": "qualification_exit0_training_live_first_semantic_check_nonqualifying",
+        "status": "complete_exit0_all_three_semantic_checks_fail_C5_retained_branch_closed",
         "session": 71133,
         "qualification_output": "checkpoints/terra-diverse-short-qualification-v1",
         "training_output": "checkpoints/terra-diverse-short-training-v1",
@@ -1591,9 +1591,11 @@
         "qualification_worst_CPU_Metal_relative_gradient_error": 0.0000011047587914339669,
         "qualification_original_and_frozen_values_unchanged": true,
         "training_worker_pid": 7077,
-        "observed_at": "2026-10-16T15:24:38Z",
-        "last_observed_actual_exposures": 6904,
-        "last_observed_optimizer_updates": 879,
+        "observed_at": "2026-10-16T15:54:48Z",
+        "terminal_exit_code": 0,
+        "terminal_recorded_at": "2026-10-16T15:37:09.702041Z",
+        "last_observed_actual_exposures": 7424,
+        "last_observed_optimizer_updates": 944,
         "last_observed_finite_nonzero_gradients": 8,
         "first_semantic_check": {
           "optimizer_updates": 240,
@@ -1621,7 +1623,43 @@
           "candidate_WER_diagnostic": 0.22549019607843135,
           "WER_veto_used": false
         },
-        "next_observation_at": "2026-10-16T15:54:38Z"
+        "final_semantic_check": {
+          "optimizer_updates": 944,
+          "actual_exposures": 7424,
+          "C5_quality": 8.676470588235293,
+          "candidate_quality": 8.132352941176471,
+          "absolute_gain": -0.5441176470588225,
+          "relative_gain": -0.06271186440677955,
+          "paired_source_group_bootstrap95": [-1.4, 0.21621621621621623],
+          "calibration_passed": true,
+          "passes_semantic_research_gate": false,
+          "statistically_established_decline_claimed": false,
+          "candidate_WER_diagnostic": 0.2745098039215686,
+          "C5_WER_diagnostic": 0.22549019607843135,
+          "WER_veto_used": false,
+          "changed_transcripts": 14
+        },
+        "final_policy_sha256": "b4a3d17b0acd408c9da64a5d5e650d2a94f44424eb4913881f0e31b260da2eed",
+        "final_optimizer_sha256": "6ea4efea89f087b5160214532c12537de49da5de1e1c7256aa3fce3d2be97a75",
+        "final_sampler_sha256": "530c8e5900c81a145d29def860952e4b168b47205edce17c33dc402c99265ae3",
+        "completion_receipt_sha256": "f63756b4fe4f8358873bb503779cede6482caaf22e1d4dfe97a13931cb7296c8",
+        "final_semantic_receipt_sha256": "c957b831a20f3aed3649e34b3ec91d8d1560ee13ea61bf71ad7e4b2bfa8a22ef",
+        "all_updates_have_eight_finite_nonzero_gradients": true,
+        "final_source_data_and_frozen_value_checks_passed": true,
+        "fresh_evaluation_requests": 20,
+        "active_GPU_seconds": 1273.820698521915,
+        "equal_GPU_idle_seconds": 1273.820698521915,
+        "maximum_driver_bytes": 1208729600,
+        "CPU_native_memory_cache_bytes": 68725680,
+        "posthoc_normalized_reference_word_count": 102,
+        "posthoc_C5_output_word_count": 97,
+        "posthoc_sparse944_output_word_count": 99,
+        "posthoc_diverse944_output_word_count": 89,
+        "omission_or_length_bias_causal_claim": false,
+        "continuation_scheduled": false,
+        "fixed_pool_short_tail_strategy_closed": true,
+        "next_action": "inspect explicit small hand/face crops with fresh visual weights and pretrained language; verify color/timeline/roles and reserve all8 STEM participants; no new data downloads without existing storage policy",
+        "next_observation_at": null
       },
       "balanced_word_acquisition_floor_exception_requested": {
         "maximum_raw_video_budget_GiB": 2,
@@ -2486,7 +2524,7 @@
     "quality_improvement_verified": false,
     "fixed_wer_gate_changed": false,
     "miner_modified": false,
-    "next_observation_at": "2026-10-16T15:54:38Z",
+    "next_observation_at": null,
     "observation_policy": "collect bounded setup/qualification promptly; check long actualtraining no more often than30minutes"
   },
   "latest_student_numerical_qualification": {
