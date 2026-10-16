@@ -1111,7 +1111,7 @@
   "terra_visual_restart": {
     "launched_at": "2026-10-15T02:40:36Z",
     "owned_session": 60535,
-    "current_phase": "C5_selected; frozen_reward_trial_complete_exit0_7424_actual_exposures944_updates; all3_semantic_checks_nonqualifying_despite_lower_WER; no_live_job; inspect_visual_grounding_and_gradient_balance_next",
+    "current_phase": "C5_selected; rejected944_update_trial_complete; training_only_gradient_and_video_conditioning_audit_launched_session24138; no_optimizer_training_live; results_unobserved_until13:03:30Z",
     "current_owner_semantic_primary_policy": {
       "date": "2026-10-16",
       "authority": "Owner: LLM scores decisive for training; WER side measurement; start with words/short phrases then expand",
@@ -1429,6 +1429,27 @@
         "model_quality_gain_claimed": false,
         "focused_tests_passed": 241,
         "new_tests_passed": 24
+      },
+      "short_learning_diagnostic": {
+        "plan": "runs/terra-short-learning-audit-v1/plan.json",
+        "plan_sha256": "5db243aad065c62055d0f7620a203bf0647062a2527b3153277201fef5771d1f",
+        "status": "launched_results_unobserved",
+        "session": 24138,
+        "output": "checkpoints/terra-short-learning-audit-v1",
+        "observed_launch_at": "2026-10-16T12:33:30Z",
+        "policies": ["original_C5", "rejected944"],
+        "training_gradient_cases_per_policy": 116,
+        "conditioning_training_cases": 12,
+        "conditioning_forward_comparisons": 288,
+        "new_Terra_requests": 0,
+        "optimizer_updates": 0,
+        "development_used": false,
+        "is_heldout_model_quality_or_promotion_gate": false,
+        "GPU_duty_fraction": 0.5,
+        "CPU_threads": 2,
+        "focused_tests_passed": 257,
+        "new_tests_passed": 16,
+        "next_observation_at": "2026-10-16T13:03:30Z"
       },
       "balanced_word_acquisition_floor_exception_requested": {
         "maximum_raw_video_budget_GiB": 2,
@@ -2293,7 +2314,7 @@
     "quality_improvement_verified": false,
     "fixed_wer_gate_changed": false,
     "miner_modified": false,
-    "next_observation_at": null,
+    "next_observation_at": "2026-10-16T13:03:30Z",
     "observation_policy": "collect bounded setup/qualification promptly; check long actualtraining no more often than30minutes"
   },
   "latest_student_numerical_qualification": {
