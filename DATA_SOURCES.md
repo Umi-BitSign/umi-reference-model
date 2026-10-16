@@ -1,6 +1,6 @@
 # Known sign-language data sources
 
-Updated 2026-10-14. This is the project's discovery catalog, not a blanket rights clearance. The project owner reports counsel's advice that UMI's public model track may use How2Sign and other noncommercial datasets to train an open-weight model; counsel treats Bittensor miner grants as grants for that open-source work. This handling applies to the public model track. Review each source's exact version and terms before download, and record the applicable counsel decision, attribution, access conditions and transform history in the experiment ledger. Permission-gated access and third-party source-video or redistribution terms require separate review.
+Updated 2026-10-16. This is the project's discovery catalog, not a blanket rights clearance. The project owner reports counsel's advice that UMI's public model track may use How2Sign and other noncommercial datasets to train an open-weight model; counsel treats Bittensor miner grants as grants for that open-source work. This handling applies to the public model track. Review each source's exact version and terms before download, and record the applicable counsel decision, attribution, access conditions and transform history in the experiment ledger. Permission-gated access and third-party source-video or redistribution terms require separate review.
 
 ## Data used in the public UMI S1 lineage
 
@@ -37,9 +37,11 @@ An annotation-only duration audit on October 14, 2026 found six of the 4,928 loc
 
 ## ASL isolated signs, lexicons and linguistic annotations
 
+The owner's October16 word-to-phrase curriculum can first investigate existing ASL-STEM metadata. An offline audit finds1,956 simple single-word-label candidates at0.75-8 seconds after basic filtering; a provisional60-label pilot selects228 training and96 signer-disjoint development clips. These are complete source clips with single-English-word captions, not verified one-sign annotations. No new clips have been acquired: the80GiB storage guard is still active. See `runs/terra-word-curriculum-capacity-v1/metadata-only.json`. Keep its reserved development signers out of later local STEM curriculum training and preserve the source's existing research license and confidentiality/redistribution requirements.
+
 | Source | Direct source | Rights/use note |
 | --- | --- | --- |
-| ASL Citizen | https://www.microsoft.com/en-us/research/project/asl-citizen/ | About 84k isolated-sign videos. Microsoft directs commercial users to request permission. |
+| ASL Citizen | https://www.microsoft.com/en-us/research/project/asl-citizen/ | About84k isolated-sign videos from52 signers and2.7k signs, with signer-independent publisher splits. The [Microsoft Research license](https://www.microsoft.com/en-us/research/project/asl-citizen/dataset-license/) includes noncommercial/non-revenue research, confidentiality and data-redistribution conditions; do not treat it as a generic CC license. The official ZIP is listed at42.8GB. Preserve terms and consent conditions before any use; no ASL Citizen videos have been acquired here. |
 | WLASL | https://github.com/dxli94/WLASL | In-the-wild isolated ASL metadata/clips. Review source-video and dataset terms. |
 | MS-ASL | https://www.microsoft.com/en-us/download/details.aspx?id=100121 | Large isolated-sign benchmark. Microsoft's download terms govern use. |
 | ASLLVD / Boston ASL Lexicon Video Dataset | https://www.bu.edu/asllrp/SignStream/3/index.html | Lexical video and linguistic annotation. Resolve overlap with ASLLRP/SignStream. |
