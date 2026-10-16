@@ -735,6 +735,19 @@ At `2026-10-16T05:21:42Z`, exact continuation worker3863 is live at3,504 exposur
 
 A read-only audit restricted to the438 completed scoring receipts already observed finds all3,504 human anchors scored10; nonidentical current-greedy candidates span every integer0-10 (583 zeros,123 tens), with110 additional greedy outputs exactly deduplicated against the human and12 explicitly truncated generated prefixes. Training-only mean greedy quality varies by source: about6.28-6.40/10 on STEM,3.75 on FLEURS,1.80-2.49 across How2Sign preparations and5.73 on OpenASL. These are changing-policy, unmatched training examples, not a before/after or held-out improvement. The audit confirms differentiated scores, not perfect judge calibration or generalization. No new scoring calls, decoding or recipe changes were made.
 
+### Native C5-tail4,096 fails; matched trajectory worsens
+
+At `2026-10-16T05:51:47Z`, exact worker3863 is live at4,280 exposures /535 updates,3,424 examples /428 updates since recovery. All8 gradients remain finite/nonzero, pinned sources match and no new failure/stop receipts exist. GPU active/idle time is340.953 seconds each, maximum driver allocation1,217,904,640 bytes, duty50%, CPU2.
+
+The4,096 checkpoint fails the fixed5% C5 gate after124 How2Sign clips, with0 FLEURS decoded. The matched intersection across all checkpoints is exactly124 clips:
+
+| Same124 How2Sign clips, lower is better | C5 | Terra128 | Terra512 | Terra2,048 | Terra4,096 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Mean WER | 79.74% | 79.24% | 79.48% | 81.71% | 82.78% |
+| Word-weighted WER | 78.64% | 78.42% | 78.51% | 80.40% | 81.34% |
+
+At4,096,29 clips improve,38 regress and57 tie C5 in word edits; all124 outputs remain distinct. This is worsening quality, not output collapse or a qualifying win. These partial controls are not a full benchmark/native-composite/official score. Tail checkpoint SHA-256 `5e8e88168dbbdced2d9c8c5ab42a24539b0b6ef63f65588c4e695bafb2622a24`, optimizer `329d545529081ea2fe278431891acf26192f042ef29217996e977b222d00a3b5`. Leave the predeclared final one-pass check at7,523 unchanged; C5 remains selected. Next observation `2026-10-16T06:21:47Z`, without intermediate polls. No miner/LB changes or new confirmation use.
+
 ### Public visual-model research and publisher-split audit (2026-10-16)
 
 The [Uni-Sign repository](https://github.com/ZechengLi19/Uni-Sign) announces released How2Sign/OpenASL pose-only checkpoints. Its [publisher model card](https://huggingface.co/ZechengLi19/Uni-Sign) declares CC-BY-NC-4.0; the public file API reports `how2sign_pose_only_slt.pth` at1,186,925,007 bytes, LFS SHA-256 `1bfd5f3312f04e4736f0a52f4ef9535916e6de9676a2a0d00c708748683fb00d`. This is a candidate compact-input architecture, not verified better weights. The [paper](https://arxiv.org/html/2501.15187v3) uses69 selected pose points; its RGB variant processes112-pixel hand crops. Public source inspection finds CUDA-specific online inference and RTMPose133-point inputs. Existing MediaPipe coordinates are not a verified drop-in equivalent. No new weights, pose archives, dependencies or third-party source code were installed. Code-license and runtime-portability review remain separate from the model card's license.
