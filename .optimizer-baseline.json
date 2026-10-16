@@ -1111,7 +1111,7 @@
   "terra_visual_restart": {
     "launched_at": "2026-10-15T02:40:36Z",
     "owned_session": 60535,
-    "current_phase": "C5_selected; fixed_final_ROI_actual_sentence_evaluation_session35449_launched; all34_native_C5_controls_must_reproduce_before_candidate_decode; progress_unobserved; paired_Terra_scoring_prepared_not_launched; next_observation2026-10-16T21:03:25Z",
+    "current_phase": "C5_selected; fixed_ROI_inference_complete_exit0_all34_native_controls_exact_all34_candidates_decoded_weights_unchanged; paired_Terra_semantic_evaluation_session25055_launched_grades_unobserved; next_observation2026-10-16T21:36:11Z",
     "ROI64_actual_translation_evaluation": {
       "plan": "runs/roi-short-translation-evaluation-v1/plan.json",
       "plan_sha256": "580e336d2cde047399248b27446f6546311e70dfdcc82d8542dde0e148b80349",
@@ -1135,6 +1135,24 @@
       "focused_tests_passed": 332,
       "promotion_authorized": false,
       "next_observation_at": "2026-10-16T21:03:25Z"
+      ,"inference_observed_complete_at": "2026-10-16T21:03:34Z",
+      "inference_terminal_at": "2026-10-16T20:37:43.649217Z",
+      "inference_terminal_exit_code": 0,
+      "all34_native_control_texts_reproduced": true,
+      "all34_candidates_decoded_with_native_crop_parity": true,
+      "all_fixed_weights_unchanged": true,
+      "inference_receipt_sha256": "c4a1c21459a015c1da8b985eadbaf2169f3c025d63d5db0a767477aadafe5255",
+      "candidate_mean_WER_diagnostic": 1.2647058823529411,
+      "C5_mean_WER_diagnostic": 0.22549019607843135,
+      "WER_has_not_selected_or_vetoed_model": true,
+      "semantic_plan": "runs/roi-short-translation-semantic-v1/plan.json",
+      "semantic_plan_sha256": "fcc3ffe7952f6496685c3c5a8ad6e4fef8818016c2afa92403dafd401dbde33b",
+      "semantic_session": 25055,
+      "semantic_output": "checkpoints/roi-short-translation-semantic-v1",
+      "semantic_launch_at": "2026-10-16T21:06:11Z",
+      "semantic_planned_requests": 10,
+      "semantic_grades_and_calibration_unobserved_at_launch": true,
+      "semantic_next_observation_at": "2026-10-16T21:36:11Z"
     },
     "ROI64_expanded_short_corpus": {
       "data_plan": "runs/roi-short-corpus-data-v1/plan.json",
