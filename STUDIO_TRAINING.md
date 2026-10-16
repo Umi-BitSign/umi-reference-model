@@ -659,6 +659,8 @@ At `2026-10-16T00:28:59Z`, exact custom-vision worker2455 is live at1,448 new-ar
 
 At `2026-10-16T00:59:07Z`, exact worker2455 is live at1,640 new-arm exposures /205 updates, all90 gradients finite/nonzero,1,129 completed rollouts since resume and no failure/exit receipts. Pinned sources match; maximum process peak25,520,848,896 bytes, GPU duty50%, CPU threads2. The2,048 quality check remains pending. Next observation `2026-10-16T01:29:07Z`.
 
+At `2026-10-16T01:29:17Z`, exact worker2455 is live at1,824 new-arm exposures /228 updates, all90 gradients finite/nonzero,1,316 completed rollouts since resume and no failure/exit receipts. Pinned sources match; process peak26,249,822,208 bytes, GPU duty50%, CPU threads2. The2,048 quality check is pending. Next observation `2026-10-16T01:59:17Z`.
+
 ## Hard boundaries
 
 - Current owner direction: another chat owns miner and codex-lb maintenance. Do not inspect, restart, reconfigure or load-test either service, and do not query port8787 from this training work. Historical health-guarded extraction procedures below do not authorize service checks for the current runs. The approved v2 compute window expired at `2026-10-15T22:47:28Z`; current training uses50% GPU duty and2 CPU threads. Do not extend the temporary unthrottled window without new owner direction.
