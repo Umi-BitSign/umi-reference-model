@@ -868,6 +868,23 @@ The recovery runner's restore-only worker5672 completed exit0 at `2026-10-16T09:
 
 Full continuation launched through live session42329, observed `2026-10-16T09:15:39Z`, output `checkpoints/terra-short-pilot-v2-recovery/`. Optimizer progress after96/12 is unobserved at launch; the first semantic check remains116. GPU duty50%, CPU2, no miner/LB inspection or modification. Next observation `2026-10-16T09:45:39Z`, with no intermediate training checks. C5 remains selected and no new model-quality gain is claimed.
 
+### Short-phrase116/232 checks: tiny nonqualifying semantic gains (2026-10-16, 09:45Z)
+
+At the scheduled `2026-10-16T09:45:58Z` observation, live session42329 has reached232 exposures /30 updates,18 new updates since the96/12 restoration. All observed steps have eight finite/nonzero gradients. No new failure is observed. GPU duty50%, CPU2; active/idle11.87678059 seconds each, maximum driver allocation1,205,485,568 bytes. Continue the unchanged maximum464-exposure recipe; next observation `2026-10-16T10:15:58Z`, without intermediate training polls.
+
+Both complete34-clip semantic evaluations pass all calibration controls in both shuffled passes. These newly reserved STEM short phrases are a separate, easier cohort from the older124-clip How2Sign comparison. Do not compare their absolute scores across cohorts.
+
+| Same34 reserved short phrases, higher quality is better | C5 control | Candidate | Mean gain /10 | Paired source-bootstrap95% interval |
+| --- | ---: | ---: | ---: | --- |
+| After116 exposures | 8.7500 | 8.8088 | +0.0588 | [0.0000, 0.1818] |
+| After232 exposures | 8.8088 | 8.8382 | +0.0294 | [0.0000, 0.0909] |
+
+Both fail the unchanged semantic improvement gate: the gains are below the5% requirement and the interval's lower bound is not positive. Neither model reaches the predeclared9/10 stage-mastery threshold. C5 remains selected; no broader benchmark, competitive win or independent-human validation is claimed. WER22.55% for C5 versus23.53% for both candidates is diagnostic and was not a veto. Training continues despite that worse WER, as the owner requested.
+
+A read-only check restricted to the completed116/232 artifacts finds all34 candidate transcripts identical between those checkpoints, with33/34 identical to C5. The one changed case is reference “Reproduction-related changes”; C5 says “Reproduction-related mutations in sexual changes”, while both candidates say “Reproduction-related modifications of sexual change”. The judge rates the new wording slightly higher while literal WER worsens. Fresh judge scores also vary between evaluations, so these small point differences are not proof of sustained learning.
+
+The116 policy SHA-256 is `197c08da53ef02c0f27ce777559b84a534cbdec0a7b16b1c23580d4681afdd6a`, optimizer `d1c2338f8ce454a765e867dfdd0dced332eb6311bdf9e9062a82cfa893d01c32`. The232 policy is `7883d57267376171f30d228b6e549cb38f579e72c7eda9650180d0c23f74dfc3`, optimizer `a98a4c7b4ef1cd922bc9d83684a1b2b0bff60ee15e64defcc6bee8826379a7d3`. Both complete checkpoint pairs remain saved. No code, data, model initialization, generation, scorer rubric or gate changed during the live run. Miner/LB services and new-data acquisition remain untouched.
+
 ### Public visual-model research and publisher-split audit (2026-10-16)
 
 The [Uni-Sign repository](https://github.com/ZechengLi19/Uni-Sign) announces released How2Sign/OpenASL pose-only checkpoints. Its [publisher model card](https://huggingface.co/ZechengLi19/Uni-Sign) declares CC-BY-NC-4.0; the public file API reports `how2sign_pose_only_slt.pth` at1,186,925,007 bytes, LFS SHA-256 `1bfd5f3312f04e4736f0a52f4ef9535916e6de9676a2a0d00c708748683fb00d`. This is a candidate compact-input architecture, not verified better weights. The [paper](https://arxiv.org/html/2501.15187v3) uses69 selected pose points; its RGB variant processes112-pixel hand crops. Public source inspection finds CUDA-specific online inference and RTMPose133-point inputs. Existing MediaPipe coordinates are not a verified drop-in equivalent. No new weights, pose archives, dependencies or third-party source code were installed. Code-license and runtime-portability review remain separate from the model card's license.
