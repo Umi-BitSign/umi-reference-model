@@ -1111,7 +1111,7 @@
   "terra_visual_restart": {
     "launched_at": "2026-10-15T02:40:36Z",
     "owned_session": 60535,
-    "current_phase": "C5_selected; fixed_ROI_development_rejection_preserved; six_predeclared_seen_training_clip_three_model_decode_session82170_launched_progress_unobserved; training_only_not_a_win_gate; next_observation2026-10-16T22:21:24Z",
+    "current_phase": "C5_selected; seen_six_clip_decode_complete_exit0_oldROI_matches_C5_6of6_expanded5of6; fixed_weights_unchanged_training_roles_preserved; seen_Terra_diagnostic_session81686_launched_grades_unobserved; reserved_semantic_rejection_unchanged; next_observation2026-10-16T22:55:26Z",
     "ROI64_seen_translation_diagnostic": {
       "plan": "runs/roi-seen-translation-probe-v1/plan.json",
       "plan_sha256": "9c54b9154d435c507bee811bc7dbc3dd8093c14ca4abd457e19280396e479d65",
@@ -1133,7 +1133,26 @@
       "model_win_claimed": false,
       "promotion_authorized": false,
       "focused_tests_passed": 341,
-      "next_observation_at": "2026-10-16T22:21:24Z"
+      "next_observation_at": null,
+      "inference_observed_complete_at": "2026-10-16T22:21:34Z",
+      "inference_terminal_at": "2026-10-16T21:53:45.023561Z",
+      "inference_terminal_exit_code": 0,
+      "inference_receipt_sha256": "8dad60339558ca3cb034afdd7a06789904867443ae6656eeaa1e6b58b1a87434",
+      "fixed_old_ROI_training_texts_identical_to_C5": 6,
+      "fixed_expanded_ROI_training_texts_identical_to_C5": 5,
+      "all_fixed_weights_unchanged": true,
+      "no_claim_of_signer_only_causation_or_all88_training_quality": true,
+      "scoring_preflight_relative_path_failed_before_API": true,
+      "scoring_freeze_requires_absolute_decoded_path": true,
+      "semantic_plan": "runs/roi-seen-translation-scores-v1/plan.json",
+      "semantic_plan_sha256": "d8289502e5c547f39cb1267dd94f69866517807efbf5868db7a4da15c2a28e07",
+      "semantic_session": 81686,
+      "semantic_output": "checkpoints/roi-seen-translation-scores-v1",
+      "semantic_launch_at": "2026-10-16T22:25:26Z",
+      "semantic_unique_items_including_controls": 11,
+      "semantic_planned_requests": 2,
+      "semantic_grade_and_completion_unobserved_at_launch": true,
+      "semantic_next_observation_at": "2026-10-16T22:55:26Z"
     },
     "ROI64_actual_translation_evaluation": {
       "plan": "runs/roi-short-translation-evaluation-v1/plan.json",
