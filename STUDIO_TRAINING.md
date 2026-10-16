@@ -1079,6 +1079,23 @@ The corrected qualification completes exit0, worker7800 at `2026-10-16T17:10:50.
 
 Session87746 launches an independent fresh fit under the unchanged v2 plan at `2026-10-16T17:11:18Z`, using the complete terminal proof. Output `checkpoints/roi-appearance-fit-v2`; no learning update, fit result or quality gain is observed at launch. The planned64 epochs/2,624 updates and feature-only gates are unchanged. Next training observation `2026-10-16T17:41:18Z`; actually wait without intermediate polls. The310 focused tests and Ruff pass; compatibility fix and evidence are pushed as `39c354f`. No miner or LB operations occurred, and C5 remains selected.
 
+### Fresh ROI feasibility complete: learned training features, weak unseen-signer transfer
+
+At the scheduled `2026-10-16T17:41:28Z` observation, session87746 is terminal exit0, worker7830 at `17:39:36.585756Z`. All64 epochs/2,624 consecutive optimizer updates/20,672 actual frame-exposures completed. The final source/data validation passed and a complete visual/AdamW/RNG/sampler checkpoint pair was saved. No scoring request or translation evaluation occurred.
+
+| Appearance-only metric | Fresh initialization | Fixed epoch64 | Change |
+| --- | ---: | ---: | ---: |
+| Mean training cosine loss, six clips |0.9934980 |0.0034627 |99.65% reduction |
+| Training aligned-minus-shifted hand similarity | -0.0007655 |0.6850712 |99.56% of teacher gap0.6880646 |
+| Mean feature-diagnostic cosine loss, two other signers |0.9834296 |0.7961533 |19.04% reduction |
+| Feature-diagnostic aligned-minus-shifted hand similarity |0.0029996 |0.2466223 |29.61% of teacher gap0.8327904 |
+
+The two predeclared training-feasibility requirements pass. These64px inputs and fresh visual weights can learn detailed appearance and within-clip hand-time correspondence on the six training clips. This does not establish semantic recognition, human legibility, speed versus C5 or competitive translation quality. The large fit/diagnostic gap remains: final diagnostic face cosine losses0.97114/0.93145 and hand losses0.62041-0.82002 are far above training losses. Do not train longer on these six clips or promote this model based on its fit. No statistically supported generalization claim follows from two diagnostics. The fixed epoch64 is retained; earlier diagnostic values do not select a checkpoint.
+
+Final visual `checkpoints/roi-appearance-fit-v2/visual-after-020672.safetensors`, SHA-256 `94aa0ddb60d7da1b72fc61c96242c99e7c2843e1b45c11f9d45478fd0f88e93a`; optimizer `57054e5629a7c85092b636364ea4aac66122a93d083dcd41fb8111c6de2c6d78`; sampler `0f6b1215f52c23efb96a896773ac7335868d93e964412ef18d12b237d2e7dd70`; decision `6e7b9396d3a9e4e0681706111f85e95d7791056007b275bc34d53ff4f69770dc`. CPU2, active/idle Metal802.316770 seconds each, maximum driver allocation3,531,161,600 bytes. The checkpoint is research-only and no longer running. C5 remains selected and the competitive goal remains unmet.
+
+Next broaden appearance training while keeping the64px visual input and fresh initialization. An annotation-only inventory of the existing short curriculum yields88 original/supplemental STEM training clips/7,865 complete sampled frames across25 signers after excluding all reserved primary participants plus P19/P0. This needs no downloads or word-alignment invention. The same two feature-diagnostic clips stay out of training; all34 primary translation-development clips remain untouched. Longer source clips require a bounded native-reference reader, rather than raising the original128MiB full-RGB reference limit. Freeze and validate the expanded data before fitting. Semantic translation training and the unchanged Terra-primary quality gate remain required after visual preparation; WER stays diagnostic.
+
 ### Public visual-model research and publisher-split audit (2026-10-16)
 
 The [Uni-Sign repository](https://github.com/ZechengLi19/Uni-Sign) announces released How2Sign/OpenASL pose-only checkpoints. Its [publisher model card](https://huggingface.co/ZechengLi19/Uni-Sign) declares CC-BY-NC-4.0; the public file API reports `how2sign_pose_only_slt.pth` at1,186,925,007 bytes, LFS SHA-256 `1bfd5f3312f04e4736f0a52f4ef9535916e6de9676a2a0d00c708748683fb00d`. This is a candidate compact-input architecture, not verified better weights. The [paper](https://arxiv.org/html/2501.15187v3) uses69 selected pose points; its RGB variant processes112-pixel hand crops. Public source inspection finds CUDA-specific online inference and RTMPose133-point inputs. Existing MediaPipe coordinates are not a verified drop-in equivalent. No new weights, pose archives, dependencies or third-party source code were installed. Code-license and runtime-portability review remain separate from the model card's license.
