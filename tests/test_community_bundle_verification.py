@@ -216,9 +216,9 @@ def test_invalid_manifest_inventory(verifier, bundle, mutation):
     elif mutation == "wrong_profile":
         document["profile"] = "native"
     elif mutation == "wrong_parent":
-        document["parent_baseline_sha256"] = "a" * 64
+        document["parent_baseline_sha256"] = "not-a-digest"
     elif mutation == "wrong_license":
-        document["license_id"] = "no-approval"
+        document["license_id"] = ""
     elif mutation == "empty":
         document["files"] = []
     else:
@@ -316,3 +316,37 @@ def test_importer_output_is_accepted(tmp_path, monkeypatch, verifier, umask):
     assert result["manifest_file_sha256"] == intake["manifest_file_sha256"]
     assert result["files"] == intake["files"]
     assert result["bytes"] == intake["bytes"]
+
+
+@pytest.mark.parametrize("license_id", ["MIT", "Apache-2.0", "CC-BY-SA-4.0", "policy-custom"])
+@pytest.mark.parametrize("parent", [None, "6f" * 32])
+def test_public_derivative_uses_common_manifest_declarations(verifier, bundle, license_id, parent):
+    root, document, _ = bundle
+    for name, role in [
+        ("processor.json", "processor"),
+        ("requirements.txt", "environment"),
+        ("PROVENANCE.md", "provenance"),
+    ]:
+        data = b"retained declaration"
+        path = root / "model" / name
+        path.write_bytes(data)
+        path.chmod(0o400)
+        document["files"].append(
+            {
+                "path": name,
+                "role": role,
+                "sha256": hashlib.sha256(data).hexdigest(),
+                "size_bytes": len(data),
+            }
+        )
+    document["files"].sort(key=lambda record: record["path"])
+    document["license_id"] = license_id
+    document["parent_baseline_sha256"] = parent
+    revision = publish(root, verifier, document)
+    assert verifier.verify_imported_bundle(root, expected_bundle_sha256=revision)["files"] == 8
+    # Parent declarations do not require loading or downloading parent weights.
+    assert not (root / str(parent)).exists()
+    document["files"] = [record for record in document["files"] if record["role"] != "license"]
+    revision = publish(root, verifier, document)
+    with pytest.raises(ValueError):
+        verifier.verify_imported_bundle(root, expected_bundle_sha256=revision)
