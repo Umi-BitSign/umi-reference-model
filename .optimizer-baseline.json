@@ -1111,7 +1111,27 @@
   "terra_visual_restart": {
     "launched_at": "2026-10-15T02:40:36Z",
     "owned_session": 60535,
-    "current_phase": "C5_selected; seen_six_clip_Terra_complete_C5_and_oldROI9.8333_expanded9.1667; reserved_ROI0.6471_vs_C58.8971_rejection_unchanged; direct_ROI_semantic_gradient_path_implemented_numerical_proof_not_launched; no_live_job",
+    "current_phase": "C5_selected; direct_ROI_semantic_plan_frozen; training_candidate_generation_and_actual_Terra_rewards_session46117_live_at_launch; zero_optimizer_updates; numerical_qualification_not_yet_launched; next_observation2026-10-16T23:37:24Z",
+    "ROI64_direct_semantic_gradient": {
+      "plan": "runs/roi-semantic-gradient-v1/plan.json",
+      "plan_sha256": "1a55b775aee4f28de2f85ac47da42db8a51c09f69017a86805fa438170aed7da",
+      "candidate_session": 46117,
+      "candidate_output": "checkpoints/roi-semantic-candidates-v1",
+      "candidate_launch_at": "2026-10-16T23:07:24Z",
+      "candidate_completion_and_actual_grades_unobserved_at_launch": true,
+      "proof_training_record_indices": [0, 44, 72],
+      "complete_training_frames": [132, 47, 149],
+      "ROI_visual_parameters": 32826496,
+      "ROI_visual_parameter_tensors": 116,
+      "pure_Terra_objective_caption_weight": 0,
+      "augmentation": "none; isolate direct semantic gradients first",
+      "optimizer_updates": 0,
+      "numerical_qualification_launched": false,
+      "heldout_or_feature_diagnostic_inputs_used": false,
+      "promotion_authorized": false,
+      "targeted_tests_passed": 112,
+      "next_observation_at": "2026-10-16T23:37:24Z"
+    },
     "ROI64_seen_translation_diagnostic": {
       "plan": "runs/roi-seen-translation-probe-v1/plan.json",
       "plan_sha256": "9c54b9154d435c507bee811bc7dbc3dd8093c14ca4abd457e19280396e479d65",
