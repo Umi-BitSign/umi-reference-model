@@ -54,9 +54,25 @@ in the UMI Python 3.12 environment; the model runs in a separate Python 3.10
 environment with the community baseline's dependencies. Linux miners do not
 need to write their own worker entrypoint.
 
-Use the [verified CPU bundle importer](README.md#verify-and-stage). This selects
-the original CPU bundle, including its original preprocessing; it does not
-silently substitute the later Mac adapters. Install its `model/requirements.txt`
+Use the [verified CPU bundle importer](README.md#verify-and-stage) for the original
+baseline, or stage a complete reviewed `umi-model-bundle/1` public derivative
+with its original manifest and `model/` tree. The integrity verifier accepts
+non-null parent baseline digests and declared license identifiers, including
+CC-BY-SA-4.0; it no longer treats MIT with no parent as the only serving format.
+A derivative must retain all required artifact roles, including license and
+provenance. Its parent digest is a lineage declaration; parent weights do not
+need to be downloaded to serve it. The manifest, file hashes, exact tree,
+permissions, sandbox and caller-pinned bundle identity are still verified.
+
+License policy eligibility and rights approval remain separate checks in UMI.
+An accepted declaration is not proof of ownership or permission. Preserve every
+upstream notice, attribution, lineage and applicable share-alike obligation;
+never relabel a derivative as MIT or remove its parent to pass the worker.
+This warm path serves the bundle's SHuBERT translator. It does not execute an
+arbitrary `umi_inference.py` router or reproduce other bundled model components.
+Keep a separately bound fingerspelling/router sidecar when that is part of the
+endpoint. It does not silently substitute the later Mac adapters.
+Install its `model/requirements.txt`
 in a dedicated Python 3.10 environment, using pip 24.0 for the supplied OmegaConf
 metadata as in [the existing CPU image recipe](Dockerfile). Use the CPU builds of
 the pinned Torch packages. Preserve the package licenses and provenance.
@@ -65,9 +81,10 @@ The deployment needs separate canonical absolute directories for worker code,
 the Python 3.10 installation, its environment, the imported bundle, and scratch.
 They must belong to the dedicated model-service user and must not overlap.
 Use an operator-owned standalone Python installation: a system `/usr` tree is
-not a worker-owned Python root. Copy these five files into the code directory:
-`cpu_worker.py`, `cpu_runtime.py`, `native_runtime.py`, `bundle_verification.py`
-and `worker_transport.py`. `native_runtime.py` supplies inventory helpers only;
+not a worker-owned Python root. Copy these six files into the code directory:
+`cpu_worker.py`, `cpu_runtime.py`, `cpu_generation.py`, `native_runtime.py`,
+`bundle_verification.py` and `worker_transport.py`. `native_runtime.py` supplies
+inventory helpers only;
 this path imports no Metal worker or macOS overlay. Copy files rather than
 hardlinking them, and keep group/other write permissions disabled.
 
@@ -85,13 +102,44 @@ local values. The output manifest must be outside the inventoried directories:
   --output /ABSOLUTE/PRIVATE/cpu-runtime.json
 ```
 
+The sealer writes `umi-community-cpu-runtime/2`. It reads decoding declarations
+from hash-verified `MODEL_IDENTITY.json` (`generation` and, when present,
+`baseline_generation_overrides`), and checks any `fs_router.json`
+`baseline_generate_overrides` for agreement. The supported parameters are
+`num_beams`, `max_length`, `length_penalty`, and `no_repeat_ngram_size`.
+Missing declarations retain the original five beams and maximum length 2048;
+missing optional settings preserve the translator's existing defaults. Invalid,
+unknown or conflicting declarations stop sealing instead of falling back.
+
+For a derivative declaring `length_penalty: 0.6` and
+`no_repeat_ngram_size: 16`, the ordinary sealing command above automatically
+includes those exact values. No CLI override or modification of the immutable
+bundle is needed. The worker verifies them against the bundle again before
+importing model code, then supplies the sealed kwargs to the original
+translator's `generate()` call through the warm adapter. Asset verification
+remains enabled; a changed checkpoint must already have the correct asset pins
+in its own reviewed runtime. The adapter does not rewrite those pins.
+
 The printed `model_revision` binds the bundle, code, Python installation,
-installed packages and CPU execution settings. Use it in both the service
+installed packages, CPU execution settings and declared decoding parameters.
+Use it in both the service
 configuration and miner configuration. Keep the manifest owner-private and
 read-only. A changed file, execution setting or bundle requires a new reviewed
 manifest and revision. This is a local deployment identity, not a signed UMI
 release or a claim of reproducible packages. The inventory has a 4 GiB ceiling
 for code, environment and Python combined, excluding the separate model bundle.
+
+Existing `/1` manifests remain readable with their original execution settings
+and hashes. They cannot authorize newly declared decoding parameters: reseal
+with this command into a new output file to adopt `/2`. Copy all six updated
+worker files into a new reviewed code directory, seal it with the existing
+bundle and environment, and retain the previous code and manifest for rollback.
+Changing the inventoried code requires a new runtime revision even when the
+model weights are unchanged. Qualify startup, a real clip and restart in the
+isolated standby service before switching an enrolled endpoint. Keep existing
+miner grants, nonce/assignment state, cohort bindings and old backend intact;
+the separate authenticated cohort revision migration must permit that cutover.
+Do not replace an active endpoint's revision by editing its manifest in place.
 
 The worker invocation is:
 

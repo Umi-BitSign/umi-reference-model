@@ -260,7 +260,6 @@ def test_worker_refuses_writable_runtime_and_visible_marker(modules, tmp_path, m
 
 
 def test_actual_cpu_worker_loop_reuses_model_and_reaps_on_timeout(modules, tmp_path, worker_python):
-    _, worker = modules
     transport = importlib.import_module("worker_transport")
     script = tmp_path / "inert_cpu_loader.py"
     scratch = tmp_path / "scratch"
@@ -439,3 +438,233 @@ def test_runtime_sealing_cli_in_worker_interpreter(modules, sealed, tmp_path, wo
         ]
         == bundle_sha
     )
+
+
+def add_bundle_metadata(bundle, runtime, metadata):
+    manifest = bundle / "manifest.json"
+    document = json.loads(manifest.read_bytes())
+    for name, content in metadata.items():
+        raw = content if isinstance(content, bytes) else runtime.canonical(content)
+        target = bundle / "model" / name
+        target.write_bytes(raw)
+        target.chmod(0o400)
+        document["files"].append(
+            {
+                "path": name,
+                "role": "dependency" if name == "runtime.py" else "config",
+                "sha256": hashlib.sha256(raw).hexdigest(),
+                "size_bytes": len(raw),
+            }
+        )
+    document["files"].sort(key=lambda row: row["path"])
+    manifest.chmod(0o600)
+    raw = runtime.canonical(document)
+    manifest.write_bytes(raw)
+    manifest.chmod(0o400)
+    return hashlib.sha256(b"umi-open-competition-v1\0" + raw).hexdigest()
+
+
+def test_sealing_retained_rc5_declarations_preserves_bundle(modules, sealed, tmp_path):
+    runtime, worker = modules
+    roots, bundle, _, _, old_revision = sealed
+    retained = ROOT / "tests/fixtures/community-public-derivative"
+    verifier = importlib.import_module("bundle_verification")
+    actual_manifest = (retained / "manifest.json").read_bytes()
+    assert hashlib.sha256(verifier.DOMAIN + actual_manifest).hexdigest() == (
+        "132d59d4692f32c29ff92b7ada5f392c69adc8a14302eae124ceb92f3f685224"
+    )
+    records = verifier._records(actual_manifest)
+    metadata = {
+        name: (retained / name).read_bytes() for name in ("MODEL_IDENTITY.json", "fs_router.json")
+    }
+    for name, raw in metadata.items():
+        row = next(record for record in records if record["path"] == name)
+        assert len(raw) == row["size_bytes"]
+        assert hashlib.sha256(raw).hexdigest() == row["sha256"]
+    bundle_sha = add_bundle_metadata(bundle, runtime, metadata)
+    before = {str(p): p.read_bytes() for p in bundle.rglob("*") if p.is_file()}
+    output = tmp_path / "rc5-runtime.json"
+    revision = runtime.stage_manifest(roots, bundle=bundle, bundle_sha256=bundle_sha, output=output)
+    assert revision != old_revision
+    for _ in range(2):
+        document = runtime.verify_runtime(roots, manifest=output, expected_revision=revision)
+        assert document["schema"] == "umi-community-cpu-runtime/2"
+        assert document["generation"] == {
+            "num_beams": 5,
+            "max_length": 2048,
+            "length_penalty": 0.6,
+            "no_repeat_ngram_size": 16,
+        }
+        assert (
+            worker.declared_generation(bundle, bundle_sha256=bundle_sha) == document["generation"]
+        )
+    assert before == {str(p): p.read_bytes() for p in bundle.rglob("*") if p.is_file()}
+
+
+@pytest.mark.parametrize(
+    "settings",
+    [
+        {"length_penalty": True},
+        {"length_penalty": float("inf")},
+        {"no_repeat_ngram_size": -1},
+        {"no_repeat_ngram_size": True},
+        {"num_beams": 0},
+        {"max_length": 0},
+        {"num_beams": 5.0},
+        {"do_sample": True},
+    ],
+)
+def test_invalid_generation_cannot_authorize_runtime(modules, sealed, settings):
+    runtime, _ = modules
+    roots, _, _, manifest, _ = sealed
+    document = json.loads(manifest.read_bytes())
+    document["generation"].update(settings)
+    # Non-finite JSON is rejected by canonical sealing too; exercise the reader.
+    raw = json.dumps(document, sort_keys=True, separators=(",", ":")).encode()
+    manifest.chmod(0o600)
+    manifest.write_bytes(raw)
+    with pytest.raises(ValueError):
+        runtime.verify_runtime(
+            roots,
+            manifest=manifest,
+            expected_revision=hashlib.sha256(runtime.DOMAIN + raw).hexdigest(),
+        )
+
+
+@pytest.mark.parametrize(
+    "metadata",
+    [
+        {
+            "MODEL_IDENTITY.json": {
+                "generation": {"length_penalty": 0.6},
+                "baseline_generation_overrides": {"length_penalty": 1.0},
+            }
+        },
+        {
+            "MODEL_IDENTITY.json": {"generation": {"no_repeat_ngram_size": 16}},
+            "fs_router.json": {"baseline_generate_overrides": {"no_repeat_ngram_size": 8}},
+        },
+        {"MODEL_IDENTITY.json": b'{"generation":{"length_penalty":0.6,"length_penalty":1}}'},
+        {"MODEL_IDENTITY.json": {"generation": {"temperature": 1}}},
+        {"MODEL_IDENTITY.json": {"generation": None}},
+    ],
+)
+def test_invalid_or_disagreeing_declarations_fail_before_seal(modules, sealed, tmp_path, metadata):
+    runtime, _ = modules
+    roots, bundle, _, _, _ = sealed
+    bundle_sha = add_bundle_metadata(bundle, runtime, metadata)
+    output = tmp_path / "must-not-exist.json"
+    with pytest.raises(ValueError):
+        runtime.stage_manifest(roots, bundle=bundle, bundle_sha256=bundle_sha, output=output)
+    assert not output.exists()
+
+
+def test_generation_metadata_tamper_and_unsealed_runtime_fail(modules, sealed):
+    runtime, worker = modules
+    _, bundle, _, _, _ = sealed
+    bundle_sha = add_bundle_metadata(
+        bundle, runtime, {"MODEL_IDENTITY.json": {"generation": {"length_penalty": 0.6}}}
+    )
+    assert worker.declared_generation(bundle, bundle_sha256=bundle_sha)["length_penalty"] == 0.6
+    path = bundle / "model/MODEL_IDENTITY.json"
+    path.chmod(0o600)
+    path.write_text('{"generation":{"length_penalty":.7}}')
+    path.chmod(0o400)
+    with pytest.raises(ValueError):
+        worker.declared_generation(bundle, bundle_sha256=bundle_sha)
+
+
+def test_version_one_manifest_remains_readable_without_rewriting(modules, sealed):
+    runtime, worker = modules
+    roots, bundle, bundle_sha, manifest, _ = sealed
+    document = json.loads(manifest.read_bytes())
+    document["schema"] = "umi-community-cpu-runtime/1"
+    document["execution"] = runtime.EXECUTION
+    del document["generation"]
+    raw = runtime.canonical(document)
+    manifest.chmod(0o600)
+    manifest.write_bytes(raw)
+    revision = hashlib.sha256(runtime.DOMAIN + raw).hexdigest()
+    assert runtime.verify_runtime(roots, manifest=manifest, expected_revision=revision) == document
+    assert worker.declared_generation(bundle, bundle_sha256=bundle_sha) == worker.DEFAULT_GENERATION
+    assert manifest.read_bytes() == raw
+
+
+@pytest.mark.parametrize("beams,length", [(5, 2048), (3, 1024)])
+def test_real_bundle_runtime_import_and_generate_kwargs(
+    modules, sealed, tmp_path, monkeypatch, beams, length
+):
+    runtime, worker = modules
+    roots, bundle, _, _, _ = sealed
+    # An inert historical runtime implements the same narrow warm boundary:
+    # its constructor predates length_penalty/no_repeat_ngram_size arguments.
+    model_source = """from types import SimpleNamespace
+class Translator:
+    def generate(self, **kwargs):
+        return kwargs
+class SHuBERTInferenceRuntime:
+    def __init__(self, root, *, device, generation_num_beams, generation_max_length,
+                 dino_batch_size, model_execution_concurrency, verify_assets):
+        assert device == "cpu" and verify_assets is True
+        self._translator = Translator()
+        self.beams, self.length = generation_num_beams, generation_max_length
+    def translate_path(self, path, *, deadline_unix_ns):
+        result = self._translator.generate(num_beams=self.beams, max_length=self.length,
+                    video=path.read_bytes(), deadline=deadline_unix_ns,
+                    early_stopping=True, length_penalty=1.0)
+        return repr(result)
+"""
+    generation = {
+        "num_beams": beams,
+        "max_length": length,
+        "length_penalty": 0.6,
+        "no_repeat_ngram_size": 16,
+    }
+    bundle_sha = add_bundle_metadata(
+        bundle,
+        runtime,
+        {"runtime.py": model_source.encode(), "MODEL_IDENTITY.json": {"generation": generation}},
+    )
+    manifest = tmp_path / "derivative-runtime.json"
+    revision = runtime.stage_manifest(
+        roots, bundle=bundle, bundle_sha256=bundle_sha, output=manifest
+    )
+    document = runtime.verify_runtime(roots, manifest=manifest, expected_revision=revision)
+    assert worker.verified_generation(bundle, document) == generation
+    monkeypatch.delitem(sys.modules, "runtime", raising=False)
+    monkeypatch.setitem(
+        sys.modules,
+        "torch",
+        types.SimpleNamespace(
+            set_num_threads=lambda _: None, set_num_interop_threads=lambda _: None
+        ),
+    )
+    monkeypatch.setattr(sys, "path", list(sys.path))
+    monkeypatch.setattr(os, "environ", dict(os.environ))
+    try:
+        for _ in range(2):  # fresh loading after restart applies exactly the same settings
+            model = worker.load_model(bundle, tmp_path, generation)
+            import ast
+
+            result = ast.literal_eval(worker.translate_video(model, tmp_path, b"video", 123))
+            assert result == generation | {
+                "video": b"video",
+                "deadline": 123,
+                "early_stopping": True,
+            }
+        assert not list(tmp_path.glob("request-*"))
+    finally:
+        sys.modules.pop("runtime", None)
+
+
+def test_legacy_manifest_cannot_silently_ignore_declared_decoding(modules, sealed):
+    runtime, worker = modules
+    _, bundle, _, manifest, _ = sealed
+    sha = add_bundle_metadata(
+        bundle, runtime, {"MODEL_IDENTITY.json": {"generation": {"length_penalty": 0.6}}}
+    )
+    document = json.loads(manifest.read_bytes())
+    document.update(schema="umi-community-cpu-runtime/1", model_bundle_sha256=sha)
+    del document["generation"]
+    with pytest.raises(ValueError, match="reseal before serving"):
+        worker.verified_generation(bundle, document)

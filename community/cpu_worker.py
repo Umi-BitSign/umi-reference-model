@@ -18,6 +18,12 @@ from itertools import combinations
 from pathlib import Path
 
 from bundle_verification import verify_imported_bundle
+from cpu_generation import (
+    DEFAULT_GENERATION,
+    ConfiguredGenerator,
+    declared_generation,
+    validate_generation,
+)
 from cpu_runtime import EXECUTION, verify_runtime
 from native_runtime import opened_directory
 from worker_transport import serve_worker
@@ -64,7 +70,8 @@ def sandbox_probes(read_only_roots: list[Path], deny_read_marker: Path) -> None:
             raise RuntimeError("sandbox must deny outbound connections")
 
 
-def load_model(bundle: Path, scratch: Path):
+def load_model(bundle: Path, scratch: Path, generation: dict | None = None):
+    generation = validate_generation(DEFAULT_GENERATION if generation is None else generation)
     model_root = bundle / "model"
     for name, value in {
         "HF_HUB_OFFLINE": "1",
@@ -88,15 +95,18 @@ def load_model(bundle: Path, scratch: Path):
 
     torch.set_num_threads(EXECUTION["cpu_threads"])
     torch.set_num_interop_threads(1)
-    return SHuBERTInferenceRuntime(
+    model = SHuBERTInferenceRuntime(
         model_root,
         device=EXECUTION["device"],
-        generation_num_beams=EXECUTION["generation_num_beams"],
-        generation_max_length=EXECUTION["generation_max_length"],
+        generation_num_beams=generation["num_beams"],
+        generation_max_length=generation["max_length"],
         dino_batch_size=EXECUTION["dino_batch_size"],
         model_execution_concurrency=EXECUTION["model_execution_concurrency"],
         verify_assets=True,
     )
+    if generation != DEFAULT_GENERATION:
+        model._translator = ConfiguredGenerator(model._translator, generation)
+    return model
 
 
 def translate_video(model, scratch: Path, video: bytes, deadline_ns: int) -> str:
@@ -111,17 +121,32 @@ def translate_video(model, scratch: Path, video: bytes, deadline_ns: int) -> str
         path.unlink(missing_ok=True)
 
 
-def run_worker(bundle: Path, scratch: Path, model_revision: str) -> None:
+def run_worker(
+    bundle: Path, scratch: Path, model_revision: str, generation: dict | None = None
+) -> None:
     # Reserve stdout before Torch/model imports, including native-library prints.
     sys.stdout.flush()
     with os.fdopen(os.dup(sys.stdout.fileno()), "wb") as protocol:
         os.dup2(sys.stderr.fileno(), sys.stdout.fileno())
-        model = load_model(bundle, scratch)
+        model = (
+            load_model(bundle, scratch)
+            if generation is None
+            else load_model(bundle, scratch, generation)
+        )
         serve_worker(
             lambda video, deadline: translate_video(model, scratch, video, deadline),
             verified_model_revision=model_revision,
             destination=protocol,
         )
+
+
+def verified_generation(bundle: Path, document: dict) -> dict:
+    """Refuse an unsealed decoding change before importing bundle code."""
+    verify_imported_bundle(bundle, expected_bundle_sha256=document["model_bundle_sha256"])
+    generation = document.get("generation", DEFAULT_GENERATION)
+    if declared_generation(bundle, bundle_sha256=document["model_bundle_sha256"]) != generation:
+        raise ValueError("bundle generation differs from sealed runtime; reseal before serving")
+    return validate_generation(generation)
 
 
 def main() -> None:
@@ -167,8 +192,8 @@ def main() -> None:
     document = verify_runtime(
         roots, manifest=args.runtime_manifest, expected_revision=args.model_revision
     )
-    verify_imported_bundle(args.bundle, expected_bundle_sha256=document["model_bundle_sha256"])
-    run_worker(args.bundle, args.scratch, args.model_revision)
+    generation = verified_generation(args.bundle, document)
+    run_worker(args.bundle, args.scratch, args.model_revision, generation)
 
 
 if __name__ == "__main__":

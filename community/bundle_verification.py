@@ -124,7 +124,16 @@ def _directory(
         os.close(descriptor)
 
 
-def _file(parent: int, name: str, *, size: int | None = None, expected: str | None = None):
+def _file(
+    parent: int,
+    name: str,
+    *,
+    size: int | None = None,
+    expected: str | None = None,
+    capture: bool = False,
+):
+    if capture and (size is None or size > MAXIMUM_MANIFEST_BYTES):
+        raise ValueError("bundle metadata exceeds size limit")
     descriptor = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=parent)
     with os.fdopen(descriptor, "rb") as stream:
         before = os.fstat(stream.fileno())
@@ -146,7 +155,7 @@ def _file(parent: int, name: str, *, size: int | None = None, expected: str | No
             if total > ceiling:
                 raise ValueError("artifact grew during verification")
             checksum.update(chunk)
-            if size is None:
+            if size is None or capture:
                 metadata.extend(chunk)
         after = os.fstat(stream.fileno())
         linked = os.stat(name, dir_fd=parent, follow_symlinks=False)
@@ -176,11 +185,15 @@ def _records(raw: bytes) -> list[dict]:
         or set(document) != {"schema", "profile", "parent_baseline_sha256", "license_id", "files"}
         or document["schema"] != "umi-model-bundle/1"
         or document["profile"] != "offline_bundle/1"
-        or document["parent_baseline_sha256"] is not None
-        or document["license_id"] != "MIT"
+        or not isinstance(document["license_id"], str)
+        or not 1 <= len(document["license_id"]) <= 64
         or _canonical(document) != raw
     ):
-        raise ValueError("not the canonical imported-community bundle manifest")
+        raise ValueError("not a canonical community bundle manifest")
+    # License eligibility and rights review belong to the signed cohort policy.
+    # Here they are immutable declarations, not a MIT-only serving allowlist.
+    if document["parent_baseline_sha256"] is not None:
+        _digest(document["parent_baseline_sha256"])
     records = document["files"]
     if not isinstance(records, list) or not 1 <= len(records) <= MAXIMUM_FILES:
         raise ValueError("invalid artifact inventory size")
@@ -207,6 +220,10 @@ def _records(raw: bytes) -> list[dict]:
         raise ValueError("artifact inventory is oversized, unsorted or aliased")
     if [r["path"] for r in records if r["role"] == "inference"] != ["umi_inference.py"]:
         raise ValueError("imported-community entrypoint differs")
+    if document["parent_baseline_sha256"] is not None or document["license_id"] != "MIT":
+        required = ROLES - {"dependency"}
+        if not required.issubset({record["role"] for record in records}):
+            raise ValueError("public bundle lacks required artifacts, license or provenance")
     folded = {name.casefold() for name in names}
     for name in names:
         if any(str(p).casefold() in folded for p in PurePosixPath(name).parents):
@@ -268,6 +285,44 @@ def verify_imported_bundle(root: Path, *, expected_bundle_sha256: str) -> dict:
         "files": len(records),
         "bytes": sum(record["size_bytes"] for record in records),
     }
+
+
+def read_bundle_metadata(
+    root: Path, *, expected_bundle_sha256: str, names: tuple[str, ...]
+) -> dict[str, bytes]:
+    """Read small declared metadata against its pinned manifest; import no code.
+
+    Call after full bundle verification. This rechecks only the manifest and
+    requested metadata, never the weights. Missing optional declarations are
+    absent from the result; an existing undeclared file is not accepted.
+    """
+    _digest(expected_bundle_sha256)
+    for name in names:
+        if _name(name) != PurePosixPath(name).name:
+            raise ValueError("metadata must be at the model root")
+    result = {}
+    with _directory(root, private=True, canonical=root) as bundle_fd:
+        raw = _file(bundle_fd, "manifest.json")
+        if hashlib.sha256(DOMAIN + raw).hexdigest() != expected_bundle_sha256:
+            raise ValueError("bundle manifest does not match the caller-pinned identity")
+        records = {record["path"]: record for record in _records(raw)}
+        with _directory("model", parent=bundle_fd) as model_fd:
+            for name in names:
+                if name not in records:
+                    continue
+                record = records[name]
+                if record["role"] != "config":
+                    raise ValueError("bundle configuration has the wrong artifact role")
+                result[name] = _file(
+                    model_fd,
+                    name,
+                    size=record["size_bytes"],
+                    expected=record["sha256"],
+                    capture=True,
+                )
+        if _file(bundle_fd, "manifest.json") != raw:
+            raise ValueError("bundle manifest changed during metadata read")
+    return result
 
 
 def main() -> None:

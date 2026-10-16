@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 
 from bundle_verification import verify_imported_bundle
+from cpu_generation import declared_generation, validate_generation
 from native_runtime import MAXIMUM_MANIFEST_BYTES, canonical, digest, file_hash, inventory
 
 DOMAIN = b"umi-community-cpu-runtime-v1\0"
@@ -20,6 +21,11 @@ EXECUTION = {
     "model_execution_concurrency": 1,
     "cpu_threads": 4,
 }
+EXECUTION_V2 = {
+    key: value
+    for key, value in EXECUTION.items()
+    if key not in {"generation_num_beams", "generation_max_length"}
+}
 
 
 def stage_manifest(
@@ -29,11 +35,12 @@ def stage_manifest(
         raise ValueError("runtime manifest must be outside inventoried roots and bundle")
     verify_imported_bundle(bundle, expected_bundle_sha256=bundle_sha256)
     document = {
-        "schema": "umi-community-cpu-runtime/1",
+        "schema": "umi-community-cpu-runtime/2",
         "platform": "linux/x86_64",
         "python_abi": "cp310",
         "model_bundle_sha256": digest(bundle_sha256),
-        "execution": EXECUTION,
+        "execution": EXECUTION_V2,
+        "generation": declared_generation(bundle, bundle_sha256=bundle_sha256),
         "entries": inventory(roots),
     }
     raw = canonical(document)
@@ -54,18 +61,24 @@ def verify_runtime(roots: dict[str, Path], *, manifest: Path, expected_revision:
     if hashlib.sha256(DOMAIN + raw).hexdigest() != expected_revision:
         raise ValueError("runtime manifest differs from reviewed release")
     document = json.loads(raw)
+    fields = {"schema", "platform", "python_abi", "model_bundle_sha256", "execution", "entries"}
+    execution = EXECUTION
+    if isinstance(document, dict) and document.get("schema") == "umi-community-cpu-runtime/2":
+        fields.add("generation")
+        execution = EXECUTION_V2
     if (
         not isinstance(document, dict)
-        or set(document)
-        != {"schema", "platform", "python_abi", "model_bundle_sha256", "execution", "entries"}
-        or document["schema"] != "umi-community-cpu-runtime/1"
+        or set(document) != fields
+        or document["schema"] not in {"umi-community-cpu-runtime/1", "umi-community-cpu-runtime/2"}
         or document["platform"] != "linux/x86_64"
         or document["python_abi"] != "cp310"
-        or document["execution"] != EXECUTION
+        or document["execution"] != execution
         or canonical(document) != raw
     ):
         raise ValueError("unsupported CPU runtime manifest")
     digest(document["model_bundle_sha256"])
+    if "generation" in document:
+        validate_generation(document["generation"])
     if inventory(roots) != document["entries"]:
         raise ValueError("installed runtime differs from reviewed release")
     if manifest.read_bytes() != raw:
