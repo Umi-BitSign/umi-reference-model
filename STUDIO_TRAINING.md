@@ -657,7 +657,11 @@ No new C5-tail plan is frozen and no Metal qualification or training has started
 
 At `2026-10-16T00:28:59Z`, exact custom-vision worker2455 is live at1,448 new-arm exposures /181 updates, all90 gradients finite/nonzero. There are944 completed rollouts since resume, no failure/exit receipts, unchanged pinned sources and a25,317,081,088-byte process peak. GPU duty remains50% with2 CPU threads. No new quality result; the2,048 check is pending. C5-tail code is committed but has not begun Metal qualification or training. Next observation `2026-10-16T00:58:59Z`.
 
+At `2026-10-16T00:59:07Z`, exact worker2455 is live at1,640 new-arm exposures /205 updates, all90 gradients finite/nonzero,1,129 completed rollouts since resume and no failure/exit receipts. Pinned sources match; maximum process peak25,520,848,896 bytes, GPU duty50%, CPU threads2. The2,048 quality check remains pending. Next observation `2026-10-16T01:29:07Z`.
+
 ## Hard boundaries
+
+- Current owner direction: another chat owns miner and codex-lb maintenance. Do not inspect, restart, reconfigure or load-test either service, and do not query port8787 from this training work. Historical health-guarded extraction procedures below do not authorize service checks for the current runs. The approved v2 compute window expired at `2026-10-15T22:47:28Z`; current training uses50% GPU duty and2 CPU threads. Do not extend the temporary unthrottled window without new owner direction.
 
 - The user requests commits and pushes for this work. Commit verified code, tests and research notes to `studio-competitive-training` and push that branch to `origin` at completed milestones. Keep datasets, transformed data, checkpoints, run logs and local artifacts out of Git; publish selected model weights through an explicit release workflow.
 - The user grants standing permission to delete obsolete model weight files created by this training work when needed. Preserve the selected baseline and production candidates, dataset files, source assets, experiment plans, logs and evaluation results. Record exact removed weight paths and verify retained files after cleanup.
