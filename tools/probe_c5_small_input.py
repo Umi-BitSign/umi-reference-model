@@ -19,6 +19,7 @@ from launch_terra_visual_job import identity, now, write
 from probe_tiny_rgb_capacity import compare, state_digest
 from terra_training_recovery import artifact, verify_snapshot
 from tiny_rgb_capacity_protocol import LIMITS, verified_comparison
+from training_media_artifact import media_artifact
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA_PLAN = ROOT / "runs/roi-appearance-data-v1/plan.json"
@@ -92,6 +93,7 @@ def specification():
         "tiny_rgb_capacity_protocol.py",
         "tiny_rgb_full_run.py",
         "terra_training_storage.py",
+        "training_media_artifact.py",
     ):
         sources[f"tools/{name}"] = sha256(ROOT / "tools" / name)
     return {
@@ -149,7 +151,7 @@ def crop_case(row, side):
     pair = row["original_row"]["original_pair"]
     header = pair["header"]
     video, landmark = ROOT / pair["raw"]["video"], ROOT / row["landmarks"]["path"]
-    if sha256(video) != pair["raw"]["video_sha256"] or artifact(landmark) != row["landmarks"]:
+    if sha256(video) != pair["raw"]["video_sha256"] or media_artifact(landmark) != row["landmarks"]:
         raise ValueError("small DINO video or landmark bytes changed")
     landmarks, metadata = unpack_landmarks(landmark)
     if (

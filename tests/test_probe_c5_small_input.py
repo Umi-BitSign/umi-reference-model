@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import copy
 import sys
+from functools import partial
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -118,3 +120,92 @@ def test_frozen_policy_does_not_claim_training_or_translation_qualification():
     assert probe.POLICY["new_Terra_requests"] == probe.POLICY["optimizer_updates"] == 0
     assert probe.POLICY["native_side"] == 112 and probe.POLICY["control_side"] == 224
     assert probe.verified_comparison.__module__ == "tiny_rgb_capacity_protocol"
+
+
+def test_native_crop_path_binds_real_data_files_and_keeps_complete_RGB_geometry(
+    tmp_path, monkeypatch
+):
+    import extract_mediapipe_landmarks
+    import prepare_roi_appearance
+    from training_media_artifact import media_artifact
+
+    video, landmark = tmp_path / "data/clip.mp4", tmp_path / "data/landmarks.npz"
+    video.parent.mkdir()
+    video.write_bytes(b"bound video fixture")
+    landmark.write_bytes(b"bound landmark fixture")
+    monkeypatch.setattr(probe, "ROOT", tmp_path)
+    monkeypatch.setattr(
+        probe, "media_artifact", partial(media_artifact, root=tmp_path), raising=False
+    )
+    frames = np.stack([np.full((4, 4, 3), i, dtype=np.uint8) for i in range(3)])
+    observed = []
+
+    class Sampled:
+        def __init__(self, *args):
+            pass
+
+        def __enter__(self):
+            return frames[::2]
+
+        def __exit__(self, *args):
+            pass
+
+    class NativeReader:
+        def __init__(self, path):
+            pass
+
+        def __len__(self):
+            return len(frames)
+
+        def get_batch(self, indices):
+            return SimpleNamespace(asnumpy=lambda: frames[list(indices)])
+
+    class Extractor:
+        def __init__(self, output_size):
+            self.side = output_size[0]
+
+        def values(self, reader):
+            values = []
+            for i in range(len(reader)):
+                source_index = int(reader[i][0, 0, 0])
+                observed.append(source_index)
+                values.append(
+                    np.full((self.side, self.side, 3), [10 + source_index, 20, 30], dtype=np.uint8)
+                )
+            return values
+
+        def extract_hand_frames(self, reader, sampled):
+            values = self.values(reader)
+            return values, values
+
+        def extract_face_frames(self, reader, sampled):
+            return self.values(reader)
+
+    monkeypatch.setattr(prepare_roi_appearance, "SampledRgbReader", Sampled)
+    monkeypatch.setattr(
+        prepare_roi_appearance, "native_helpers", lambda: (Extractor, Extractor, NativeReader)
+    )
+    monkeypatch.setattr(
+        extract_mediapipe_landmarks,
+        "unpack_landmarks",
+        lambda path: (
+            {i: None for i in range(3)},
+            {"source_sha256": probe.sha256(video), "frames": 3, "fps": 25},
+        ),
+    )
+    row = {
+        "landmarks": media_artifact(landmark, root=tmp_path),
+        "original_row": {
+            "original_pair": {
+                "raw": {"video": "data/clip.mp4", "video_sha256": probe.sha256(video)},
+                "header": {"source_frames": 3, "sampled_frames": 2, "source_shape": [4, 4]},
+            }
+        },
+    }
+    result = probe.crop_case(row, 112)
+    assert result.shape == (2, 3, 112, 112, 3)
+    assert observed == [0, 2] * 4
+    np.testing.assert_array_equal(result[:, 0, 0, 0], [[30, 20, 10], [30, 20, 12]])
+    landmark.write_bytes(b"changed landmark bytes")
+    with pytest.raises(ValueError, match="bytes changed"):
+        probe.crop_case(row, 112)
