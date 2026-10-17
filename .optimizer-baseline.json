@@ -1111,7 +1111,7 @@
   "terra_visual_restart": {
     "launched_at": "2026-10-15T02:40:36Z",
     "owned_session": 60535,
-    "current_phase": "C5_selected; v1_direct_ROI_semantic_training_stopped_at72_clips18_updates_on_calibration_negation4_outside0to3; exact_recovery_saved_failed_grades_unused; one_explicit_same_recipe_recovery_session68752_started_for_remaining16; next_observation2026-10-17T01:47:31Z",
+    "current_phase": "C5_selected; recovery68752_confirmed_live_at_owner_status_request_84of88_clips21of22_updates; final_evaluator_prepared_172_tests_pass; no_heldout_result; next_observation2026-10-17T01:59:10Z",
     "ROI64_direct_semantic_training": {
       "plan": "runs/roi-semantic-training-v1/plan.json",
       "output": "checkpoints/roi-semantic-training-v1",
@@ -1136,7 +1136,7 @@
       "CPU_threads": 2,
       "GPU_average_duty_fraction": 0.5,
       "targeted_tests_passed": 126,
-      "next_observation_at": "2026-10-17T01:47:31Z",
+      "next_observation_at": "2026-10-17T01:59:10Z",
       "plan_sha256": "22cdde04bd542122f30759a131f73dd96272312d3a096e315004f9dfc53d3738",
       "observed_live_at": "2026-10-17T00:44:15Z",
       "observed_training_examples": 40,
@@ -1163,7 +1163,14 @@
       "v2_recovery_manual_attempt_limit": 1,
       "v2_recovery_unchanged_scientific_recipe_proof_and_calibration": true,
       "v2_recovery_remaining_clips": 16,
-      "recovery_and_related_tests_passed": 147
+      "recovery_and_related_tests_passed": 147,
+      "v2_recovery_plan_sha256": "f5e3e526950d5f314fea248453882dfc8de539bbec63b0cf49ce89b9559f85bc",
+      "v2_recovery_observed_live_at_owner_request": "2026-10-17T01:29:10Z",
+      "v2_recovery_observed_training_examples": 84,
+      "v2_recovery_observed_optimizer_updates": 21,
+      "v2_recovery_completion_unobserved": true,
+      "final34_evaluator_prepared_not_launched": true,
+      "final_evaluation_targeted_tests_passed": 172
     },
     "ROI64_direct_semantic_gradient": {
       "plan": "runs/roi-semantic-gradient-v1/plan.json",
