@@ -225,6 +225,26 @@ def test_prior_raw_scoring_authenticator_is_the_prepared_word_evaluator():
     assert evidence.word_evaluation.authenticated_passes is words.authenticated_passes
 
 
+def test_significant_decline_can_be_recorded_for_complete_evaluation_but_still_blocks_stage_advance(
+    predecessor,
+):
+    env = predecessor(decline=True)
+    result = evidence.previous_evaluation(
+        env.parent, "word", env.initialization, evaluation_only=True
+    )
+    assert result["decision_values"]["stop_for_semantic_decline"] is True
+    assert result["semantic_decline_recorded_for_evaluation_only"] is True
+    assert result["stage_advance_or_promotion_authorized"] is False
+    with pytest.raises(ValueError, match="stop condition"):
+        evidence.previous_evaluation(env.parent, "word", env.initialization)
+
+
+def test_evaluation_only_mode_never_bypasses_failed_calibration(predecessor):
+    env = predecessor(failed_control=True)
+    with pytest.raises(ValueError, match="stop condition"):
+        evidence.previous_evaluation(env.parent, "word", env.initialization, evaluation_only=True)
+
+
 @pytest.mark.parametrize("failure", [None, "word", "sentence", "inputs", "selector"])
 def test_specification_joins_all_complete_prerequisites_in_order_without_model_work(
     tmp_path, monkeypatch, failure

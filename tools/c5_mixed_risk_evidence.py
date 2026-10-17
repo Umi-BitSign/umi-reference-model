@@ -30,7 +30,7 @@ def require_terminal(path):
         raise ValueError("mixed risk cannot consume a failed or stopped predecessor")
 
 
-def previous_evaluation(path, kind, initialization):
+def previous_evaluation(path, kind, initialization, *, evaluation_only=False):
     path = path.resolve()
     require_terminal(path)
     parent = json.loads(path.read_text())
@@ -91,7 +91,9 @@ def previous_evaluation(path, kind, initialization):
         or decision.get("optimizer_updates") != 0
     ):
         raise ValueError("mixed risk predecessor decision differs from authentic paired scores")
-    if not expected["calibration_passed"] or expected["stop_for_semantic_decline"]:
+    if not expected["calibration_passed"] or (
+        expected["stop_for_semantic_decline"] and not evaluation_only
+    ):
         raise ValueError("mixed risk predecessor triggered an original semantic stop condition")
     exit_record = json.loads(path.with_name("exit.json").read_text())
     exited = datetime.fromisoformat(exit_record["observed_at"])
@@ -112,6 +114,9 @@ def previous_evaluation(path, kind, initialization):
         "API_start_not_before": (exited + timedelta(seconds=60)).isoformat(),
         "source_sha256": {**inference["source_sha256"], **plan["source_sha256"]},
         "stage_advance_or_promotion_authorized": False,
+        "semantic_decline_recorded_for_evaluation_only": bool(
+            evaluation_only and expected["stop_for_semantic_decline"]
+        ),
     }
 
 
