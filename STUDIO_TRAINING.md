@@ -1757,6 +1757,12 @@ Freeze session56850 completes exit0 with `runs/c5-polarity-semantic-gradient-v1/
 
 `prelaunch-review.json` records that no actual proof output exists at review and no API, model, numerical or optimizer operation occurs during freeze/review. Actual three-case CPU/Metal qualification remains required; this frozen plan alone advances no training stage or model selection. C5 remains selected and the goal stays active and unmet.
 
+### Reviewed zero-update polarity proof launched from the public initializer
+
+After code/tests and frozen-plan notes are pushed as `b830abe`, session69087 launches the serial candidates/qualification pipeline at `2026-10-17T22:57:12Z`, plan `runs/c5-polarity-semantic-gradient-v1/plan.json`, output `checkpoints/c5-polarity-semantic-gradient-v1`. The plan hash remains `66e028277c19b53a0c7415f60496b685b80e67b8a0454aa7f7ed0dfd65f749c7`. The preceding text-only worker26489 is already confirmed terminal exit0. Original C5 values, complete99/60/16-frame training cases, all350 gradients, CPU2/GPU50%/default allocator, exclusive C5 phase leases and serial Terra-medium requests remain enforced. No optimizer, training continuation, failed-prefix reuse or promotion is authorized by this proof.
+
+`launch-receipt.json` records original session69087 and its first observation no earlier than `2026-10-17T23:27:12Z`. Launch establishes no actual model construction, fresh candidates, accepted rewards or successful numerical qualification. At the scheduled check, follow that same session; a timeout does not authorize restarting. On actual success, authenticate the complete parent/child receipts and all three CPU/Metal comparisons before considering a separately reviewed fresh training plan. Both old word attempts remain failed at286 exposures/72 updates, their one continuation is exhausted, and partial fixed-final evaluation remains ineligible. C5 remains selected, held-out quality is unmeasured and the competitive-model goal remains active and unmet.
+
 ## Hard boundaries
 
 - Current owner direction: another chat owns miner and codex-lb maintenance. Do not inspect, restart, reconfigure or load-test either service, and do not query port8787 from this training work. Historical health-guarded extraction procedures below do not authorize service checks for the current runs. The approved v2 compute window expired at `2026-10-15T22:47:28Z`; current training uses50% GPU duty and2 CPU threads. Do not extend the temporary unthrottled window without new owner direction.
