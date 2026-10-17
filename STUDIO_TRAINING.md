@@ -1325,6 +1325,8 @@ An optional owner question is pending about allowing0-5 instead of0-3 for this n
 
 The scheduled `2026-10-17T06:58:48Z` observation confirms worker17241 live at202/1,668 exposures and51 updates, two complete99-clip passes plus four exposures into short-stage epoch2. No stop/exit/result receipts exist. Process peak16,340,156,416 bytes, Metal driver7,962,083,328 bytes, active/idle832.503198 seconds each, CPU2. Next observation `2026-10-17T07:28:48Z`. No new held-out quality is established.
 
+Scheduled checks at `2026-10-17T07:28:57Z` and `07:59:03Z` confirm the same worker17241 live, respectively246/62 and290/73 exposures/updates. No terminal/failure receipt appears; the third short pass remains in progress. Latest process peak17,365,860,352 bytes, Metal driver7,964,000,256 bytes, active/idle1,614.018789 seconds each, CPU2. Fixed schedule, controls and one-continuation limit remain unchanged. No further model/score job is launched and no quality gain is inferred from these counters. Next observation `2026-10-17T08:29:03Z`.
+
 ### Existing visual weights with smaller native inputs (2026-10-17)
 
 Read-only inspection of the pinned C5 bundle finds that `model/vendor/demo/dinov2_features.py` always applies `Resize((224,224))` before the network. Shrinking only crop output would therefore leave the network's input surface unchanged. Its pinned DINO `layers/patch_embed.py` asserts divisibility by its14-pixel patch side;64 is invalid for this backbone, while70/84/112 are valid. `models/vision_transformer.py` already interpolates positional embeddings for another valid patch grid. These are source constraints, not measured performance or quality.
