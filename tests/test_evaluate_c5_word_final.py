@@ -197,6 +197,33 @@ def test_unfinished_training_stops_before_terminal_audit_read_child_or_any_outpu
     assert not output.exists()
 
 
+@pytest.mark.parametrize("mutation", [None, "missing_resume", "wrong_source"])
+def test_recovered_handoff_accepts_only_the_frozen_lineage_auditor(
+    completed, monkeypatch, mutation
+):
+    env = completed
+    descriptor = handoff.artifact(env.source)
+    fit = {
+        "resume": {},
+        "lineage_audit_source": descriptor,
+        "source_sha256": {"tools/audit_c5_word_lineage.py": descriptor["sha256"]},
+    }
+    if mutation == "missing_resume":
+        fit.pop("resume")
+    elif mutation == "wrong_source":
+        fit["source_sha256"]["tools/audit_c5_word_lineage.py"] = "unreviewed"
+    write(env.plan, fit)
+    env.binding["word_training_plan"] = handoff.artifact(env.plan)
+    env.audit["plan"] = env.binding["word_training_plan"]
+    write(env.audit_path, env.audit)
+    monkeypatch.setattr(handoff, "TERMINAL_AUDIT_SOURCE_SHA256", "original-auditor-differs")
+    if mutation is None:
+        assert handoff.prerequisites(env.plan, env.result, env.audit_path) == env.binding
+    else:
+        with pytest.raises(ValueError, match="audit program"):
+            handoff.prerequisites(env.plan, env.result, env.audit_path)
+
+
 @pytest.mark.parametrize(
     "failure",
     [

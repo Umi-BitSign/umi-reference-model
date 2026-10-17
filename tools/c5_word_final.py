@@ -39,7 +39,10 @@ def require_final(result, plan, plan_sha):
         raise ValueError("word evaluation requires the completed fixed-final curriculum")
 
 
-def verify_steps(plan, steps, result):
+def verify_steps(plan, steps, result, *, resource_reset_batches=()):
+    resets = set(resource_reset_batches)
+    if resets and ("resume" not in plan or resets != {plan["resume"]["completed_batches"]}):
+        raise ValueError("word resources may reset only at the authenticated worker handoff")
     if len(steps) != len(plan["batches"]):
         raise ValueError("word evaluation cannot omit unfinished curriculum batches")
     examples = updates = 0
@@ -88,6 +91,8 @@ def verify_steps(plan, steps, result):
             raise ValueError("word final update/exposure counters differ from actual steps")
         resources = step["resources"]
         require_resources(resources)
+        if number in resets:
+            previous_active = previous_idle = 0.0
         if (
             resources["mps_active_seconds"] < previous_active
             or resources["mps_idle_seconds"] < previous_idle
@@ -149,7 +154,7 @@ def verified_batch_evidence(plan, directory, steps, tokenizer):
     return assets
 
 
-def checked_checkpoints(plan, result, directory, plan_sha, steps):
+def checked_checkpoints(plan, result, directory, plan_sha, steps, *, inherited=None):
     from safetensors import safe_open
 
     scope_descriptor = plan["model_plan"]["visual_scope"]
@@ -168,6 +173,9 @@ def checked_checkpoints(plan, result, directory, plan_sha, steps):
     expected_examples = [examples for examples, updates in boundaries.items() if updates > 0]
     if len(result["checkpoints"]) != len(expected_examples):
         raise ValueError("word final result changed planned epoch-checkpoint coverage")
+    inherited = {} if inherited is None else inherited
+    if not set(inherited).issubset(expected_examples):
+        raise ValueError("word final inherited an unplanned checkpoint")
     assets = []
     for descriptor, examples in zip(result["checkpoints"], expected_examples, strict=True):
         path = directory / f"visual-after-{examples:06d}.safetensors"
@@ -176,6 +184,7 @@ def checked_checkpoints(plan, result, directory, plan_sha, steps):
         commit_path = path.with_suffix(".json")
         optimizer_path = path.with_name(path.stem + "-optimizer.safetensors")
         commit = json.loads(commit_path.read_text())
+        origin = inherited.get(examples)
         if (
             commit.get("complete") is not True
             or commit.get("visual") != descriptor
@@ -183,12 +192,15 @@ def checked_checkpoints(plan, result, directory, plan_sha, steps):
             or commit.get("training_examples") != examples
             or commit.get("optimizer_updates") != boundaries[examples]
             or commit.get("committed_batch_RNG") is not True
+            or (origin is not None and commit.get("inherited_from") != origin["commit"])
+            or (origin is None and "inherited_from" in commit)
         ):
             raise ValueError("word checkpoint lacks complete weight/Adam/RNG provenance")
         for saved_path in (path, optimizer_path):
             with safe_open(str(saved_path), framework="pt", device="cpu") as saved:
                 metadata = saved.metadata()
-                if metadata.get("plan_sha256") != plan_sha or metadata.get("update") != str(
+                expected_sha = origin["source_plan_sha256"] if origin is not None else plan_sha
+                if metadata.get("plan_sha256") != expected_sha or metadata.get("update") != str(
                     examples
                 ):
                     raise ValueError("word checkpoint belongs to another plan or exposure count")
@@ -221,6 +233,10 @@ def checked_final(training_path, result_path):
     from transformers import ByT5Tokenizer
 
     training_path, result_path = training_path.resolve(), result_path.resolve()
+    if "resume" in json.loads(training_path.read_text()):
+        from c5_word_resumed_final import checked_final as checked_resumed
+
+        return checked_resumed(training_path, result_path)
     if not result_path.is_relative_to(ROOT / "checkpoints"):
         raise ValueError("word final result must remain in owned checkpoints/")
     plan = checked_training(training_path)

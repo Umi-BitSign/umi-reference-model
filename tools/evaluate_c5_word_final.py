@@ -76,9 +76,23 @@ def prerequisites(training_path, result_path, audit_path):
     ):
         raise ValueError("final evaluation requires complete independently audited training")
     source = ROOT / audit["audit_source"]["path"]
+    fit = json.loads(training_path.read_text())
+    expected_audit = fit.get("lineage_audit_source")
     if (
         artifact(source) != audit["audit_source"]
-        or audit["audit_source"]["sha256"] != TERMINAL_AUDIT_SOURCE_SHA256
+        or (
+            expected_audit is None
+            and audit["audit_source"]["sha256"] != TERMINAL_AUDIT_SOURCE_SHA256
+        )
+        or (expected_audit is not None and audit["audit_source"] != expected_audit)
+        or (
+            expected_audit is not None
+            and (
+                "resume" not in fit
+                or expected_audit["sha256"]
+                != fit["source_sha256"].get("tools/audit_c5_word_lineage.py")
+            )
+        )
     ):
         raise ValueError("final evaluation terminal-audit program differs from reviewed source")
     if len(audit["checkpoints"]) != 4 or len(audit["epochs"]) != 4:
