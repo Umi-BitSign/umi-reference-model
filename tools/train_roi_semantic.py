@@ -162,6 +162,7 @@ def specification():
     random.Random(RECIPE["seed"]).shuffle(order)
     source = dict(proof_plan["source_sha256"])
     source["tools/train_roi_semantic.py"] = sha256(Path(__file__))
+    source["tools/roi_semantic_resume.py"] = sha256(ROOT / "tools/roi_semantic_resume.py")
     return {
         "schema": "umi-studio-roi-semantic-training/1",
         "recipe": RECIPE,
@@ -183,21 +184,33 @@ def specification():
 
 
 def checked(path):
+    from roi_semantic_resume import make_resume
+
     plan = json.loads(path.read_text())
-    if plan != specification():
+    expected = specification()
+    if "resume" in plan:
+        expected["resume"] = make_resume(
+            ROOT / plan["resume"]["source_plan"]["path"],
+            ROOT / plan["resume"]["visual"]["path"],
+            expected,
+        )
+    if plan != expected:
         raise ValueError("ROI semantic optimizer/data/proof/source recipe changed")
     verify_snapshot(path, plan)
     return plan
 
 
-def freeze(path):
+def freeze(path, *, resume_plan=None, checkpoint=None):
     from c5_experiment_sources import archive_sources
+    from roi_semantic_resume import make_resume
 
     path = path.resolve()
     if path.parent.exists() or not path.is_relative_to(ROOT / "runs"):
         raise ValueError("ROI semantic training requires a fresh owned plan")
     torch.set_num_threads(2)
     plan = specification()
+    if resume_plan is not None:
+        plan["resume"] = make_resume(resume_plan, checkpoint, plan)
     storage(PROOF_POLICY["trainable_parameters"] * 12 + 1024**2)
     path.parent.mkdir(parents=True)
     write(path, plan)
@@ -280,6 +293,11 @@ def fit(path, output, plan):
     pacer, stop = RecoveryPacer(), CheckpointRequest()
     examples = updates = 0
     saved = []
+    if "resume" in plan:
+        from roi_semantic_resume import restore
+
+        examples, updates = duty.run(lambda: restore(plan, gpu, optimizer))
+        saved.append(plan["resume"]["visual"])
     fixed = plan["model_plan"]["initial_reference_hashes"]
     write(
         output / "run.json",
@@ -288,8 +306,10 @@ def fit(path, output, plan):
             "initial_visual_sha256": plan["vision_initialization_sha256"],
             "fixed_backbones": fixed,
             "recipe": RECIPE,
-            "training_examples": 0,
-            "optimizer_updates": 0,
+            "training_examples": examples,
+            "optimizer_updates": updates,
+            "resume": plan.get("resume"),
+            "starting_visual_sha256": state_digest(gpu.vision.state_dict()),
         },
     )
 
@@ -309,7 +329,7 @@ def fit(path, output, plan):
         )
 
     try:
-        for batch_start in range(0, len(plan["order"]), RECIPE["batch_clips"]):
+        for batch_start in range(examples, len(plan["order"]), RECIPE["batch_clips"]):
             if stop.requested:
                 raise RuntimeError("owner-requested batch-boundary checkpoint stop")
             indices = plan["order"][batch_start : batch_start + RECIPE["batch_clips"]]
@@ -490,9 +510,13 @@ def main():
     parser.add_argument("--freeze", type=Path)
     parser.add_argument("--plan", type=Path)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--resume-plan", type=Path)
+    parser.add_argument("--checkpoint", type=Path)
     args = parser.parse_args()
     if args.freeze:
-        freeze(args.freeze)
+        if bool(args.resume_plan) != bool(args.checkpoint):
+            parser.error("manual recovery requires both --resume-plan and --checkpoint")
+        freeze(args.freeze, resume_plan=args.resume_plan, checkpoint=args.checkpoint)
         if args.output:
             run(args.freeze, args.output)
     elif args.plan and args.output:
