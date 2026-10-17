@@ -37,7 +37,7 @@ from training_media_artifact import media_artifact
 
 POLICY = {
     "scope": "same34 reserved development identities; all C5 control texts reproduced first",
-    "appearance": "original C5 hand/face weights, direct native112px crops, no training",
+    "appearance": "original C5 hand/face weights, direct native112px crops, qualified projection",
     "native_input_side": 112,
     "appearance_batch_frames": 2,
     "sampling": "complete existing stride2 timeline, independently checked native crop pixels",
@@ -85,6 +85,42 @@ def require_qualification(result, plan, plan_sha):
         verified_comparison(comparison["comparison"], 350)
 
 
+def component_evidence(qualification_plan, qualification_result):
+    schema = json.loads(qualification_plan.read_text())["schema"]
+    result = json.loads(qualification_result.read_text())
+    terminal(qualification_result)
+    if schema == "umi-studio-c5-native-small-input-qualification/1":
+        qualified = checked_qualification(qualification_plan)
+        require_qualification(result, qualified, sha256(qualification_plan))
+        for index, comparison in enumerate(result["comparisons"]):
+            actual = json.loads(
+                qualification_result.with_name(f"comparison-{index:02d}.json").read_text()
+            )
+            if actual != comparison:
+                raise ValueError("native112 qualification differs from actual comparison files")
+    elif schema == "umi-studio-C5-linear-patch-component-qualification/1":
+        from probe_c5_linear_patch import checked as checked_linear
+        from probe_c5_linear_patch import require_result
+
+        qualified = checked_linear(qualification_plan)
+        require_result(result, qualified, sha256(qualification_plan), qualification_result.parent)
+    else:
+        raise ValueError("native112 evaluation received an unknown component qualification")
+    return qualified, result
+
+
+def appearance_model(plan, hands, face):
+    projection = plan.get("patch_projection", "original_native_convolution")
+    if projection == "original_native_convolution":
+        return SmallInputDino(hands, face)
+    from probe_c5_linear_patch import POLICY as LINEAR_POLICY
+    from probe_c5_linear_patch import linear_model
+
+    if projection != LINEAR_POLICY["patch_projection"]:
+        raise ValueError("native112 evaluation changed its qualified projection")
+    return linear_model(hands, face)
+
+
 def specification(qualification_plan, qualification_result):
     qualification_plan, qualification_result = (
         qualification_plan.resolve(),
@@ -92,16 +128,7 @@ def specification(qualification_plan, qualification_result):
     )
     if not qualification_result.is_relative_to(ROOT / "checkpoints"):
         raise ValueError("native112 qualification must remain in owned checkpoints")
-    qualified = checked_qualification(qualification_plan)
-    result = json.loads(qualification_result.read_text())
-    terminal(qualification_result)
-    require_qualification(result, qualified, sha256(qualification_plan))
-    for i, comparison in enumerate(result["comparisons"]):
-        if (
-            json.loads(qualification_result.with_name(f"comparison-{i:02d}.json").read_text())
-            != comparison
-        ):
-            raise ValueError("native112 qualification differs from its actual comparison files")
+    qualified, result = component_evidence(qualification_plan, qualification_result)
     inputs = checked_inputs(INPUT_PLAN)
     if inputs["reference"] != qualified["reference"]:
         raise ValueError("native112 qualification and evaluation reference models differ")
@@ -127,6 +154,9 @@ def specification(qualification_plan, qualification_result):
         "qualification_plan": artifact(qualification_plan),
         "qualification_result": artifact(qualification_result),
         "pretrained_state_sha256": result["pretrained_state_sha256"],
+        "patch_projection": qualified["policy"].get(
+            "patch_projection", "original_native_convolution"
+        ),
         "input_protocol": artifact(INPUT_PLAN),
         "records": inputs["records"],
         "control": inputs["control"],
@@ -282,7 +312,7 @@ def infer(path, output, plan):
         ROOT / reference["bundle_root"] / "model/models/byt5_base", local_files_only=True
     )
     hands, face = legacy_models(plan)
-    appearance = SmallInputDino(hands.model, face.model).requires_grad_(False).eval()
+    appearance = appearance_model(plan, hands.model, face.model).requires_grad_(False).eval()
     if state_digest(appearance.state_dict()) != plan["pretrained_state_sha256"]:
         raise ValueError("native112 inference loaded another hand/face state")
     appearance = duty.run(lambda: appearance.to("mps"))
