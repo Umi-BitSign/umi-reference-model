@@ -171,7 +171,9 @@ def test_pose_loader_uses_the_bound_body_file_instead_of_a_cached_module(tmp_pat
     assert word.pose_processor().bound_file is True
 
 
-@pytest.mark.parametrize("mutation", [None, "incomplete", "plan", "receipt", "source_record"])
+@pytest.mark.parametrize(
+    "mutation", [None, "incomplete", "plan", "receipt", "source_record", "worker", "audit_source"]
+)
 def test_bind_requires_complete_audit_and_unchanged_original_receipts(
     tmp_path, monkeypatch, mutation
 ):
@@ -189,6 +191,9 @@ def test_bind_requires_complete_audit_and_unchanged_original_receipts(
     if mutation == "source_record":
         saved["record"]["original"]["row"]["participant"] = "P3"
     receipt.write_text(json.dumps(saved))
+    monkeypatch.setattr(word, "terminal", lambda directory: {"bound_terminal": str(directory)})
+    audit_source = tmp_path / "runs/audit-source.py"
+    audit_source.write_text("# frozen audit implementation\n")
     audit = {
         "schema": "umi-studio-word-complete-landmark-audit/1",
         "complete_landmark_audit": mutation != "incomplete",
@@ -196,12 +201,19 @@ def test_bind_requires_complete_audit_and_unchanged_original_receipts(
         "all_native_source_timeline_and_coordinate_checks_passed": True,
         "by_role": {"training": 228, "development": 96},
         "frames": 35245,
+        "supervisor": word.terminal(plan.parent / "remaining-batches"),
+        "workers": [word.terminal(plan.parent / f"batch-{i:04d}") for i in range(1, 22)],
+        "source_sha256": {"runs/audit-source.py": word.sha256(audit_source)},
         "records": [{"receipt": artifact(receipt, root=tmp_path), "landmarks": bound["landmarks"]}],
     }
     if mutation == "plan":
         audit["plan"]["sha256"] = "changed"
     if mutation == "receipt":
         receipt.write_text("{}")
+    if mutation == "worker":
+        audit["workers"].pop()
+    if mutation == "audit_source":
+        audit_source.write_text("# changed audit\n")
     audit_path = tmp_path / "runs/audit.json"
     audit_path.write_text(json.dumps(audit))
     monkeypatch.setattr(word, "checked", lambda path: {"records": [original]})

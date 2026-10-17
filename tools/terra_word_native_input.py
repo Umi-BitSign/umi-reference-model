@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 
 import numpy as np
+from audit_terra_word_landmarks import terminal
 from benchmark_fleurs_dev import sha256
 from extract_mediapipe_landmarks import unpack_landmarks
 from prepare_roi_appearance import DEMO, SampledRgbReader, native_helpers
@@ -50,6 +51,15 @@ def bind_records(plan_path, audit_path):
         or audit.get("frames") != 35245
     ):
         raise ValueError("word native inputs require the complete bound landmark audit")
+    if (
+        audit.get("supervisor") != terminal(plan_path.parent / "remaining-batches")
+        or audit.get("workers")
+        != [terminal(plan_path.parent / f"batch-{i:04d}") for i in range(1, 22)]
+        or any(sha256(ROOT / name) != digest for name, digest in audit["source_sha256"].items())
+    ):
+        raise ValueError(
+            "word native input audit lost its authoritative terminal receipts or source"
+        )
     records = []
     for record, audited in zip(plan["records"], audit["records"], strict=True):
         receipt = ROOT / audited["receipt"]["path"]
