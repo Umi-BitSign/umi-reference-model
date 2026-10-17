@@ -33,6 +33,7 @@ from terra_training_recovery import artifact, verify_snapshot
 from terra_training_storage import storage
 from tiny_rgb_capacity_protocol import verified_comparison
 from tiny_rgb_visual_teacher_data import load_targets
+from training_media_artifact import media_artifact
 
 POLICY = {
     "scope": "same34 reserved development identities; all C5 control texts reproduced first",
@@ -105,7 +106,11 @@ def specification(qualification_plan, qualification_result):
     if inputs["reference"] != qualified["reference"]:
         raise ValueError("native112 qualification and evaluation reference models differ")
     sources = {**inputs["source_sha256"], **qualified["source_sha256"]}
-    for name in ("evaluate_c5_small_input.py", "evaluate_roi_semantic.py"):
+    for name in (
+        "evaluate_c5_small_input.py",
+        "evaluate_roi_semantic.py",
+        "training_media_artifact.py",
+    ):
         sources[f"tools/{name}"] = sha256(ROOT / "tools" / name)
     return {
         "schema": "umi-studio-c5-native112-translation-evaluation/1",
@@ -161,7 +166,10 @@ def crops(record):
     pair = record["development"]["original_pair"]
     video, header = ROOT / pair["raw"]["video"], pair["header"]
     landmark = ROOT / record["landmarks"]["path"]
-    if sha256(video) != pair["raw"]["video_sha256"] or artifact(landmark) != record["landmarks"]:
+    if (
+        sha256(video) != pair["raw"]["video_sha256"]
+        or media_artifact(landmark) != record["landmarks"]
+    ):
         raise ValueError("native112 evaluation video or landmark bytes changed")
     landmarks, metadata = unpack_landmarks(landmark)
     if (
