@@ -78,6 +78,7 @@ def specification():
             model / "models/dinov2face.safetensors",
             model / "vendor/demo/dinov2_features.py",
             model / "vendor/demo/device.py",
+            model / "vendor/demo/video_reader.py",
             model / "vendor/demo/crop_hands.py",
             model / "vendor/demo/crop_face.py",
             *(model / "vendor/dinov2-source").rglob("*.py"),
@@ -190,8 +191,15 @@ def crop_case(row, side):
 
 
 def legacy_models(plan):
+    from prepare_roi_appearance import DEMO, native_helpers
+
     model = ROOT / plan["reference"]["bundle_root"] / "model"
     demo = model / "vendor/demo"
+    if sha256(demo / "video_reader.py") != sha256(DEMO / "video_reader.py"):
+        raise ValueError("small DINO original and crop video readers must be byte-identical")
+    # Bind the cropper's canonical module before the legacy loader imports its
+    # byte-identical VideoReader through Python's shared module cache.
+    native_helpers()
     os.environ["SHUBERT_DINOV2_SOURCE"] = str(model / "vendor/dinov2-source")
     previous = list(sys.path)
     sys.path.insert(0, str(demo))

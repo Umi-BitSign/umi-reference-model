@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import copy
+import os
+import subprocess
 import sys
 from functools import partial
 from pathlib import Path
@@ -209,3 +211,57 @@ def test_native_crop_path_binds_real_data_files_and_keeps_complete_RGB_geometry(
     landmark.write_bytes(b"changed landmark bytes")
     with pytest.raises(ValueError, match="bytes changed"):
         probe.crop_case(row, 112)
+
+
+def test_legacy_loader_preloads_canonical_reader_in_a_fresh_process_without_loading_weights(
+    tmp_path,
+):
+    code = r"""
+import importlib.abc, importlib.util, json, sys
+from pathlib import Path
+sys.path.insert(0, "tools")
+import probe_c5_small_input as probe
+import prepare_roi_appearance as roi
+root = Path(sys.argv[1])
+probe.ROOT = root
+roi.DEMO = root / "artifacts/baseline/vendor/demo"
+winner = root / "artifacts/winner/model/vendor/demo"
+for directory in (roi.DEMO, winner):
+    directory.mkdir(parents=True)
+    (directory / "video_reader.py").write_text("class VideoReader: pass\n")
+(roi.DEMO / "crop_hands.py").write_text(
+    "from video_reader import VideoReader\nclass HandExtractor: pass\n"
+)
+(roi.DEMO / "crop_face.py").write_text(
+    "from video_reader import VideoReader\nclass FaceExtractor: pass\n"
+)
+original_spec = importlib.util.spec_from_file_location
+class Loader(importlib.abc.Loader):
+    def create_module(self, spec): return None
+    def exec_module(self, module):
+        import video_reader
+        assert Path(video_reader.__file__).resolve() == (roi.DEMO / "video_reader.py").resolve()
+        class Embedder:
+            def __init__(self, path, batch_size, device):
+                assert batch_size == 2 and device == "cpu"
+                self.path = path
+        module.DINOEmbedder = Embedder
+def spec(name, path, *args, **kwargs):
+    if name == "small_dino_legacy":
+        return importlib.util.spec_from_loader(name, Loader())
+    return original_spec(name, path, *args, **kwargs)
+importlib.util.spec_from_file_location = spec
+hands, face = probe.legacy_models({"reference": {"bundle_root": "artifacts/winner"}})
+assert hands.path.endswith("dinov2hand.safetensors")
+assert face.path.endswith("dinov2face.safetensors")
+print("canonical reader loaded first; no model weights loaded")
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", code, str(tmp_path)],
+        cwd=Path(__file__).resolve().parents[1],
+        env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert "no model weights loaded" in result.stdout
