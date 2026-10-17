@@ -1198,6 +1198,24 @@
       "optimizer_launched": true,
       "promotion_authorized": false
     },
+    "ROI64_broad_semantic_evaluation": {
+      "implementation": "tools/evaluate_roi_broad_semantic.py",
+      "status": "implemented_and_tested; no_plan_freeze_or_inference_or_scoring_until_complete_training",
+      "requires_complete1668_exposure318clip_curriculum": true,
+      "all_planned420_batch_rows_and_actual_update_counts_joined": true,
+      "legitimate_tied_reward_zero_updates_allowed": true,
+      "fixed_final_checkpoint_commit_and_tensor_provenance_required": true,
+      "stage_boundary_checkpoint_selection_rejected": true,
+      "original34_reserved_development_cases_and_C5_controls": true,
+      "generation_native_crops_and_scoring_bytecode_unchanged": true,
+      "private_adapter_changes_only_plan_validation_callbacks": true,
+      "same_two_pass_calibrated_Terra_quality_gate": true,
+      "WER_is_diagnostic_only": true,
+      "targeted_tests_passed": 292,
+      "new_Terra_requests": 0,
+      "new_heldout_predictions": 0,
+      "promotion_authorized": false
+    },
     "ROI64_broad_short_data": {
       "plan": "runs/roi-broad-short-data-v1/plan.json",
       "plan_sha256": "02e689921ca0a527ddc89c05940c8ae18c29d5831b2fb674b13682991689a942",
