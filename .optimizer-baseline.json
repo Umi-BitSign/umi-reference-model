@@ -1132,6 +1132,27 @@
       "targeted_tests_passed": 232,
       "promotion_authorized": false
     },
+    "ROI64_broad_semantic_training_recipe": {
+      "implementation": "tools/train_roi_broad_semantic.py",
+      "status": "implemented_and_tested_not_frozen_or_launched; requires_actual_broader_qualification_exit0",
+      "stages": [
+        {"caption_words": "2-3", "unique_training_clips": 99, "epochs": 4, "clip_exposures": 396, "maximum_updates": 100},
+        {"caption_words": "2-6_including_short_replay", "unique_training_clips": 318, "epochs": 4, "clip_exposures": 1272, "maximum_updates": 320}
+      ],
+      "planned_training_examples": 1668,
+      "maximum_optimizer_updates": 420,
+      "all_complete_clips_and_untruncated_reference_tokens": true,
+      "same_initial_vision_as_rejected88clip_arm_not_its_final_weights": true,
+      "pure_Terra_no_auxiliary_loss": true,
+      "learning_rate": 0.00003,
+      "risk_alpha": 0.005,
+      "augmentation": "none; isolate_breadth_and_short_to_long_exposure",
+      "checkpoint_selection": "fixed_final; two_stage_boundaries_for_recovery_only",
+      "targeted_tests_passed": 252,
+      "heldout_quality_measured": false,
+      "optimizer_launched": false,
+      "promotion_authorized": false
+    },
     "ROI64_broad_short_data": {
       "plan": "runs/roi-broad-short-data-v1/plan.json",
       "plan_sha256": "02e689921ca0a527ddc89c05940c8ae18c29d5831b2fb674b13682991689a942",
