@@ -458,7 +458,10 @@ def test_cross_process_API_cooldown_waits_before_first_request_in_small_interval
     assert waits == [30, 30, 5]
 
 
-def test_unfinished_prerequisites_leave_no_real_frozen_plan(tmp_path, monkeypatch):
+@pytest.mark.parametrize("explicit_lineage", [False, True])
+def test_unfinished_prerequisites_leave_no_real_frozen_plan(
+    tmp_path, monkeypatch, explicit_lineage
+):
     monkeypatch.setattr(proof, "ROOT", tmp_path)
 
     def unavailable(*args):
@@ -466,6 +469,77 @@ def test_unfinished_prerequisites_leave_no_real_frozen_plan(tmp_path, monkeypatc
 
     monkeypatch.setattr(proof, "evidence_specification", unavailable)
     target = tmp_path / "runs/not-ready/plan.json"
+    arguments = ["--freeze", str(target)]
+    if explicit_lineage:
+        arguments += [
+            "--training-plan",
+            str(tmp_path / "runs/recovery/plan.json"),
+            "--training-result",
+            str(tmp_path / "checkpoints/recovery/result.json"),
+        ]
     with pytest.raises(ValueError, match="incomplete"):
-        proof.freeze(target)
+        proof.main(arguments)
     assert not target.parent.exists()
+
+
+def test_freeze_binds_explicit_lineage_through_the_existing_specification(tmp_path, monkeypatch):
+    import c5_experiment_sources
+
+    monkeypatch.setattr(proof, "ROOT", tmp_path)
+    monkeypatch.setattr(proof, "artifact", partial(artifact, root=tmp_path))
+    monkeypatch.setattr(proof, "guard", lambda: None)
+    captured = []
+    training = tmp_path / "runs/recovery/plan.json"
+    result = tmp_path / "checkpoints/recovery/result.json"
+    plan = {"records": ["complete-case"], "authenticated_initialization": "fixture"}
+
+    def specification(training_path, result_path):
+        captured.append((training_path, result_path))
+        return plan
+
+    monkeypatch.setattr(proof, "specification", specification)
+    monkeypatch.setattr(c5_experiment_sources, "archive_sources", lambda *args: None)
+    target = tmp_path / "runs/proof/plan.json"
+    proof.main(
+        [
+            "--freeze",
+            str(target),
+            "--training-plan",
+            str(training),
+            "--training-result",
+            str(result),
+        ]
+    )
+    assert captured == [(training, result)]
+    assert json.loads(target.read_text()) == plan
+
+
+@pytest.mark.parametrize(
+    "arguments, message",
+    [
+        (["--freeze", "plan.json", "--training-plan", "recovery.json"], "supplied together"),
+        (["--freeze", "plan.json", "--training-result", "result.json"], "supplied together"),
+        ([], "only with --freeze"),
+        (["--plan", "plan.json", "--output", "out", "--pipeline"], "only with --freeze"),
+        (["--freeze", "plan.json", "--mode", "candidates"], "only with --freeze"),
+    ],
+)
+def test_invalid_lineage_cli_is_rejected_before_any_action(arguments, message, monkeypatch, capsys):
+    if "supplied together" not in message:
+        arguments = [
+            *arguments,
+            "--training-plan",
+            "recovery.json",
+            "--training-result",
+            "result.json",
+        ]
+
+    def forbidden(*args):
+        pytest.fail("invalid lineage arguments reached a proof action")
+
+    for name in ("freeze", "pipeline", "run"):
+        monkeypatch.setattr(proof, name, forbidden)
+    with pytest.raises(SystemExit) as error:
+        proof.main(arguments)
+    assert error.value.code == 2
+    assert message in capsys.readouterr().err

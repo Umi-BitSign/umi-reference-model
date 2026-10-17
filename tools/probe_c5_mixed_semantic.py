@@ -99,13 +99,13 @@ def checked(path):
     return plan
 
 
-def freeze(path):
+def freeze(path, training_path=TRAINING_PLAN, result_path=TRAINING_RESULT):
     from c5_experiment_sources import archive_sources
 
     path = path.resolve()
     if path.parent.exists() or not path.is_relative_to(ROOT / "runs"):
         raise ValueError("mixed risk requires a fresh owned plan")
-    plan = specification()
+    plan = specification(training_path, result_path)
     guard()
     path.parent.mkdir(parents=True)
     write(path, plan)
@@ -416,18 +416,34 @@ def pipeline(path, output):
         write(output / "exit.json", {"pid": os.getpid(), "exit_code": code, "observed_at": now()})
 
 
-if __name__ == "__main__":
+def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("freeze", "plan", "output", "candidates"):
         parser.add_argument("--" + name, type=Path)
+    parser.add_argument("--training-plan", type=Path)
+    parser.add_argument("--training-result", type=Path)
     parser.add_argument("--mode", choices=("candidates", "qualify"))
     parser.add_argument("--pipeline", action="store_true")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
+    if bool(args.training_plan) != bool(args.training_result):
+        parser.error("--training-plan and --training-result must be supplied together")
+    if args.training_plan and (
+        not args.freeze or args.plan or args.output or args.candidates or args.mode or args.pipeline
+    ):
+        parser.error("training lineage options are valid only with --freeze")
     if args.freeze:
-        freeze(args.freeze)
+        freeze(
+            args.freeze,
+            args.training_plan or TRAINING_PLAN,
+            args.training_result or TRAINING_RESULT,
+        )
     if args.pipeline and args.plan and args.output:
         pipeline(args.plan, args.output)
     elif args.plan and args.output and args.mode:
         run(args.plan, args.output, args.mode, args.candidates)
     elif args.plan or args.output or not args.freeze:
         parser.error("choose --freeze, --plan/--output/--mode, or --pipeline")
+
+
+if __name__ == "__main__":
+    main()

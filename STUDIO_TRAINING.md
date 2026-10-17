@@ -1699,6 +1699,14 @@ Launch alone establishes no actual restoration or fresh optimizer progress. `lau
 
 After an actual complete same-worker exit0 at856 exposures, execute the plan's frozen `terminal-audit.py` with explicit `--plan runs/c5-word-semantic-training-v2-recovery/plan.json --result checkpoints/c5-word-semantic-training-v2-recovery/result.json --output runs/c5-word-semantic-training-v2-recovery/terminal-audit.json`. Only a complete passing audit permits `tools/evaluate_c5_word_final.py` with those explicit recovery plan/result/audit paths and the fresh final-evaluation output. The original failed run's default paths remain ineligible. No fixed-final evaluation or later mixed proof is launched now. C5 remains selected, quality is unmeasured and the competitive-model goal remains active and unmet.
 
+### Mixed proof CLI can bind an explicitly selected completed word lineage
+
+`tools/probe_c5_mixed_semantic.py --freeze` now accepts paired `--training-plan` and `--training-result` paths. It forwards both through the existing specification and predecessor checks, allowing the recovered word final to be selected after completion and evaluation. The original defaults remain unchanged. Supplying only one path, using the paths without `--freeze`, or combining them with proof execution arguments fails before any action. Execution of an existing frozen plan continues to use its authenticated initialization binding.
+
+All90 focused mixed-proof, predecessor-evidence and model-initialization tests pass; Ruff and `git diff --check` pass. The tests cover CLI forwarding, rejection before side effects and incomplete-prerequisite rejection through both default and explicit paths. No numerical loop, policy, input, case or threshold changes. All105 original word sources,97 completed-input sources and112 continuation sources still match their frozen plans; neither edited code/test file is in those protected maps.
+
+No mixed plan is frozen and no mixed model, API, proof or optimizer runs. The word continuation remains unobserved since launch, with its first scheduled check still no earlier than `2026-10-17T22:29:00Z`. Complete word training, its independent terminal audit and both complete calibrated evaluations remain prerequisites. C5 remains selected; held-out quality is unmeasured and the competitive-model goal remains active and unmet.
+
 ## Hard boundaries
 
 - Current owner direction: another chat owns miner and codex-lb maintenance. Do not inspect, restart, reconfigure or load-test either service, and do not query port8787 from this training work. Historical health-guarded extraction procedures below do not authorize service checks for the current runs. The approved v2 compute window expired at `2026-10-15T22:47:28Z`; current training uses50% GPU duty and2 CPU threads. Do not extend the temporary unthrottled window without new owner direction.
