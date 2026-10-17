@@ -348,6 +348,32 @@ def test_source_request_cooldown_keeps_exact_sixty_seconds_and_short_waits(stopp
     assert record["ready_at"] == record["not_before"] == "2026-10-17T20:01:00+00:00"
 
 
+def test_second_calibration_failure_keeps_committed_source_and_blocks_another_attempt(
+    stopped, monkeypatch
+):
+    env = stopped.env
+    path, plan = freeze(stopped)
+    output = env.output.with_name("second-stop")
+    output.mkdir()
+    put(output / "worker.json", {"pid": 222})
+    pacer = fixtures.FakePacer(fail_call=1)
+    monkeypatch.setattr(fixtures.trainer, "RecoveryPacer", lambda: pacer)
+    with pytest.raises(ValueError, match="calibration"):
+        controller.fit(path, output, plan)
+    stopped_again = json.loads((output / "stopped.json").read_text())
+    assert stopped_again["training_examples"] == 6 and stopped_again["optimizer_updates"] == 2
+    assert stopped_again["uncommitted_optimizer_mutation_possible"] is False
+    assert stopped_again["recovery_is_committed_prefix"] is True
+    assert (output / "steps.jsonl").read_bytes() == (env.output / "steps.jsonl").read_bytes()
+    assert pacer.calls == 1 and not (output / "result.json").exists()
+    source = load_file(str(stopped.checkpoint))
+    rejected_recovery = load_file(str(recovery.ROOT / stopped_again["recovery"]["path"]))
+    assert set(source) == set(rejected_recovery)
+    assert all(torch.equal(value, rejected_recovery[name]) for name, value in source.items())
+    with pytest.raises((ValueError, FileExistsError)):
+        recovery.claim(path, output, plan)
+
+
 @pytest.mark.parametrize(
     "mutation",
     [
