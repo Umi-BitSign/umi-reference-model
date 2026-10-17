@@ -110,6 +110,15 @@ def specification(qualification_plan, qualification_result):
         "evaluate_c5_small_input.py",
         "evaluate_roi_semantic.py",
         "training_media_artifact.py",
+        "score_c5_small_input.py",
+        "score_roi_short_translation.py",
+        "terra_short_curriculum_learning.py",
+        "terra_semantic_selection.py",
+        "terra_short_resume.py",
+        "terra_quality_training.py",
+        "probe_jeff_terra_quality.py",
+        "semantic_quality_judge.py",
+        "probe_roi_seen_translation.py",
     ):
         sources[f"tools/{name}"] = sha256(ROOT / "tools" / name)
     return {
