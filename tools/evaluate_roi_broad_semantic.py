@@ -88,6 +88,18 @@ def verify_steps(plan, steps, result):
         raise ValueError("broad ROI final optimizer counter differs from complete training steps")
 
 
+def completed_steps(fit, steps_path):
+    steps = [json.loads(line) for line in steps_path.read_text().splitlines()]
+    prefix_assets = []
+    if "resume" in fit:
+        prefix = ROOT / fit["resume"]["source_steps"]["path"]
+        if artifact(prefix) != fit["resume"]["source_steps"]:
+            raise ValueError("broad ROI evaluation lost its exact original completed-step prefix")
+        steps = [json.loads(line) for line in prefix.read_text().splitlines()] + steps
+        prefix_assets.append(artifact(prefix))
+    return steps, prefix_assets
+
+
 def specification(training_plan_path, result_path):
     from safetensors import safe_open
 
@@ -105,9 +117,15 @@ def specification(training_plan_path, result_path):
         or run.get("fixed_backbones") != inputs["initial_reference_hashes"]
         or run.get("recipe") != fit["recipe"]
         or run.get("unique_training_clips") != fit["unique_training_clips"]
+        or run.get("resume") != fit.get("resume")
+        or (
+            "resume" in fit
+            and run.get("starting_visual_sha256") != fit["resume"]["starting_visual_state_sha256"]
+        )
     ):
         raise ValueError("broad ROI result has a different actual training run")
-    verify_steps(fit, [json.loads(line) for line in steps_path.read_text().splitlines()], result)
+    steps, prefix_assets = completed_steps(fit, steps_path)
+    verify_steps(fit, steps, result)
     visual = ROOT / result["visual"]["path"]
     commit = json.loads(visual.with_suffix(".json").read_text())
     if (
@@ -143,6 +161,7 @@ def specification(training_plan_path, result_path):
         "fit_result": artifact(result_path),
         "fit_run": artifact(run_path),
         "fit_steps": artifact(steps_path),
+        "fit_prefix_steps": prefix_assets,
         "visual": artifact(visual),
         "visual_commit": artifact(visual.with_suffix(".json")),
         "visual_state_sha256": result["visual_final_sha256"],

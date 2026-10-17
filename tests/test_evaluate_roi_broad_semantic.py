@@ -104,6 +104,31 @@ def test_complete_step_join_checks_planned_repeats_and_legitimate_zero_contrast_
     evaluation.verify_steps(plan, steps, result)
 
 
+@pytest.mark.parametrize("resume", [False, True])
+def test_actual_original_prefix_and_recovery_steps_join_to_the_same_complete_curriculum(
+    tmp_path, monkeypatch, resume
+):
+    from benchmark_fleurs_dev import sha256
+
+    plan, steps, result = complete_steps()
+    prefix, current = tmp_path / "prefix.jsonl", tmp_path / "steps.jsonl"
+    prefix.write_text("\n".join(json.dumps(s) for s in steps[:1]) + "\n")
+    current.write_text("\n".join(json.dumps(s) for s in (steps[1:] if resume else steps)) + "\n")
+    descriptor = {"path": prefix.name, "sha256": sha256(prefix)}
+    monkeypatch.setattr(evaluation, "ROOT", tmp_path)
+    monkeypatch.setattr(evaluation, "artifact", lambda p: {"path": p.name, "sha256": sha256(p)})
+    if resume:
+        plan["resume"] = {"source_steps": descriptor}
+    joined, assets = evaluation.completed_steps(plan, current)
+    assert joined == steps
+    assert assets == ([descriptor] if resume else [])
+    evaluation.verify_steps(plan, joined, result)
+    if resume:
+        prefix.write_text("{}\n")
+        with pytest.raises(ValueError, match="prefix"):
+            evaluation.completed_steps(plan, current)
+
+
 @pytest.mark.parametrize(
     "mutation",
     [

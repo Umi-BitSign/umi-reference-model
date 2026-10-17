@@ -170,6 +170,9 @@ def specification():
         raise ValueError("broad ROI fixed curriculum inventory/exposure counts changed")
     source = dict(proof_plan["source_sha256"])
     source["tools/train_roi_broad_semantic.py"] = sha256(Path(__file__))
+    source["tools/roi_broad_semantic_resume.py"] = sha256(
+        ROOT / "tools/roi_broad_semantic_resume.py"
+    )
     return {
         "schema": "umi-studio-roi-broad-semantic-training/1",
         "recipe": RECIPE,
@@ -196,21 +199,33 @@ def specification():
 
 
 def checked(path):
+    from roi_broad_semantic_resume import make_resume
+
     plan = json.loads(path.read_text())
-    if plan != specification():
+    expected = specification()
+    if "resume" in plan:
+        expected["resume"] = make_resume(
+            ROOT / plan["resume"]["source_plan"]["path"],
+            ROOT / plan["resume"]["visual"]["path"],
+            expected,
+        )
+    if plan != expected:
         raise ValueError("broad ROI optimizer/data/qualified implementation or recipe changed")
     verify_snapshot(path, plan)
     return plan
 
 
-def freeze(path):
+def freeze(path, *, resume_plan=None, checkpoint=None):
     from c5_experiment_sources import archive_sources
+    from roi_broad_semantic_resume import make_resume
 
     path = path.resolve()
     if path.parent.exists() or not path.is_relative_to(ROOT / "runs"):
         raise ValueError("broad ROI training requires a fresh owned plan")
     torch.set_num_threads(2)
     plan = specification()
+    if resume_plan is not None:
+        plan["resume"] = make_resume(resume_plan, checkpoint, plan)
     storage(NUMERICAL_POLICY["trainable_parameters"] * 12 + 1024**2)
     path.parent.mkdir(parents=True)
     write(path, plan)
@@ -266,6 +281,18 @@ def fit(path, output, plan):
     fixed = plan["model_plan"]["initial_reference_hashes"]
     examples = updates = 0
     saved, observed_order = [], []
+    start_batch = 0
+    if "resume" in plan:
+        from roi_broad_semantic_resume import restore
+
+        examples, updates = duty.run(lambda: restore(plan, gpu, optimizer))
+        start_batch = plan["resume"]["completed_batches"]
+        saved.append(plan["resume"]["visual"])
+        observed_order = [
+            i for batch in plan["batches"][:start_batch] for i in batch["training_record_indices"]
+        ]
+        if state_digest(gpu.vision.state_dict()) != plan["resume"]["starting_visual_state_sha256"]:
+            raise ValueError("broad ROI recovery loaded a different visual state")
     write(
         output / "run.json",
         {
@@ -273,9 +300,11 @@ def fit(path, output, plan):
             "initial_visual_sha256": plan["vision_initialization_sha256"],
             "fixed_backbones": fixed,
             "recipe": RECIPE,
-            "training_examples": 0,
-            "optimizer_updates": 0,
+            "training_examples": examples,
+            "optimizer_updates": updates,
             "unique_training_clips": len(plan["records"]),
+            "resume": plan.get("resume"),
+            "starting_visual_sha256": state_digest(gpu.vision.state_dict()),
         },
     )
 
@@ -296,6 +325,8 @@ def fit(path, output, plan):
 
     try:
         for batch_number, batch in enumerate(plan["batches"]):
+            if batch_number < start_batch:
+                continue
             if stop.requested:
                 raise RuntimeError("owner-requested batch-boundary checkpoint stop")
             indices = batch["training_record_indices"]
@@ -493,9 +524,13 @@ def main():
     parser.add_argument("--freeze", type=Path)
     parser.add_argument("--plan", type=Path)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--resume-plan", type=Path)
+    parser.add_argument("--checkpoint", type=Path)
     args = parser.parse_args()
     if args.freeze:
-        freeze(args.freeze)
+        if bool(args.resume_plan) != bool(args.checkpoint):
+            parser.error("manual recovery requires both --resume-plan and --checkpoint")
+        freeze(args.freeze, resume_plan=args.resume_plan, checkpoint=args.checkpoint)
         if args.output:
             run(args.freeze, args.output)
     elif args.plan and args.output:
