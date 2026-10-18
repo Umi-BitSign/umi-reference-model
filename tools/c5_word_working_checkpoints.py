@@ -1,7 +1,7 @@
 """Filesystem transactions for a proposed per-batch word checkpoint policy.
 
-No training entry point installs this helper. The caller supplies its original
-checkpoint writer and storage guard. Tensor validation and model restoration
+Prepared for the separately authorized storage-recovery controller. The caller
+supplies its original checkpoint writer and storage guard. Tensor validation and model restoration
 remain the qualified writer/auditor's responsibility. Full epoch checkpoints,
 source checkpoints and all receipts are retained; only retired working tensor
 files can be removed by this store.
@@ -111,16 +111,19 @@ class WorkingCheckpoints:
         require(path.is_file() and self._artifact(path) == artifact, "checkpoint bytes changed")
         return path
 
-    def _events(self):
+    def _events(self, *, allow_incomplete_tail=False):
         self._check_control_paths()
         if not self.journal.exists():
             return []
         data = self.journal.read_bytes()
-        require(data.endswith(b"\n"), "working journal has a partial append")
+        if not data.endswith(b"\n"):
+            require(allow_incomplete_tail, "working journal has a partial append")
+            data = data[: data.rfind(b"\n") + 1]
         return [json.loads(line) for line in data.splitlines()]
 
     def _append(self, event):
         self._check_control_paths()
+        self._events()  # Never concatenate a new event onto an incomplete append.
         with self.journal.open("a") as stream:
             stream.write(json.dumps(event, sort_keys=True, allow_nan=False) + "\n")
             stream.flush()
@@ -254,7 +257,7 @@ class WorkingCheckpoints:
             "invalid working pointer prefix fields",
         )
         require(
-            {"kind": "prepared", "state": state} in self._events(),
+            {"kind": "prepared", "state": state} in self._events(allow_incomplete_tail=True),
             "working pointer has no durable preparation record",
         )
         prefix = (self.output / "steps.jsonl").read_bytes()[: state["ledger_bytes"]]
@@ -274,6 +277,7 @@ class WorkingCheckpoints:
 
     def commit(self, *, examples, updates, writer):
         """Call writer once for the next accepted batch, then atomically publish."""
+        self._events()  # A torn journal can be read for recovery but cannot advance.
         previous = self.latest()
         raw, rows = self._ledger()
         require(

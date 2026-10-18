@@ -390,3 +390,38 @@ def test_tensor_pair_cannot_be_two_hardlinks_to_one_file(seeded):
     with pytest.raises(ValueError, match="aliased tensor pair"):
         store.commit(examples=8, updates=2, writer=writer)
     assert store.latest()["training_examples"] == 4
+
+
+def test_torn_acknowledgment_does_not_hide_the_already_published_state(seeded, monkeypatch):
+    store, _, _, _ = seeded
+    original = store._append
+
+    def torn(event):
+        if event["kind"] == "committed" and event["state"]["training_examples"] == 8:
+            with store.journal.open("ab") as stream:
+                stream.write(b'{"kind":"committed","state":')
+                stream.flush()
+                os.fsync(stream.fileno())
+            raise OSError("torn acknowledgment")
+        original(event)
+
+    monkeypatch.setattr(store, "_append", torn)
+    with pytest.raises(OSError, match="torn acknowledgment"):
+        save(seeded, 8, 2)
+    assert store.latest()["training_examples"] == 8
+
+
+def test_torn_journal_blocks_new_writes_or_retirement_but_allows_read_only_recovery(seeded):
+    store, _, output, _ = seeded
+    state = save(seeded, 8, 2)
+    with store.journal.open("ab") as stream:
+        stream.write(b'{"incomplete":')
+    assert store.latest() == state
+    append(output, 12, 3)
+    with pytest.raises(ValueError, match="partial append"):
+        store.commit(examples=12, updates=3, writer=lambda _: pytest.fail("writer called"))
+    with pytest.raises(ValueError, match="partial append"):
+        store.retire()
+    with pytest.raises(ValueError, match="partial append"):
+        store._append({"kind": "unsafe"})
+    assert store.latest() == state
