@@ -79,14 +79,23 @@ def batches():
 def qualification(plan_path, result_path, poll_path):
     import probe_c5_timing_semantic as proof
 
-    plan = proof.checked(plan_path)
+    metadata = read(plan_path)
+    recovery = None
+    if metadata.get("schema") == "umi-studio-explicit-timing-proof-HTTP502-recovery-plan/1":
+        import recover_c5_timing_semantic as recovery
+
+        plan = recovery.checked(plan_path)
+        program = ROOT / "tools/recover_c5_timing_semantic.py"
+    else:
+        plan = proof.checked(plan_path)
+        program = ROOT / "tools/probe_c5_timing_semantic.py"
     result = read(result_path)
     authority = terminal(result_path.parent)
     poll, worker = read(poll_path), read(bound(authority["worker.json"]))
     argv = worker["argv"]
     plan_flag = "--plan" if "--plan" in argv else "--freeze"
     require(
-        Path(argv[1]).absolute() == ROOT / "tools/probe_c5_timing_semantic.py"
+        Path(argv[1]).absolute() == program
         and Path(argv[argv.index(plan_flag) + 1]).absolute() == plan_path
         and Path(argv[argv.index("--output") + 1]).absolute() == result_path.parent,
         "timing training qualification worker changed its actual program or paths",
@@ -114,6 +123,8 @@ def qualification(plan_path, result_path, poll_path):
         and result["promotion_authorized"] is False,
         "timing training requires complete actual zero-update C5 qualification",
     )
+    if recovery is not None:
+        recovery.require_completion(plan, result, result_path.parent)
     pairs = read(bound(result["comparison"]))
     judged, raw = proof.authenticated_passes(pairs, result_path.parent / "semantic")
     require(
