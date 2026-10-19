@@ -12,6 +12,7 @@ import json
 import os
 import shutil
 from datetime import datetime
+from importlib import import_module
 from pathlib import Path
 
 from c5_native112_export_values import (
@@ -116,6 +117,17 @@ def checked_coordinator(complete, handoff, initialization, audit, evaluations):
         )
 
 
+def evaluation_protocol(training_path):
+    """Select the exact audited lineage's complete-evaluation implementation."""
+    modules = {
+        "umi-studio-C5-polarity-storage-recovery/1": "evaluate_c5_word_storage_final",
+        "umi-studio-C5-polarity-HTTP502-recovery/1": "evaluate_c5_word_http502_final",
+    }
+    name = modules.get(read(training_path).get("schema"))
+    require(name is not None, "unsupported visual export training lineage")
+    return import_module(name), "tools/" + name + ".py"
+
+
 def authenticate(
     training_path, result_path, audit_path, coordinator_path, word_path, sentence_path
 ):
@@ -132,26 +144,25 @@ def authenticate(
     )
     import torch
     from c5_mixed_risk_evidence import require_terminal
-    from evaluate_c5_word_storage_final import control_sources, prerequisites, previous_evaluation
 
     torch.set_num_threads(2)
 
-    initialization = prerequisites(training_path, result_path, audit_path)
+    protocol, coordinator_source = evaluation_protocol(training_path)
+    initialization = protocol.prerequisites(training_path, result_path, audit_path)
     require_terminal(coordinator_path)
     complete = read(coordinator_path)
     handoff_path = bound(complete["handoff"])
     require(handoff_path == coordinator_path.with_name("handoff.json"), "unrelated export handoff")
     handoff = read(handoff_path)
     evaluations = {
-        "word": previous_evaluation(word_path, "word", initialization),
-        "sentence": previous_evaluation(sentence_path, "sentence", initialization),
+        "word": protocol.previous_evaluation(word_path, "word", initialization),
+        "sentence": protocol.previous_evaluation(sentence_path, "sentence", initialization),
     }
     checked_coordinator(complete, handoff, initialization, artifact(audit_path), evaluations)
-    sources = control_sources()
+    sources = protocol.control_sources()
     require(
         handoff["source_sha256"] == sources
-        and handoff["coordinator_source_sha256"]
-        == sources["tools/evaluate_c5_word_storage_final.py"],
+        and handoff["coordinator_source_sha256"] == sources[coordinator_source],
         "export evaluation coordinator differs from reviewed sources",
     )
     for name, digest in sources.items():

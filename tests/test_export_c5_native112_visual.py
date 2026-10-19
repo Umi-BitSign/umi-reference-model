@@ -307,3 +307,122 @@ def test_low_physical_space_blocks_export_before_any_write(small_export, monkeyp
     with pytest.raises(ValueError, match="80GiB floor"):
         exporter.run(*f.inputs, f.output)
     assert not f.output.exists() and not f.output.with_name(".export.partial").exists()
+
+
+@pytest.mark.parametrize(
+    "schema,module",
+    [
+        ("umi-studio-C5-polarity-storage-recovery/1", "evaluate_c5_word_storage_final"),
+        ("umi-studio-C5-polarity-HTTP502-recovery/1", "evaluate_c5_word_http502_final"),
+    ],
+)
+def test_export_dispatches_to_exact_training_lineage(tmp_path, monkeypatch, schema, module):
+    path = tmp_path / "plan.json"
+    put(path, {"schema": schema})
+    imported = []
+    protocol = SimpleNamespace(synthetic_protocol=True)
+
+    def loader(name):
+        imported.append(name)
+        return protocol
+
+    monkeypatch.setattr(exporter, "import_module", loader)
+    actual, source = exporter.evaluation_protocol(path)
+    assert actual is protocol
+    assert imported == [module]
+    assert source == "tools/" + module + ".py"
+
+
+def test_export_rejects_unknown_lineage_before_importing_model_helpers(tmp_path, monkeypatch):
+    path = tmp_path / "plan.json"
+    put(path, {"schema": "unqualified-training"})
+    monkeypatch.setattr(exporter, "import_module", lambda _: pytest.fail("import reached"))
+    with pytest.raises(ValueError, match="unsupported visual export training lineage"):
+        exporter.evaluation_protocol(path)
+
+
+@pytest.mark.parametrize(
+    "schema,module",
+    [
+        ("umi-studio-C5-polarity-storage-recovery/1", "evaluate_c5_word_storage_final"),
+        ("umi-studio-C5-polarity-HTTP502-recovery/1", "evaluate_c5_word_http502_final"),
+    ],
+)
+@pytest.mark.parametrize("fault", [None, "other_coordinator", "corrupt_archive", "no_gain"])
+def test_authentication_enforces_selected_protocol_and_source_integrity(
+    tmp_path, monkeypatch, schema, module, fault
+):
+    """Real receipt authentication with synthetic model and terminal validators."""
+    monkeypatch.setattr(exporter, "ROOT", tmp_path)
+    plan = tmp_path / "runs/training/plan.json"
+    result = tmp_path / "checkpoints/training/result.json"
+    audit = tmp_path / "runs/training/audit.json"
+    coordinator = tmp_path / "checkpoints/evaluation/complete.json"
+    word = tmp_path / "checkpoints/word/complete.json"
+    sentence = tmp_path / "checkpoints/sentence/complete.json"
+    for path in (result, audit, word, sentence):
+        put(path, {"synthetic": True})
+    put(plan, {"schema": schema})
+    complete, handoff, initial, _, evaluations = gate_fixture()
+    complete["terminal_audit"] = handoff["terminal_audit"] = exporter.artifact(audit)
+    source_name = "tools/" + module + ".py"
+    source = tmp_path / source_name
+    source.parent.mkdir()
+    source.write_text("# synthetic evaluation protocol\n")
+    archived = coordinator.parent / "control-sources" / source_name
+    archived.parent.mkdir(parents=True)
+    archived.write_bytes(source.read_bytes())
+    sources = {source_name: exporter.sha(source)}
+    handoff["source_sha256"] = sources
+    handoff["coordinator_source_sha256"] = sources[source_name]
+    if fault == "other_coordinator":
+        handoff["coordinator_source_sha256"] = "0" * 64
+    if fault == "corrupt_archive":
+        archived.write_text("# altered\n")
+    if fault == "no_gain":
+        evaluations["sentence"]["decision_values"]["passes_semantic_research_gate"] = False
+    handoff_path = coordinator.with_name("handoff.json")
+    put(handoff_path, handoff)
+    complete["handoff"] = exporter.artifact(handoff_path)
+    spacing = []
+    for name in ("training-to-word-spacing.json", "word-to-sentence-spacing.json"):
+        path = coordinator.with_name(name)
+        put(
+            path,
+            {"not_before": "2026-10-19T00:00:00+00:00", "ready_at": "2026-10-19T00:00:01+00:00"},
+        )
+        spacing.append(exporter.artifact(path))
+    complete["API_spacing"] = spacing
+    put(coordinator, complete)
+    calls = []
+
+    def prerequisites(*args):
+        assert args == (plan, result, audit)
+        calls.append("qualified_final")
+        return initial
+
+    def previous(path, kind, initialization):
+        assert path == {"word": word, "sentence": sentence}[kind]
+        assert initialization == initial
+        calls.append(kind)
+        return evaluations[kind]
+
+    protocol = SimpleNamespace(
+        prerequisites=prerequisites, previous_evaluation=previous, control_sources=lambda: sources
+    )
+    monkeypatch.setitem(sys.modules, module, protocol)
+    monkeypatch.setitem(sys.modules, "torch", SimpleNamespace(set_num_threads=lambda _: None))
+    monkeypatch.setitem(
+        sys.modules,
+        "c5_mixed_risk_evidence",
+        SimpleNamespace(require_terminal=lambda p: calls.append("terminal")),
+    )
+    if fault is None:
+        evidence = exporter.authenticate(plan, result, audit, coordinator, word, sentence)
+        assert evidence["initialization"] == initial
+        assert evidence["training_plan"] == exporter.artifact(plan)
+        assert evidence["API_spacing"] == spacing
+    else:
+        with pytest.raises(ValueError):
+            exporter.authenticate(plan, result, audit, coordinator, word, sentence)
+    assert calls == ["qualified_final", "terminal", "word", "sentence"]
