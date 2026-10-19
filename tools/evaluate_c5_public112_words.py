@@ -9,8 +9,10 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import random
 import subprocess
 import sys
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import evaluate_c5_small_input as native
@@ -20,7 +22,7 @@ from benchmark_fleurs_dev import sha256
 from c5_experiment_sources import archive_sources
 from launch_terra_visual_job import identity, now, write
 from probe_c5_mixed_semantic import wait_for_predecessor
-from terra_polarity_judge import Pacer, bind, payload
+from terra_polarity_judge import Pacer, authenticated_scores, bind, payload
 from terra_training_recovery import artifact, verify_snapshot
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -30,10 +32,138 @@ FINAL = ROOT / "checkpoints/c5-http502-final-evaluation-v1/complete.json"
 DECLINE = ROOT / "checkpoints/c5-http502-word-evaluation-v1/scoring/decision.json"
 
 
+def failed_sentence_release():
+    """Admit a stopped experiment for diagnosis; never complete its missing grades."""
+    sentence = ROOT / "checkpoints/c5-http502-sentence-evaluation-v1"
+    scoring = sentence / "scoring"
+    semantic = scoring / "semantic"
+    evidence = []
+    for directory, expected_code in (
+        (FINAL.parent, 1),
+        (sentence, 1),
+        (scoring, 1),
+        (sentence / "inference", 0),
+    ):
+        exited = json.loads((directory / "exit.json").read_text())
+        worker = json.loads((directory / "worker.json").read_text())
+        live = subprocess.run(
+            ["ps", "-p", str(worker["pid"]), "-o", "pid="], capture_output=True, text=True
+        )
+        if (
+            type(exited.get("exit_code")) is not int
+            or exited["exit_code"] != expected_code
+            or exited.get("pid") != worker.get("pid")
+            or worker.get("uid") != os.getuid()
+            or live.returncode != 1
+            or live.stdout.strip()
+        ):
+            raise ValueError(
+                "resolution diagnostic needs actual terminal owned predecessor workers"
+            )
+        evidence.extend(artifact(directory / name) for name in ("worker.json", "exit.json"))
+    parent_failure = json.loads(FINAL.with_name("failure.json").read_text())
+    if parent_failure != {
+        "automatic_retries": 0,
+        "error": "final sentence evaluation stopped; no retry or next pipeline",
+    }:
+        raise ValueError("unexpected serial evaluation failure")
+    word_complete = DECLINE.parent.parent / "complete.json"
+    original.terminal(word_complete)
+    word = json.loads(word_complete.read_text())
+    if word.get("complete") is not True or word["decision"] != artifact(DECLINE):
+        raise ValueError("resolution diagnostic lost its complete valid word result")
+    inference = sentence / "inference/receipt.json"
+    receipt = json.loads(inference.read_text())
+    if (
+        receipt.get("complete") is not True
+        or receipt.get("clips") != 34
+        or receipt.get("all34_frozen_C5_controls_reproduced") is not True
+        or receipt.get("all_fixed_weights_unchanged") is not True
+    ):
+        raise ValueError("HTTP502 occurred before complete sentence inference")
+    score_path = ROOT / "runs/c5-http502-sentence-evaluation-v1-scores/plan.json"
+    score_plan = json.loads(score_path.read_text())
+    verify_snapshot(score_path, score_plan)
+    if score_plan["decoded"] != artifact(inference) or score_plan["comparison"] != json.loads(
+        (semantic / "blinded-inputs.json").read_text()
+    ):
+        raise ValueError("failed sentence scoring lost its actual complete inference")
+    orders = []
+    for repeat in range(2):
+        order = list(range(len(score_plan["comparison"]["items"])))
+        random.Random(original.SCORE_RECIPE["seed"] + repeat).shuffle(order)
+        orders.append([order[i : i + 16] for i in range(0, len(order), 16)])
+    if [len(v) for v in orders] != [4, 4]:
+        raise ValueError("failed sentence request inventory changed")
+    expected = {f"pass-1-batch-{i:03d}" for i in range(4)} | {
+        "pass-2-batch-000",
+        "pass-2-batch-001",
+    }
+    if {p.name for p in semantic.glob("pass-*-batch-*")} != expected:
+        raise ValueError(
+            "failed sentence requests are not the exact five-success prefix and HTTP502"
+        )
+    for repeat, count in ((0, 4), (1, 1)):
+        joined = [None] * len(score_plan["comparison"]["items"])
+        for batch in range(count):
+            path = semantic / f"pass-{repeat + 1}-batch-{batch:03d}"
+            chosen = orders[repeat][batch]
+            values = authenticated_scores(
+                [score_plan["comparison"]["items"][i] for i in chosen], path
+            )
+            for index, value in zip(chosen, values, strict=True):
+                joined[index] = value
+            evidence.extend(
+                artifact(path / name)
+                for name in ("request.json", "started.json", "response.json", "scores.json")
+            )
+        if repeat == 0 and joined != json.loads((semantic / "pass-1-scores.json").read_text()):
+            raise ValueError("completed first sentence pass changed")
+    failed = semantic / "pass-2-batch-001"
+    failure = json.loads((failed / "failure.json").read_text())
+    request = json.loads((failed / "request.json").read_text())
+    started = json.loads((failed / "started.json").read_text())
+    if (
+        failure.get("http_status") != 502
+        or failure.get("ambiguous_completion") is not False
+        or failure.get("automatic_retry_allowed") is not False
+        or {p.name for p in failed.iterdir()} != {"request.json", "started.json", "failure.json"}
+        or request != payload([score_plan["comparison"]["items"][i] for i in orders[1][1]])
+        or started.get("request_sha256") != sha256(failed / "request.json")
+        or started.get("automatic_retries") != 0
+        or (semantic / "pass-2-scores.json").exists()
+        or (scoring / "decision.json").exists()
+    ):
+        raise ValueError("failed sentence request is not an explicit unreplayed HTTP502")
+    evidence.extend(
+        artifact(failed / name) for name in ("request.json", "started.json", "failure.json")
+    )
+    evidence.extend(
+        artifact(path)
+        for path in (word_complete, inference, score_path, FINAL.with_name("failure.json"))
+    )
+    return {
+        "kind": "terminal_HTTP502_after_complete_sentence_inference",
+        "evaluation_terminal": artifact(FINAL.with_name("exit.json")),
+        "evidence": evidence,
+        "decline": artifact(DECLINE),
+        "sentence_quality_available": False,
+        "failed_request_replayed": False,
+        "partial_sentence_grades_interpreted": False,
+    }
+
+
 def checked_release():
+    decline = json.loads(DECLINE.read_text())
+    if (
+        decline.get("calibration_passed") is not True
+        or decline.get("stop_for_semantic_decline") is not True
+    ):
+        raise ValueError("resolution diagnostic requires a real regression")
+    if not FINAL.exists():
+        return failed_sentence_release()
     original.terminal(FINAL)
     complete = json.loads(FINAL.read_text())
-    decline = json.loads(DECLINE.read_text())
     if (
         complete.get("complete") is not True
         or set(complete["evaluations"]) != {"word", "sentence"}
@@ -44,6 +174,8 @@ def checked_release():
             "resolution diagnostic requires the completed serial evaluation and real regression"
         )
     return {
+        "kind": "complete_serial_evaluation",
+        "evaluation_terminal": artifact(FINAL.with_name("exit.json")),
         "complete": artifact(FINAL),
         "decline": artifact(DECLINE),
         "exit": artifact(FINAL.with_name("exit.json")),
@@ -163,9 +295,14 @@ def authenticated_passes(comparison, directory):
 
 def wait_after_predecessor():
     release = checked_release()
-    predecessor = json.loads(FINAL.read_text())["evaluations"]["sentence"]
+    if release["kind"] == "complete_serial_evaluation":
+        predecessor = json.loads(FINAL.read_text())["evaluations"]["sentence"]
+    else:
+        exited = json.loads(FINAL.with_name("exit.json").read_text())
+        boundary = datetime.fromisoformat(exited["observed_at"]) + timedelta(seconds=60)
+        predecessor = {"API_start_not_before": boundary.isoformat()}
     return {
-        "predecessor": release["complete"],
+        "predecessor": release["evaluation_terminal"],
         "not_before": predecessor["API_start_not_before"],
         "ready_at": wait_for_predecessor(predecessor),
     }
