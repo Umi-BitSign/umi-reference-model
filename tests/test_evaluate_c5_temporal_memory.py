@@ -316,6 +316,12 @@ def test_full_word_and_sentence_scoring_uses_real_parser_and_never_claims_confir
     evaluation.score(path, output, plan)
     result = data.read(output / "decision.json")
     assert result["word"]["clips"] == 96 and result["sentence"]["clips"] == 34
+    assert all(
+        result[kind]["candidate_kind"] == "local_temporal_memory_adapter"
+        and result[kind]["trainable_parameters"] == 24600
+        and result[kind]["scope"] == f"complete_reserved_{kind}_temporal_memory_comparison"
+        for kind in ("word", "sentence")
+    )
     assert result["passes_both_semantic_research_gates"] is True
     assert result["word"]["calibration_passed"] and result["sentence"]["calibration_passed"]
     assert result["new_Terra_requests"] == 4

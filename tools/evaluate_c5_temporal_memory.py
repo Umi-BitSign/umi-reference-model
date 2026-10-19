@@ -22,7 +22,8 @@ from c5_timing_development_input import (
     read_development224,
     source_visibility,
 )
-from c5_timing_evaluation_protocol import both_families, compare, inventory, summarize
+from c5_timing_evaluation_protocol import both_families, compare, inventory
+from c5_timing_evaluation_protocol import summarize as protocol_summarize
 from c5_timing_feature_data import (
     ROOT,
     WIDTHS,
@@ -61,6 +62,16 @@ POLICY = {
     "word_labels_shared_with_training_intentionally": True,
     "promotion_authorized": False,
 }
+
+
+def summarize(kind, paired, passes, original, candidate):
+    result = protocol_summarize(kind, paired, passes, original, candidate)
+    return {
+        **result,
+        "scope": f"complete_reserved_{kind}_temporal_memory_comparison",
+        "candidate_kind": "local_temporal_memory_adapter",
+        "trainable_parameters": 24600,
+    }
 
 
 def specification(final_audit_path, native_plan, native_result, native_poll):
