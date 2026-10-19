@@ -154,8 +154,10 @@ def test_new_specification_keeps_exact_recipe_data_model_and_original_source_map
         "working_checkpoint_policy",
     ):
         assert plan[key] == f.source[key]
-    assert plan["resume"] == f.binding and plan["manual_continuations_authorized"] == 2
-    assert plan["automatic_further_continuations"] == 0
+    assert plan["resume"] == f.binding and plan["manual_continuations_authorized"] is None
+    assert plan["automatic_further_continuations"] is True
+    assert plan["continuation_claim_limit_per_source"] == 1
+    assert plan["stopping_condition"] == "training a substantially better model"
     assert plan["source_sha256"] == {
         **f.source["source_sha256"],
         **{f"tools/{n}": final.sha256(f.root / "tools" / n) for n in controller.SOURCES},
@@ -362,8 +364,8 @@ def test_final_dispatch_keeps_both_resource_resets_and_ancestor_evidence(
         tmp_path / "runs/parent/word-manual-continuation.json",
         {
             "authorization": authorization,
-            "manual_continuation_limit": 1,
-            "additional_manual_continuation_limit": 1,
+            "continuation_claim_limit_per_source": 1,
+            "standing_continuation_authorization": True,
             "manual_continuation_number": number,
             "automatic_continuations": 0,
             "rolled_back_accepted_exposures": 104,

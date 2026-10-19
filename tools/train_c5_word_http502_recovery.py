@@ -1,4 +1,4 @@
-"""One additional approved continuation from the saved512 HTTP502 checkpoint."""
+"""Resume saved512 under standing approval to train a substantially better model."""
 
 from __future__ import annotations
 
@@ -53,9 +53,11 @@ def specification(path, source_path, checkpoint, audit_path, authorization_path)
         "source_sha256": sources,
         "resume": binding,
         "initialization": "explicitly approved saved512 state from the original public-C5 lineage",
-        "manual_continuations_authorized": 2,
+        "manual_continuations_authorized": None,
         "explicit_second_HTTP502_recovery_exception": binding["authorization"],
-        "automatic_further_continuations": 0,
+        "automatic_further_continuations": True,
+        "continuation_claim_limit_per_source": 1,
+        "stopping_condition": "training a substantially better model",
         "lineage_audit_source": {
             "path": str(path.with_name("terminal-audit.py").relative_to(ROOT)),
             "sha256": sha256(ROOT / "tools/audit_c5_word_http502_lineage.py"),

@@ -125,9 +125,9 @@ def checked_final(training_path, result_path):
     claim = json.loads(claim_path.read_text())
     require(
         claim.get("authorization") == binding["authorization"]
-        and claim.get("manual_continuation_limit")
-        == claim.get("additional_manual_continuation_limit")
-        == 1
+        and type(claim.get("continuation_claim_limit_per_source")) is int
+        and claim["continuation_claim_limit_per_source"] == 1
+        and claim.get("standing_continuation_authorization") is True
         and claim.get("manual_continuation_number") == 2
         and claim.get("automatic_continuations") == 0
         and claim.get("rolled_back_accepted_exposures") == 104

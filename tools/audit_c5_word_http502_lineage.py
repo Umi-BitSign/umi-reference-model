@@ -145,6 +145,9 @@ def storage_audit_fields(plan, result, output, evidence):
     binding = plan["resume"]
     return {
         **fields,
+        "further_automatic_continuations": True,
+        "standing_continuation_authorization": binding["authorization"],
+        "stopping_condition": "training a substantially better model",
         "original_storage_failure_audit": binding["ancestor_bindings"][0]["terminal_audit"],
         "manual_recovery_authorizations": [
             binding["ancestor_bindings"][0]["authorization"],

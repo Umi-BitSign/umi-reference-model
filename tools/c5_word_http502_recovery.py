@@ -15,7 +15,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PROPOSAL = ROOT / "runs/c5-polarity-word-http502-recovery-preparation-v1/proposal.json"
 PROPOSAL_SHA = "dbeddd0193413ea36bebd7560efc6096cc2eed94f9c592a0f574f4ff6cf6bd7b"
-SCOPE = "one-additional-polarity-word-HTTP502-recovery-from-512"
+SCOPE = "indefinite-training-continuations-until-substantially-better-model"
 ERROR = "Terra request rejected with HTTP 502; receipt preserved"
 
 
@@ -75,7 +75,7 @@ def reviewed_proposal():
 
 
 def checked_authorization(path):
-    """Require a new recorded user approval, without inventing an expiry."""
+    """Authenticate standing approval; the proposal binds this run's starting state."""
     path = Path(path).absolute()
     require(path.is_file(), "new explicit HTTP502 recovery authorization is required")
     descriptor = artifact(path)
@@ -89,15 +89,12 @@ def checked_authorization(path):
         and approval["user_message"].strip()
         and approval.get("proposal") == artifact(PROPOSAL)
         and approval.get("source_checkpoint") == proposal["starting_working_state"]["visual"]
-        and all(
-            type(approval.get(key)) is int and approval[key] == expected
-            for key, expected in (
-                ("additional_manual_continuation_limit", 1),
-                ("automatic_retries", 0),
-                ("automatic_further_continuations", 0),
-            )
-        ),
-        "another continuation requires its own exact explicit HTTP502 approval",
+        and "continuation_limit" in approval
+        and approval["continuation_limit"] is None
+        and approval.get("automatic_further_continuations") is True
+        and approval.get("stopping_condition") == "training a substantially better model",
+        "HTTP502 recovery requires recorded standing user authorization "
+        "and quality stopping condition",
     )
     received = datetime.fromisoformat(approval["received_at"].replace("Z", "+00:00"))
     require(received.tzinfo is not None, "HTTP502 approval requires a timezone-aware timestamp")
@@ -384,7 +381,7 @@ def source_binding():
         "failed_batch_evidence": audit["failed_batch"]["evidence"],
         "failed_batch_rollouts_reused": False,
         "rolled_back_accepted_rewards_reused": False,
-        "additional_manual_continuation_limit": 1,
+        "continuation_claim_limit_per_source": 1,
     }
 
 
@@ -423,8 +420,8 @@ def claim(path, output, plan):
             "output": str(output.relative_to(ROOT)),
             "authorization": binding["authorization"],
             "claimed_at": now(),
-            "manual_continuation_limit": 1,
-            "additional_manual_continuation_limit": 1,
+            "continuation_claim_limit_per_source": 1,
+            "standing_continuation_authorization": True,
             "manual_continuation_number": 2,
             "automatic_continuations": 0,
             "rolled_back_accepted_exposures": 104,

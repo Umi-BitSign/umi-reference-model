@@ -52,9 +52,9 @@ def approval(tmp_path, monkeypatch):
         "user_message": "Synthetic fixture only. Never authorizes a real run.",
         "proposal": recovery.artifact(proposal),
         "source_checkpoint": data["starting_working_state"]["visual"],
-        "additional_manual_continuation_limit": 1,
-        "automatic_retries": 0,
-        "automatic_further_continuations": 0,
+        "continuation_limit": None,
+        "automatic_further_continuations": True,
+        "stopping_condition": "training a substantially better model",
         "received_at": "2026-10-18T00:00:00+00:00",
     }
     put(path, value)
@@ -76,20 +76,18 @@ def test_exact_new_user_approval_binds_checkpoint_proposal_and_no_expiry(approva
         ("source", "automatic_goal_continuation"),
         ("approved", False),
         ("user_message", " "),
-        ("additional_manual_continuation_limit", 2),
-        ("additional_manual_continuation_limit", True),
-        ("automatic_retries", 1),
-        ("automatic_retries", False),
+        ("continuation_limit", 1),
+        ("continuation_limit", True),
+        ("stopping_condition", "complete one curriculum"),
+        ("automatic_further_continuations", False),
         ("automatic_further_continuations", 1),
         ("source_checkpoint", {"path": "other", "sha256": "b" * 64}),
         ("proposal", {"path": "other", "sha256": "b" * 64}),
     ],
 )
-def test_prior_approval_automation_or_relaxed_limits_cannot_authorize_new_work(
-    approval, field, value
-):
+def test_standing_approval_rejects_wrong_scope_limit_or_stopping_condition(approval, field, value):
     put(approval.path, {**approval.value, field: value})
-    with pytest.raises(ValueError, match="own exact explicit HTTP502 approval"):
+    with pytest.raises(ValueError, match="recorded standing user authorization"):
         recovery.checked_authorization(approval.path)
 
 
@@ -347,7 +345,7 @@ def test_second_recovery_claim_is_single_use_and_retains_original_rollback(inher
     target = approval.root / "runs/synthetic/word-manual-continuation.json"
     claim = json.loads(target.read_text())
     assert claim["manual_continuation_number"] == 2
-    assert claim["additional_manual_continuation_limit"] == 1
+    assert claim["continuation_claim_limit_per_source"] == 1
     assert claim["automatic_continuations"] == claim["newly_rolled_back_accepted_exposures"] == 0
     assert claim["rolled_back_accepted_exposures"] == 104
     assert claim["authorization"] == recovery.artifact(approval.path)
