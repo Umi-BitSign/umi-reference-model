@@ -73,7 +73,7 @@ def specification():
             "promotion_authorized": False,
         },
         "trained_result_is_context_only": True,
-        "trained_or_partial_visual_checkpoint_loaded": False,
+        "trained_or_partial_visual_checkpoint_installed_for_inference": False,
         "post_hoc_diagnostic_only": True,
     }
     del result["candidate_visual"]

@@ -78,7 +78,7 @@ def test_specification_preserves_inputs_but_selects_only_original_visual_values(
     assert value["model_plan"] == source.plan["model_plan"]
     assert value["candidate_visual_state_sha256"] == "original-public"
     assert "candidate_visual" not in value
-    assert value["trained_or_partial_visual_checkpoint_loaded"] is False
+    assert value["trained_or_partial_visual_checkpoint_installed_for_inference"] is False
     assert value["post_hoc_diagnostic_only"] is True
     assert source.plan["candidate_visual"]["path"] == "rejected.safetensors"
 
